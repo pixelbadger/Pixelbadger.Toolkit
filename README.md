@@ -1,0 +1,121 @@
+# Pixelbadger.Toolkit
+
+A CLI toolkit exposing varied functionality including string manipulation, distance calculations, esoteric programming language interpreters, and steganography.
+
+## Installation
+
+Build the project with:
+```bash
+dotnet build
+```
+
+## Usage
+
+Run commands using:
+```bash
+dotnet run -- [command] [options]
+```
+
+## Available Commands
+
+### reverse-string
+Reverses the content of a file.
+
+**Usage:**
+```bash
+dotnet run -- reverse-string --in-file <input-file> --out-file <output-file>
+```
+
+**Example:**
+```bash
+dotnet run -- reverse-string --in-file hello.txt --out-file hello-reversed.txt
+```
+
+### levenshtein-distance
+Calculates the Levenshtein distance between two strings or files.
+
+**Usage:**
+```bash
+dotnet run -- levenshtein-distance --string1 <string1> --string2 <string2>
+```
+
+**Examples:**
+```bash
+# Compare two strings directly
+dotnet run -- levenshtein-distance --string1 "hello" --string2 "world"
+
+# Compare contents of two files
+dotnet run -- levenshtein-distance --string1 file1.txt --string2 file2.txt
+```
+
+### brainfuck
+Executes a Brainfuck program from a file.
+
+**Usage:**
+```bash
+dotnet run -- brainfuck --file <program-file>
+```
+
+**Example:**
+```bash
+dotnet run -- brainfuck --file hello-world.bf
+```
+
+### ook
+Executes an Ook program from a file.
+
+**Usage:**
+```bash
+dotnet run -- ook --file <program-file>
+```
+
+**Example:**
+```bash
+dotnet run -- ook --file hello-world.ook
+```
+
+### steganography
+Encode or decode hidden messages in images using least significant bit (LSB) steganography.
+
+**Usage:**
+
+**Encoding a message:**
+```bash
+dotnet run -- steganography --mode encode --image <input-image> --message <message> --output <output-image>
+```
+
+**Decoding a message:**
+```bash
+dotnet run -- steganography --mode decode --image <encoded-image>
+```
+
+**Examples:**
+```bash
+# Hide a secret message in an image
+dotnet run -- steganography --mode encode --image photo.jpg --message "This is secret!" --output encoded.png
+
+# Extract the hidden message
+dotnet run -- steganography --mode decode --image encoded.png
+```
+
+## Help
+
+Get help for any command by adding `--help`:
+```bash
+dotnet run -- --help                    # General help
+dotnet run -- reverse-string --help     # Command-specific help
+```
+
+## Requirements
+
+- .NET 9.0
+- SixLabors.ImageSharp (for steganography features)
+
+## Technical Details
+
+### Steganography Implementation
+The steganography feature uses LSB (Least Significant Bit) encoding to hide messages in the RGB color channels of images. Each bit of the message is stored in the least significant bit of the red, green, or blue color values, making the changes imperceptible to the human eye.
+
+### Supported Languages
+- **Brainfuck**: A minimalist esoteric programming language with 8 commands
+- **Ook**: A Brainfuck derivative using "Ook." and "Ook?" syntax inspired by Terry Pratchett's Discworld orangutans

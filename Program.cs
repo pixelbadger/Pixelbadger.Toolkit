@@ -7,5 +7,6 @@ rootCommand.AddCommand(ReverseStringCommand.Create());
 rootCommand.AddCommand(LevenshteinDistanceCommand.Create());
 rootCommand.AddCommand(BrainfuckCommand.Create());
 rootCommand.AddCommand(OokCommand.Create());
+rootCommand.AddCommand(SteganographyCommand.Create());
 
 return await rootCommand.InvokeAsync(args);
