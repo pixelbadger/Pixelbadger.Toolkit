@@ -5,6 +5,7 @@ var rootCommand = new RootCommand("CLI toolkit exposing varied functionality org
 
 rootCommand.AddCommand(StringsCommand.Create());
 rootCommand.AddCommand(SearchCommand.Create());
+rootCommand.AddCommand(McpCommand.Create());
 rootCommand.AddCommand(InterpretersCommand.Create());
 rootCommand.AddCommand(ImagesCommand.Create());
 rootCommand.AddCommand(WebCommand.Create());
