@@ -3,11 +3,20 @@ using Pixelbadger.Toolkit.Components;
 
 namespace Pixelbadger.Toolkit.Commands;
 
-public static class ReverseStringCommand
+public static class StringsCommand
 {
     public static Command Create()
     {
-        var command = new Command("reverse-string", "Reverses the content of a file");
+        var command = new Command("strings", "String manipulation utilities");
+
+        command.AddCommand(CreateReverseCommand());
+
+        return command;
+    }
+
+    private static Command CreateReverseCommand()
+    {
+        var command = new Command("reverse", "Reverses the content of a file");
 
         var inFileOption = new Option<string>(
             aliases: ["--in-file"],

@@ -3,60 +3,61 @@ using Pixelbadger.Toolkit.Components;
 
 namespace Pixelbadger.Toolkit.Commands;
 
-public static class SteganographyCommand
+public static class ImagesCommand
 {
     public static Command Create()
     {
-        var command = new Command("steganography", "Encode or decode hidden messages in images");
-        
+        var command = new Command("images", "Image processing and manipulation utilities");
+
+        command.AddCommand(CreateSteganographyCommand());
+
+        return command;
+    }
+
+    private static Command CreateSteganographyCommand()
+    {
+        var command = new Command("steganography", "Encode or decode hidden messages in images using LSB steganography");
+
         var modeOption = new Option<string>(
             aliases: ["--mode"],
-            description: "Operation mode: encode or decode")
+            description: "Operation mode: 'encode' or 'decode'")
         {
             IsRequired = true
         };
-        modeOption.AddValidator(result =>
-        {
-            var mode = result.GetValueOrDefault<string>();
-            if (mode != "encode" && mode != "decode")
-            {
-                result.ErrorMessage = "Mode must be either 'encode' or 'decode'";
-            }
-        });
-        
-        var imagePathOption = new Option<string>(
+
+        var imageOption = new Option<string>(
             aliases: ["--image"],
-            description: "Path to the input image file")
+            description: "Input image file path")
         {
             IsRequired = true
         };
-        
-        var messageOption = new Option<string>(
+
+        var messageOption = new Option<string?>(
             aliases: ["--message"],
             description: "Message to encode (required for encode mode)")
         {
             IsRequired = false
         };
-        
-        var outputPathOption = new Option<string>(
+
+        var outputOption = new Option<string?>(
             aliases: ["--output"],
-            description: "Path for the output image file (required for encode mode)")
+            description: "Output image file path (required for encode mode)")
         {
             IsRequired = false
         };
-        
+
         command.AddOption(modeOption);
-        command.AddOption(imagePathOption);
+        command.AddOption(imageOption);
         command.AddOption(messageOption);
-        command.AddOption(outputPathOption);
-        
-        command.SetHandler(async (string mode, string imagePath, string? message, string? outputPath) =>
+        command.AddOption(outputOption);
+
+        command.SetHandler(async (string mode, string image, string? message, string? output) =>
         {
             try
             {
                 var steganography = new ImageSteganography();
-                
-                if (mode == "encode")
+
+                if (mode.ToLower() == "encode")
                 {
                     if (string.IsNullOrEmpty(message))
                     {
@@ -64,21 +65,26 @@ public static class SteganographyCommand
                         Environment.Exit(1);
                         return;
                     }
-                    
-                    if (string.IsNullOrEmpty(outputPath))
+
+                    if (string.IsNullOrEmpty(output))
                     {
                         Console.WriteLine("Error: --output is required for encode mode");
                         Environment.Exit(1);
                         return;
                     }
-                    
-                    await steganography.EncodeMessageAsync(imagePath, message, outputPath);
-                    Console.WriteLine($"Successfully encoded message into '{outputPath}'");
+
+                    await steganography.EncodeMessageAsync(image, message, output);
+                    Console.WriteLine($"Message encoded successfully in '{output}'");
                 }
-                else if (mode == "decode")
+                else if (mode.ToLower() == "decode")
                 {
-                    var decodedMessage = await steganography.DecodeMessageAsync(imagePath);
+                    var decodedMessage = await steganography.DecodeMessageAsync(image);
                     Console.WriteLine($"Decoded message: {decodedMessage}");
+                }
+                else
+                {
+                    Console.WriteLine("Error: Mode must be 'encode' or 'decode'");
+                    Environment.Exit(1);
                 }
             }
             catch (Exception ex)
@@ -86,8 +92,8 @@ public static class SteganographyCommand
                 Console.WriteLine($"Error: {ex.Message}");
                 Environment.Exit(1);
             }
-        }, modeOption, imagePathOption, messageOption, outputPathOption);
-        
+        }, modeOption, imageOption, messageOption, outputOption);
+
         return command;
     }
 }

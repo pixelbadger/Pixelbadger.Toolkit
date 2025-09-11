@@ -3,22 +3,31 @@ using Pixelbadger.Toolkit.Components;
 
 namespace Pixelbadger.Toolkit.Commands;
 
-public static class LevenshteinDistanceCommand
+public static class AlgorithmsCommand
 {
     public static Command Create()
+    {
+        var command = new Command("algorithms", "Algorithm implementations and utilities");
+
+        command.AddCommand(CreateLevenshteinDistanceCommand());
+
+        return command;
+    }
+
+    private static Command CreateLevenshteinDistanceCommand()
     {
         var command = new Command("levenshtein-distance", "Calculates the Levenshtein distance between two strings or files");
 
         var string1Option = new Option<string>(
-            aliases: ["--string1", "-s1"],
-            description: "First string or path to text file")
+            aliases: ["--string1"],
+            description: "First string or file path")
         {
             IsRequired = true
         };
 
         var string2Option = new Option<string>(
-            aliases: ["--string2", "-s2"],
-            description: "Second string or path to text file")
+            aliases: ["--string2"],
+            description: "Second string or file path")
         {
             IsRequired = true
         };
@@ -26,12 +35,12 @@ public static class LevenshteinDistanceCommand
         command.AddOption(string1Option);
         command.AddOption(string2Option);
 
-        command.SetHandler(async (string str1, string str2) =>
+        command.SetHandler(async (string string1, string string2) =>
         {
             try
             {
                 var calculator = new LevenshteinCalculator();
-                var distance = await calculator.CalculateDistanceAsync(str1, str2);
+                var distance = await calculator.CalculateDistanceAsync(string1, string2);
                 
                 Console.WriteLine($"Levenshtein distance: {distance}");
             }

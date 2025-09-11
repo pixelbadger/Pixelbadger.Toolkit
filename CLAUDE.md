@@ -2,36 +2,43 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-This project is a CLI toolkit exposing varied functionality.
-CLI arguments start with an action, then the required arguments for that action.
-For example, the CLI arguments "reverse-string --in-file hw.txt --out-file hw-reversed.txt" would read the content of in-file and output the reversed string to the path of out-file.
+This project is a CLI toolkit exposing varied functionality organized by topic.
+CLI arguments follow a topic-action pattern: `[topic] [action] [options]`.
+For example, the CLI arguments "strings reverse --in-file hw.txt --out-file hw-reversed.txt" would read the content of in-file and output the reversed string to the path of out-file.
 
 The project is .NET 8, and uses Microsoft's System.CommandLine library for building argument sets.
 
 ## Development Commands
 
 - **Build**: `dotnet build`
-- **Run**: `dotnet run -- [command] [options]`
+- **Run**: `dotnet run -- [topic] [action] [options]`
 - **Run with examples**: 
-  - `dotnet run -- reverse-string --in-file hello.txt --out-file hello-reversed.txt`
-  - `dotnet run -- levenshtein-distance --string1 "hello" --string2 "world"`
+  - `dotnet run -- strings reverse --in-file hello.txt --out-file hello-reversed.txt`
+  - `dotnet run -- algorithms levenshtein-distance --string1 "hello" --string2 "world"`
 
 ## Architecture
 
-The project follows a modular command-based architecture:
+The project follows a topic-based command architecture:
 
-- **Program.cs**: Entry point that registers all available commands with the root command
-- **Commands/**: Contains command definitions using System.CommandLine, each command has a static `Create()` method
+- **Program.cs**: Entry point that registers all topic commands with the root command
+- **Commands/**: Contains topic command definitions, each topic has a static `Create()` method that registers sub-actions
 - **Components/**: Contains the core business logic implementations that commands delegate to
 
-Each command follows the pattern:
-1. Define options/arguments with System.CommandLine
-2. Set up a handler that delegates to a component class
-3. Handle errors and provide user feedback
+Each topic command follows the pattern:
+1. Create a main topic command with description
+2. Add sub-commands (actions) for each functionality within that topic
+3. Each action defines options/arguments with System.CommandLine
+4. Set up handlers that delegate to component classes
+5. Handle errors and provide user feedback
 
-Commands are registered in Program.cs by calling their static `Create()` methods and adding them to the root command.
+Topic commands are registered in Program.cs by calling their static `Create()` methods and adding them to the root command.
 
-Available commands: reverse-string, levenshtein-distance, brainfuck, ook, steganography, serve-html
+Available topics and actions:
+- **strings**: reverse
+- **algorithms**: levenshtein-distance
+- **interpreters**: brainfuck, ook
+- **images**: steganography
+- **web**: serve-html
 
 ## Dependencies
 

@@ -1,6 +1,6 @@
 # Pixelbadger.Toolkit
 
-A CLI toolkit exposing varied functionality including string manipulation, distance calculations, esoteric programming language interpreters, steganography, and web serving.
+A CLI toolkit exposing varied functionality organized by topic, including string manipulation, distance calculations, esoteric programming language interpreters, steganography, and web serving.
 
 ## Installation
 
@@ -11,99 +11,114 @@ dotnet build
 
 ## Usage
 
-Run commands using:
+Run commands using the topic-action pattern:
 ```bash
-dotnet run -- [command] [options]
+dotnet run -- [topic] [action] [options]
 ```
 
-## Available Commands
+## Available Topics and Actions
 
-### reverse-string
+### strings
+String manipulation utilities.
+
+#### reverse
 Reverses the content of a file.
 
 **Usage:**
 ```bash
-dotnet run -- reverse-string --in-file <input-file> --out-file <output-file>
+dotnet run -- strings reverse --in-file <input-file> --out-file <output-file>
 ```
 
 **Example:**
 ```bash
-dotnet run -- reverse-string --in-file hello.txt --out-file hello-reversed.txt
+dotnet run -- strings reverse --in-file hello.txt --out-file hello-reversed.txt
 ```
 
-### levenshtein-distance
+### algorithms
+Algorithm implementations and utilities.
+
+#### levenshtein-distance
 Calculates the Levenshtein distance between two strings or files.
 
 **Usage:**
 ```bash
-dotnet run -- levenshtein-distance --string1 <string1> --string2 <string2>
+dotnet run -- algorithms levenshtein-distance --string1 <string1> --string2 <string2>
 ```
 
 **Examples:**
 ```bash
 # Compare two strings directly
-dotnet run -- levenshtein-distance --string1 "hello" --string2 "world"
+dotnet run -- algorithms levenshtein-distance --string1 "hello" --string2 "world"
 
 # Compare contents of two files
-dotnet run -- levenshtein-distance --string1 file1.txt --string2 file2.txt
+dotnet run -- algorithms levenshtein-distance --string1 file1.txt --string2 file2.txt
 ```
 
-### brainfuck
+### interpreters
+Esoteric programming language interpreters.
+
+#### brainfuck
 Executes a Brainfuck program from a file.
 
 **Usage:**
 ```bash
-dotnet run -- brainfuck --file <program-file>
+dotnet run -- interpreters brainfuck --file <program-file>
 ```
 
 **Example:**
 ```bash
-dotnet run -- brainfuck --file hello-world.bf
+dotnet run -- interpreters brainfuck --file hello-world.bf
 ```
 
-### ook
+#### ook
 Executes an Ook program from a file.
 
 **Usage:**
 ```bash
-dotnet run -- ook --file <program-file>
+dotnet run -- interpreters ook --file <program-file>
 ```
 
 **Example:**
 ```bash
-dotnet run -- ook --file hello-world.ook
+dotnet run -- interpreters ook --file hello-world.ook
 ```
 
-### steganography
+### images
+Image processing and manipulation utilities.
+
+#### steganography
 Encode or decode hidden messages in images using least significant bit (LSB) steganography.
 
 **Usage:**
 
 **Encoding a message:**
 ```bash
-dotnet run -- steganography --mode encode --image <input-image> --message <message> --output <output-image>
+dotnet run -- images steganography --mode encode --image <input-image> --message <message> --output <output-image>
 ```
 
 **Decoding a message:**
 ```bash
-dotnet run -- steganography --mode decode --image <encoded-image>
+dotnet run -- images steganography --mode decode --image <encoded-image>
 ```
 
 **Examples:**
 ```bash
 # Hide a secret message in an image
-dotnet run -- steganography --mode encode --image photo.jpg --message "This is secret!" --output encoded.png
+dotnet run -- images steganography --mode encode --image photo.jpg --message "This is secret!" --output encoded.png
 
 # Extract the hidden message
-dotnet run -- steganography --mode decode --image encoded.png
+dotnet run -- images steganography --mode decode --image encoded.png
 ```
 
-### serve-html
+### web
+Web server utilities.
+
+#### serve-html
 Serves a static HTML file via HTTP server.
 
 **Usage:**
 ```bash
-dotnet run -- serve-html --file <html-file> [--port <port>]
+dotnet run -- web serve-html --file <html-file> [--port <port>]
 ```
 
 **Options:**
@@ -113,10 +128,10 @@ dotnet run -- serve-html --file <html-file> [--port <port>]
 **Examples:**
 ```bash
 # Serve an HTML file on default port 8080
-dotnet run -- serve-html --file index.html
+dotnet run -- web serve-html --file index.html
 
 # Serve on a specific port
-dotnet run -- serve-html --file test.html --port 3000
+dotnet run -- web serve-html --file test.html --port 3000
 ```
 
 ## Help

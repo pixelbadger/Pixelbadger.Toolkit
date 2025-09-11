@@ -2,17 +2,25 @@ using System.CommandLine;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 
 namespace Pixelbadger.Toolkit.Commands;
 
-public static class HttpServerCommand
+public static class WebCommand
 {
     public static Command Create()
     {
-        var command = new Command("serve-html", "Serves a static HTML file via HTTP");
+        var command = new Command("web", "Web server utilities");
+
+        command.AddCommand(CreateServeHtmlCommand());
+
+        return command;
+    }
+
+    private static Command CreateServeHtmlCommand()
+    {
+        var command = new Command("serve-html", "Serves a static HTML file via HTTP server");
 
         var fileOption = new Option<string>(
             aliases: ["--file"],
@@ -23,38 +31,41 @@ public static class HttpServerCommand
 
         var portOption = new Option<int>(
             aliases: ["--port"],
-            description: "Port to bind the server to",
-            getDefaultValue: () => 8080);
+            description: "Port to bind the server to")
+        {
+            IsRequired = false
+        };
+        portOption.SetDefaultValue(8080);
 
         command.AddOption(fileOption);
         command.AddOption(portOption);
 
-        command.SetHandler(async (string filePath, int port) =>
+        command.SetHandler(async (string file, int port) =>
         {
             try
             {
-                if (!File.Exists(filePath))
+                if (!File.Exists(file))
                 {
-                    Console.WriteLine($"Error: File '{filePath}' does not exist.");
+                    Console.WriteLine($"Error: File '{file}' not found");
                     Environment.Exit(1);
                     return;
                 }
 
                 var builder = WebApplication.CreateBuilder();
-                
-                builder.Services.AddLogging(logging =>
-                {
-                    logging.ClearProviders();
-                    logging.AddConsole();
-                    logging.SetMinimumLevel(LogLevel.Information);
-                });
-
-                builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
-
                 var app = builder.Build();
 
-                var fileContent = await File.ReadAllTextAsync(filePath);
-                var contentType = Path.GetExtension(filePath).ToLowerInvariant() switch
+                var fileInfo = new FileInfo(file);
+                var directory = fileInfo.Directory?.FullName ?? Directory.GetCurrentDirectory();
+                var fileName = fileInfo.Name;
+
+                app.UseStaticFiles(new StaticFileOptions
+                {
+                    FileProvider = new PhysicalFileProvider(directory),
+                    RequestPath = ""
+                });
+
+                var fileContent = await File.ReadAllTextAsync(file);
+                var contentType = Path.GetExtension(file).ToLowerInvariant() switch
                 {
                     ".html" or ".htm" => "text/html",
                     ".css" => "text/css",
@@ -70,10 +81,10 @@ public static class HttpServerCommand
                     await context.Response.WriteAsync(fileContent);
                 });
 
-                Console.WriteLine($"Serving '{filePath}' at http://0.0.0.0:{port}");
+                Console.WriteLine($"Serving '{file}' on http://localhost:{port}");
                 Console.WriteLine("Press Ctrl+C to stop the server");
 
-                await app.RunAsync();
+                await app.RunAsync($"http://localhost:{port}");
             }
             catch (Exception ex)
             {
