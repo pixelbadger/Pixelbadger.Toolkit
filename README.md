@@ -51,6 +51,59 @@ dotnet run -- strings levenshtein-distance --string1 "hello" --string2 "world"
 dotnet run -- strings levenshtein-distance --string1 file1.txt --string2 file2.txt
 ```
 
+### search
+Search indexing and querying utilities.
+
+#### ingest
+Ingest content into a Lucene.NET search index by splitting it into paragraph chunks.
+
+**Usage:**
+```bash
+dotnet run -- search ingest --index-path <index-directory> --content-path <content-file>
+```
+
+**Examples:**
+```bash
+# Ingest a text file into a search index
+dotnet run -- search ingest --index-path ./search-index --content-path document.txt
+
+# Ingest markdown content
+dotnet run -- search ingest --index-path ./docs-index --content-path README.md
+```
+
+**Details:**
+- Content is automatically split into paragraphs (separated by double newlines, or single newlines if no double newlines found)
+- Each paragraph becomes a separate searchable document in the index
+- Metadata is stored including source file, paragraph number, and document ID
+- Creates a new index if it doesn't exist, or adds to an existing index
+
+#### query
+Perform BM25 similarity search against a Lucene.NET index.
+
+**Usage:**
+```bash
+dotnet run -- search query --index-path <index-directory> --query <search-terms> [--max-results <number>]
+```
+
+**Examples:**
+```bash
+# Search for documents containing specific terms
+dotnet run -- search query --index-path ./search-index --query "hello world"
+
+# Limit results to 5 documents
+dotnet run -- search query --index-path ./docs-index --query "lucene search" --max-results 5
+
+# Complex query with operators
+dotnet run -- search query --index-path ./index --query "\"exact phrase\" OR keyword"
+```
+
+**Details:**
+- Uses BM25 similarity ranking for relevance scoring
+- Returns results sorted by relevance score (highest first)
+- Supports Lucene query syntax including phrases, boolean operators, wildcards
+- Shows source file, paragraph number, relevance score, and content for each result
+- Default maximum results is 10
+
 ### interpreters
 Esoteric programming language interpreters.
 

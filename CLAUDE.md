@@ -15,6 +15,8 @@ The project is .NET 8, and uses Microsoft's System.CommandLine library for build
 - **Run with examples**: 
   - `dotnet run -- strings reverse --in-file hello.txt --out-file hello-reversed.txt`
   - `dotnet run -- strings levenshtein-distance --string1 "hello" --string2 "world"`
+  - `dotnet run -- search ingest --index-path ./index --content-path document.txt`
+  - `dotnet run -- search query --index-path ./index --query "hello world"`
 
 ## Architecture
 
@@ -35,6 +37,7 @@ Topic commands are registered in Program.cs by calling their static `Create()` m
 
 Available topics and actions:
 - **strings**: reverse, levenshtein-distance
+- **search**: ingest, query
 - **interpreters**: brainfuck, ook
 - **images**: steganography
 - **web**: serve-html
@@ -43,6 +46,7 @@ Available topics and actions:
 
 - Microsoft.AspNetCore.App (framework reference)
 - Microsoft.Extensions.Hosting
+- Lucene.Net (for search indexing)
 - SixLabors.ImageSharp (for steganography)
 - System.CommandLine (beta)
 
