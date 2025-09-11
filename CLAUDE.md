@@ -14,7 +14,7 @@ The project is .NET 8, and uses Microsoft's System.CommandLine library for build
 - **Run**: `dotnet run -- [topic] [action] [options]`
 - **Run with examples**: 
   - `dotnet run -- strings reverse --in-file hello.txt --out-file hello-reversed.txt`
-  - `dotnet run -- algorithms levenshtein-distance --string1 "hello" --string2 "world"`
+  - `dotnet run -- strings levenshtein-distance --string1 "hello" --string2 "world"`
 
 ## Architecture
 
@@ -34,8 +34,7 @@ Each topic command follows the pattern:
 Topic commands are registered in Program.cs by calling their static `Create()` methods and adding them to the root command.
 
 Available topics and actions:
-- **strings**: reverse
-- **algorithms**: levenshtein-distance
+- **strings**: reverse, levenshtein-distance
 - **interpreters**: brainfuck, ook
 - **images**: steganography
 - **web**: serve-html

@@ -34,24 +34,21 @@ dotnet run -- strings reverse --in-file <input-file> --out-file <output-file>
 dotnet run -- strings reverse --in-file hello.txt --out-file hello-reversed.txt
 ```
 
-### algorithms
-Algorithm implementations and utilities.
-
 #### levenshtein-distance
 Calculates the Levenshtein distance between two strings or files.
 
 **Usage:**
 ```bash
-dotnet run -- algorithms levenshtein-distance --string1 <string1> --string2 <string2>
+dotnet run -- strings levenshtein-distance --string1 <string1> --string2 <string2>
 ```
 
 **Examples:**
 ```bash
 # Compare two strings directly
-dotnet run -- algorithms levenshtein-distance --string1 "hello" --string2 "world"
+dotnet run -- strings levenshtein-distance --string1 "hello" --string2 "world"
 
 # Compare contents of two files
-dotnet run -- algorithms levenshtein-distance --string1 file1.txt --string2 file2.txt
+dotnet run -- strings levenshtein-distance --string1 file1.txt --string2 file2.txt
 ```
 
 ### interpreters
