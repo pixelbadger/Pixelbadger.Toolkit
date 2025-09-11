@@ -1,6 +1,6 @@
 # Pixelbadger.Toolkit
 
-A CLI toolkit exposing varied functionality including string manipulation, distance calculations, esoteric programming language interpreters, and steganography.
+A CLI toolkit exposing varied functionality including string manipulation, distance calculations, esoteric programming language interpreters, steganography, and web serving.
 
 ## Installation
 
@@ -96,6 +96,27 @@ dotnet run -- steganography --mode encode --image photo.jpg --message "This is s
 
 # Extract the hidden message
 dotnet run -- steganography --mode decode --image encoded.png
+```
+
+### serve-html
+Serves a static HTML file via HTTP server.
+
+**Usage:**
+```bash
+dotnet run -- serve-html --file <html-file> [--port <port>]
+```
+
+**Options:**
+- `--file`: Path to the HTML file to serve (required)
+- `--port`: Port to bind the server to (default: 8080)
+
+**Examples:**
+```bash
+# Serve an HTML file on default port 8080
+dotnet run -- serve-html --file index.html
+
+# Serve on a specific port
+dotnet run -- serve-html --file test.html --port 3000
 ```
 
 ## Help
