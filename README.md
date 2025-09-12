@@ -2,6 +2,33 @@
 
 A CLI toolkit exposing varied functionality organized by topic, including string manipulation, distance calculations, esoteric programming language interpreters, image and MP3 steganography, web serving, and Model Context Protocol (MCP) servers.
 
+## Table of Contents
+
+- [Installation](#installation)
+- [Usage](#usage)
+- [Available Topics and Actions](#available-topics-and-actions)
+  - [strings](#strings)
+    - [reverse](#reverse)
+    - [levenshtein-distance](#levenshtein-distance)
+  - [search](#search)
+    - [ingest](#ingest)
+    - [query](#query)
+  - [interpreters](#interpreters)
+    - [brainfuck](#brainfuck)
+    - [ook](#ook)
+  - [images](#images)
+    - [steganography](#steganography)
+    - [mp3-steganography](#mp3-steganography)
+  - [web](#web)
+    - [serve-html](#serve-html)
+  - [mcp](#mcp)
+    - [rag-server](#rag-server)
+- [Help](#help)
+- [Requirements](#requirements)
+- [Technical Details](#technical-details)
+  - [Steganography Implementation](#steganography-implementation)
+  - [Supported Languages](#supported-languages)
+
 ## Installation
 
 Build the project with:
