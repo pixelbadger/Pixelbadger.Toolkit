@@ -1,6 +1,6 @@
 # Pixelbadger.Toolkit
 
-A CLI toolkit exposing varied functionality organized by topic, including string manipulation, distance calculations, esoteric programming language interpreters, steganography, and web serving.
+A CLI toolkit exposing varied functionality organized by topic, including string manipulation, distance calculations, esoteric programming language interpreters, image and MP3 steganography, web serving, and Model Context Protocol (MCP) servers.
 
 ## Installation
 
@@ -160,6 +160,36 @@ dotnet run -- images steganography --mode encode --image photo.jpg --message "Th
 dotnet run -- images steganography --mode decode --image encoded.png
 ```
 
+#### mp3-steganography
+Encode or decode hidden messages in MP3 files using ID3 tags.
+
+**Usage:**
+
+**Encoding a message:**
+```bash
+dotnet run -- images mp3-steganography --mode encode --mp3 <input-mp3> --message <message> --output <output-mp3>
+```
+
+**Decoding a message:**
+```bash
+dotnet run -- images mp3-steganography --mode decode --mp3 <encoded-mp3>
+```
+
+**Examples:**
+```bash
+# Hide a secret message in an MP3 file
+dotnet run -- images mp3-steganography --mode encode --mp3 song.mp3 --message "Hidden in music!" --output encoded-song.mp3
+
+# Extract the hidden message
+dotnet run -- images mp3-steganography --mode decode --mp3 encoded-song.mp3
+```
+
+**Details:**
+- Uses ID3v2 tags with TXXX (user-defined text) frames to store hidden messages
+- Messages are Base64 encoded and stored with a special terminator for integrity
+- Compatible with most MP3 players while keeping the hidden data invisible to casual users
+- Creates or updates existing ID3v2 tags without affecting audio quality
+
 ### web
 Web server utilities.
 
@@ -182,6 +212,46 @@ dotnet run -- web serve-html --file index.html
 
 # Serve on a specific port
 dotnet run -- web serve-html --file test.html --port 3000
+```
+
+### mcp
+Model Context Protocol server utilities for AI integration.
+
+#### rag-server
+Hosts an MCP server that performs BM25 similarity search against a Lucene.NET index, enabling AI assistants to retrieve relevant context from your documents.
+
+**Usage:**
+```bash
+dotnet run -- mcp rag-server --index-path <index-directory>
+```
+
+**Options:**
+- `--index-path`: Path to the Lucene.NET index directory (required)
+
+**Examples:**
+```bash
+# Start MCP server with an existing search index
+dotnet run -- mcp rag-server --index-path ./search-index
+
+# Use with Claude Desktop or other MCP clients
+dotnet run -- mcp rag-server --index-path ./docs-index
+```
+
+**Details:**
+- Communicates via stdin/stdout using JSON-RPC protocol
+- Provides the `search` MCP tool that performs BM25 queries against the index with configurable result limits
+- Returns formatted search results with relevance scores, source files, paragraph numbers, and content
+- Compatible with MCP clients like Claude Desktop, Continue, and other AI development tools
+- Requires an existing Lucene index created with the `search ingest` command
+
+**Integration Example:**
+First create an index, then start the MCP server:
+```bash
+# 1. Create search index from your documents
+dotnet run -- search ingest --index-path ./my-docs --content-path documentation.md
+
+# 2. Start MCP server for AI integration
+dotnet run -- mcp rag-server --index-path ./my-docs
 ```
 
 ## Help
