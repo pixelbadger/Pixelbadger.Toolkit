@@ -6,7 +6,6 @@ using Lucene.Net.Search;
 using Lucene.Net.Search.Similarities;
 using Lucene.Net.Store;
 using Lucene.Net.Util;
-using Directory = Lucene.Net.Store.Directory;
 
 namespace Pixelbadger.Toolkit.Components;
 
@@ -39,7 +38,7 @@ public class SearchIndexer
         var config = new IndexWriterConfig(LUCENE_VERSION, analyzer);
 
         using var writer = new IndexWriter(indexDirectory, config);
-        
+
         for (int i = 0; i < paragraphs.Count; i++)
         {
             var paragraph = paragraphs[i];
@@ -47,10 +46,10 @@ public class SearchIndexer
                 continue;
 
             var doc = new Document();
-            
+
             // Add the paragraph content as a searchable field
             doc.Add(new TextField("content", paragraph, Field.Store.YES));
-            
+
             // Add metadata fields
             doc.Add(new StringField("source_file", Path.GetFileName(contentPath), Field.Store.YES));
             doc.Add(new StringField("source_path", contentPath, Field.Store.YES));
@@ -79,15 +78,15 @@ public class SearchIndexer
 
         using var reader = DirectoryReader.Open(indexDirectory);
         var searcher = new IndexSearcher(reader);
-        
+
         // Use BM25 similarity (default in Lucene.NET 4.8)
         searcher.Similarity = new BM25Similarity();
-        
+
         var parser = new QueryParser(LUCENE_VERSION, "content", analyzer);
         var query = parser.Parse(queryText);
-        
+
         var hits = searcher.Search(query, maxResults);
-        
+
         foreach (var scoreDoc in hits.ScoreDocs)
         {
             var doc = searcher.Doc(scoreDoc.Doc);
@@ -106,7 +105,7 @@ public class SearchIndexer
         reader.Dispose();
         indexDirectory.Dispose();
         analyzer.Dispose();
-        
+
         return Task.FromResult(results);
     }
 
