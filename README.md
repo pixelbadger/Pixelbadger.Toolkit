@@ -105,11 +105,11 @@ dotnet run -- search ingest --index-path ./docs-index --content-path README.md
 - Creates a new index if it doesn't exist, or adds to an existing index
 
 #### query
-Perform BM25 similarity search against a Lucene.NET index.
+Perform BM25 similarity search against a Lucene.NET index with optional source ID filtering.
 
 **Usage:**
 ```bash
-dotnet run -- search query --index-path <index-directory> --query <search-terms> [--max-results <number>]
+dotnet run -- search query --index-path <index-directory> --query <search-terms> [--max-results <number>] [--sourceIds <id1> <id2> ...]
 ```
 
 **Examples:**
@@ -122,6 +122,9 @@ dotnet run -- search query --index-path ./docs-index --query "lucene search" --m
 
 # Complex query with operators
 dotnet run -- search query --index-path ./index --query "\"exact phrase\" OR keyword"
+
+# Filter results by source IDs (based on filename without extension)
+dotnet run -- search query --index-path ./index --query "search terms" --sourceIds document1 readme
 ```
 
 **Details:**
@@ -130,6 +133,8 @@ dotnet run -- search query --index-path ./index --query "\"exact phrase\" OR key
 - Supports Lucene query syntax including phrases, boolean operators, wildcards
 - Shows source file, paragraph number, relevance score, and content for each result
 - Default maximum results is 10
+- Optional source ID filtering constrains results to documents from specific files
+- Source IDs are derived from filenames (without extension) during ingestion
 
 ### interpreters
 Esoteric programming language interpreters.
@@ -266,10 +271,28 @@ dotnet run -- mcp rag-server --index-path ./docs-index
 
 **Details:**
 - Communicates via stdin/stdout using JSON-RPC protocol
-- Provides the `search` MCP tool that performs BM25 queries against the index with configurable result limits
-- Returns formatted search results with relevance scores, source files, paragraph numbers, and content
+- Provides the `search` MCP tool that performs BM25 queries against the index with configurable result limits and source ID filtering
+- Returns formatted search results with relevance scores, source files, paragraph numbers, source IDs, and content
+- Supports optional source ID filtering to constrain results to specific documents
 - Compatible with MCP clients like Claude Desktop, Continue, and other AI development tools
 - Requires an existing Lucene index created with the `search ingest` command
+
+**MCP Tool Parameters:**
+- `query` (required): The search query text
+- `maxResults` (optional, default: 5): Maximum number of results to return
+- `sourceIds` (optional): Array of source IDs to filter results to specific documents
+
+**Example MCP Tool Usage:**
+```json
+{
+  "name": "search",
+  "arguments": {
+    "query": "programming concepts",
+    "maxResults": 3,
+    "sourceIds": ["document1", "readme"]
+  }
+}
+```
 
 **Integration Example:**
 First create an index, then start the MCP server:

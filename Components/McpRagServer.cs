@@ -37,7 +37,8 @@ public class McpRagServer
     [McpServerTool, Description("Performs BM25 similarity search against a Lucene.NET index")]
     public static async Task<object?> Execute(
         [Description("The search query to be performed.")] string query,
-        [Description("Maximum number of results to return (default: 5).")] int maxResults = 5)
+        [Description("Maximum number of results to return (default: 5).")] int maxResults = 5,
+        [Description("Optional array of source IDs to constrain search results to specific documents.")] string[]? sourceIds = null)
     {
         if (string.IsNullOrEmpty(query))
         {
@@ -49,7 +50,7 @@ public class McpRagServer
             if (!Directory.Exists(_indexPath))
                 return new { error = $"Index directory '{_indexPath}' not found." };
 
-            var results = await _searchIndexer.QueryAsync(_indexPath, query, maxResults);
+            var results = await _searchIndexer.QueryAsync(_indexPath, query, maxResults, sourceIds);
             return new { content = FormatSearchResults(results) };
         }
         catch (Exception ex)
@@ -70,6 +71,7 @@ public class McpRagServer
             var result = results[i];
             response += $"Document {i + 1} (Score: {result.Score:F4})\n";
             response += $"Source: {result.SourceFile} (Paragraph {result.ParagraphNumber})\n";
+            response += $"Source ID: {result.SourceId}\n";
             response += $"Content: {result.Content}\n";
 
             if (i < results.Count - 1)
