@@ -17,6 +17,7 @@ public class SearchResult
     public string SourcePath { get; set; } = string.Empty;
     public int ParagraphNumber { get; set; }
     public string DocumentId { get; set; } = string.Empty;
+    public string SourceId { get; set; } = string.Empty;
 }
 
 public class SearchIndexer
@@ -39,6 +40,8 @@ public class SearchIndexer
 
         using var writer = new IndexWriter(indexDirectory, config);
 
+        var sourceId = Path.GetFileNameWithoutExtension(contentPath);
+        
         for (int i = 0; i < paragraphs.Count; i++)
         {
             var paragraph = paragraphs[i];
@@ -53,6 +56,7 @@ public class SearchIndexer
             // Add metadata fields
             doc.Add(new StringField("source_file", Path.GetFileName(contentPath), Field.Store.YES));
             doc.Add(new StringField("source_path", contentPath, Field.Store.YES));
+            doc.Add(new StringField("source_id", sourceId, Field.Store.YES));
             doc.Add(new Int32Field("paragraph_number", i + 1, Field.Store.YES));
             doc.Add(new StringField("document_id", $"{Path.GetFileName(contentPath)}_{i + 1}", Field.Store.YES));
 
@@ -65,7 +69,7 @@ public class SearchIndexer
         analyzer.Dispose();
     }
 
-    public Task<List<SearchResult>> QueryAsync(string indexPath, string queryText, int maxResults = 10)
+    public Task<List<SearchResult>> QueryAsync(string indexPath, string queryText, int maxResults = 10, string[]? sourceIds = null)
     {
         if (!System.IO.Directory.Exists(indexPath))
         {
@@ -83,9 +87,31 @@ public class SearchIndexer
         searcher.Similarity = new BM25Similarity();
 
         var parser = new QueryParser(LUCENE_VERSION, "content", analyzer);
-        var query = parser.Parse(queryText);
+        var contentQuery = parser.Parse(queryText);
 
-        var hits = searcher.Search(query, maxResults);
+        Query finalQuery;
+        if (sourceIds != null && sourceIds.Length > 0)
+        {
+            // Create a boolean query to combine content search with source ID filter
+            var boolQuery = new BooleanQuery();
+            boolQuery.Add(contentQuery, Occur.MUST);
+
+            // Add source ID filter as OR terms within a nested boolean query
+            var sourceIdQuery = new BooleanQuery();
+            foreach (var sourceId in sourceIds)
+            {
+                var termQuery = new TermQuery(new Term("source_id", sourceId));
+                sourceIdQuery.Add(termQuery, Occur.SHOULD);
+            }
+            boolQuery.Add(sourceIdQuery, Occur.MUST);
+            finalQuery = boolQuery;
+        }
+        else
+        {
+            finalQuery = contentQuery;
+        }
+
+        var hits = searcher.Search(finalQuery, maxResults);
 
         foreach (var scoreDoc in hits.ScoreDocs)
         {
@@ -96,6 +122,7 @@ public class SearchIndexer
                 Content = doc.Get("content") ?? string.Empty,
                 SourceFile = doc.Get("source_file") ?? string.Empty,
                 SourcePath = doc.Get("source_path") ?? string.Empty,
+                SourceId = doc.Get("source_id") ?? string.Empty,
                 ParagraphNumber = int.Parse(doc.Get("paragraph_number") ?? "0"),
                 DocumentId = doc.Get("document_id") ?? string.Empty
             };

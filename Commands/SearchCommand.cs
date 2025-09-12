@@ -81,16 +81,24 @@ public static class SearchCommand
         };
         maxResultsOption.SetDefaultValue(10);
 
+        var sourceIdsOption = new Option<string[]>(
+            aliases: ["--sourceIds"],
+            description: "Optional list of source IDs to constrain search results")
+        {
+            IsRequired = false
+        };
+
         command.AddOption(indexPathOption);
         command.AddOption(queryOption);
         command.AddOption(maxResultsOption);
+        command.AddOption(sourceIdsOption);
 
-        command.SetHandler(async (string indexPath, string query, int maxResults) =>
+        command.SetHandler(async (string indexPath, string query, int maxResults, string[] sourceIds) =>
         {
             try
             {
                 var indexer = new SearchIndexer();
-                var results = await indexer.QueryAsync(indexPath, query, maxResults);
+                var results = await indexer.QueryAsync(indexPath, query, maxResults, sourceIds);
                 
                 if (results.Count == 0)
                 {
@@ -119,7 +127,7 @@ public static class SearchCommand
                 Console.WriteLine($"Error: {ex.Message}");
                 Environment.Exit(1);
             }
-        }, indexPathOption, queryOption, maxResultsOption);
+        }, indexPathOption, queryOption, maxResultsOption, sourceIdsOption);
 
         return command;
     }
