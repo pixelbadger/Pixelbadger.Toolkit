@@ -82,7 +82,7 @@ dotnet run -- strings levenshtein-distance --string1 file1.txt --string2 file2.t
 Search indexing and querying utilities.
 
 #### ingest
-Ingest content into a Lucene.NET search index by splitting it into paragraph chunks.
+Ingest content into a Lucene.NET search index with intelligent chunking based on file type.
 
 **Usage:**
 ```bash
@@ -91,18 +91,20 @@ dotnet run -- search ingest --index-path <index-directory> --content-path <conte
 
 **Examples:**
 ```bash
-# Ingest a text file into a search index
+# Ingest a text file into a search index (paragraph chunking)
 dotnet run -- search ingest --index-path ./search-index --content-path document.txt
 
-# Ingest markdown content
+# Ingest markdown content (header-based chunking)
 dotnet run -- search ingest --index-path ./docs-index --content-path README.md
 ```
 
 **Details:**
-- Content is automatically split into paragraphs (separated by double newlines, or single newlines if no double newlines found)
-- Each paragraph becomes a separate searchable document in the index
-- Metadata is stored including source file, paragraph number, and document ID
+- **Markdown files** (.md, .markdown): Automatically chunked by headers (# ## ###) for semantic organization
+- **Other files**: Split into paragraphs (separated by double newlines, or single newlines if no double newlines found)
+- Each chunk becomes a separate searchable document in the index
+- Metadata is stored including source file, chunk/paragraph number, and document ID
 - Creates a new index if it doesn't exist, or adds to an existing index
+- Markdown chunks preserve header context and hierarchy information
 
 #### query
 Perform BM25 similarity search against a Lucene.NET index with optional source ID filtering.

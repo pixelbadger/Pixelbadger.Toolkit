@@ -32,7 +32,7 @@ public class SearchIndexer
         }
 
         var content = await File.ReadAllTextAsync(contentPath);
-        var paragraphs = SplitIntoParagraphs(content);
+        var chunks = GetChunksForFile(contentPath, content);
 
         var indexDirectory = FSDirectory.Open(indexPath);
         var analyzer = new StandardAnalyzer(LUCENE_VERSION);
@@ -42,23 +42,23 @@ public class SearchIndexer
 
         var sourceId = Path.GetFileNameWithoutExtension(contentPath);
         
-        for (int i = 0; i < paragraphs.Count; i++)
+        for (int i = 0; i < chunks.Count; i++)
         {
-            var paragraph = paragraphs[i];
-            if (string.IsNullOrWhiteSpace(paragraph))
+            var chunk = chunks[i];
+            if (string.IsNullOrWhiteSpace(chunk.Content))
                 continue;
 
             var doc = new Document();
 
-            // Add the paragraph content as a searchable field
-            doc.Add(new TextField("content", paragraph, Field.Store.YES));
+            // Add the chunk content as a searchable field
+            doc.Add(new TextField("content", chunk.Content, Field.Store.YES));
 
             // Add metadata fields
             doc.Add(new StringField("source_file", Path.GetFileName(contentPath), Field.Store.YES));
             doc.Add(new StringField("source_path", contentPath, Field.Store.YES));
             doc.Add(new StringField("source_id", sourceId, Field.Store.YES));
-            doc.Add(new Int32Field("paragraph_number", i + 1, Field.Store.YES));
-            doc.Add(new StringField("document_id", $"{Path.GetFileName(contentPath)}_{i + 1}", Field.Store.YES));
+            doc.Add(new Int32Field("paragraph_number", chunk.ChunkNumber, Field.Store.YES));
+            doc.Add(new StringField("document_id", $"{Path.GetFileName(contentPath)}_{chunk.ChunkNumber}", Field.Store.YES));
 
             writer.AddDocument(doc);
         }
@@ -136,25 +136,16 @@ public class SearchIndexer
         return Task.FromResult(results);
     }
 
-    private static List<string> SplitIntoParagraphs(string content)
+    private static List<IChunk> GetChunksForFile(string filePath, string content)
     {
-        // Split by double newlines (typical paragraph separator)
-        var paragraphs = content
-            .Split(new[] { "\r\n\r\n", "\n\n", "\r\r" }, StringSplitOptions.RemoveEmptyEntries)
-            .Select(p => p.Trim())
-            .Where(p => !string.IsNullOrWhiteSpace(p))
-            .ToList();
-
-        // If no double newlines found, split by single newlines
-        if (paragraphs.Count == 1)
+        var extension = Path.GetExtension(filePath).ToLowerInvariant();
+        
+        ITextChunker chunker = extension switch
         {
-            paragraphs = content
-                .Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.RemoveEmptyEntries)
-                .Select(p => p.Trim())
-                .Where(p => !string.IsNullOrWhiteSpace(p))
-                .ToList();
-        }
+            ".md" or ".markdown" => new MarkdownTextChunker(),
+            _ => new ParagraphTextChunker()
+        };
 
-        return paragraphs;
+        return chunker.ChunkText(content);
     }
 }
