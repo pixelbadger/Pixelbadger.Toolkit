@@ -6,17 +6,19 @@ This project is a CLI toolkit exposing varied functionality organized by topic.
 CLI arguments follow a topic-action pattern: `[topic] [action] [options]`.
 For example, the CLI arguments "strings reverse --in-file hw.txt --out-file hw-reversed.txt" would read the content of in-file and output the reversed string to the path of out-file.
 
-The project is .NET 8, and uses Microsoft's System.CommandLine library for building argument sets.
+The project is .NET 9, and uses Microsoft's System.CommandLine library for building argument sets.
 
 ## Development Commands
 
 - **Build**: `dotnet build`
 - **Run**: `dotnet run -- [topic] [action] [options]`
-- **Run with examples**: 
+- **Run with examples**:
   - `dotnet run -- strings reverse --in-file hello.txt --out-file hello-reversed.txt`
   - `dotnet run -- strings levenshtein-distance --string1 "hello" --string2 "world"`
   - `dotnet run -- search ingest --index-path ./index --content-path document.txt`
   - `dotnet run -- search query --index-path ./index --query "hello world"`
+  - `dotnet run -- llm openai --question "Hello, how are you?"`
+  - `dotnet run -- llm openai --question "Continue our conversation" --chat-history ./chat.json --model "gpt-4o-mini"`
 
 ## Architecture
 
@@ -41,6 +43,7 @@ Available topics and actions:
 - **interpreters**: brainfuck, ook
 - **images**: steganography
 - **web**: serve-html
+- **llm**: openai
 
 ## Dependencies
 
@@ -49,6 +52,9 @@ Available topics and actions:
 - Lucene.Net (for search indexing)
 - SixLabors.ImageSharp (for steganography)
 - System.CommandLine (beta)
+- OpenAI (for LLM integration)
+- Microsoft.Extensions.AI (for AI abstractions)
+- Microsoft.Extensions.AI.OpenAI (for OpenAI integration)
 
 ## Important Instructions
 
