@@ -1,6 +1,6 @@
 # Pixelbadger.Toolkit
 
-A CLI toolkit exposing varied functionality organized by topic, including string manipulation, distance calculations, esoteric programming language interpreters, image and MP3 steganography, web serving, and Model Context Protocol (MCP) servers.
+A CLI toolkit exposing varied functionality organized by topic, including string manipulation, distance calculations, esoteric programming language interpreters, image and MP3 steganography, web serving, LLM integration, and Model Context Protocol (MCP) servers.
 
 ## Table of Contents
 
@@ -21,6 +21,8 @@ A CLI toolkit exposing varied functionality organized by topic, including string
     - [mp3-steganography](#mp3-steganography)
   - [web](#web)
     - [serve-html](#serve-html)
+  - [llm](#llm)
+    - [openai](#openai)
   - [mcp](#mcp)
     - [rag-server](#rag-server)
 - [Help](#help)
@@ -248,6 +250,58 @@ dotnet run -- web serve-html --file index.html
 dotnet run -- web serve-html --file test.html --port 3000
 ```
 
+### llm
+Large Language Model utilities.
+
+#### openai
+Chat with OpenAI models maintaining conversation history.
+
+**Usage:**
+```bash
+dotnet run -- llm openai --question <question> [--chat-history <history-file>] [--model <model-name>]
+```
+
+**Options:**
+- `--question`: The question to ask the LLM (required)
+- `--chat-history`: Path to JSON file containing chat history (optional, will be created if it doesn't exist)
+- `--model`: The OpenAI model to use (optional, default: gpt-5-nano)
+
+**Examples:**
+```bash
+# Simple question without history
+dotnet run -- llm openai --question "What is the capital of France?"
+
+# Start a conversation with history tracking
+dotnet run -- llm openai --question "Hello, my name is Alice" --chat-history ./chat.json
+
+# Continue the conversation (remembers previous context)
+dotnet run -- llm openai --question "What's my name?" --chat-history ./chat.json
+
+# Use a specific model
+dotnet run -- llm openai --question "Explain quantum computing" --model "gpt-4o-mini"
+
+# Complex conversation with specific model and history
+dotnet run -- llm openai --question "Continue our discussion about AI" --chat-history ./ai-chat.json --model "gpt-4o"
+```
+
+**Details:**
+- Requires `OPENAI_API_KEY` environment variable to be set
+- Chat history is stored in JSON format with role/content pairs
+- Maintains full conversation context across multiple interactions
+- Supports all OpenAI chat models (gpt-3.5-turbo, gpt-4, gpt-4o, gpt-5-nano, etc.)
+- Each conversation turn includes both user question and assistant response
+- History files are created automatically if they don't exist
+- Compatible with OpenAI API key authentication
+
+**Environment Setup:**
+```bash
+# Set your OpenAI API key
+export OPENAI_API_KEY="your-api-key-here"
+
+# Then use the llm commands
+dotnet run -- llm openai --question "Hello!"
+```
+
 ### mcp
 Model Context Protocol server utilities for AI integration.
 
@@ -318,6 +372,7 @@ dotnet run -- reverse-string --help     # Command-specific help
 
 - .NET 9.0
 - SixLabors.ImageSharp (for steganography features)
+- OpenAI API key (for LLM features)
 
 ## Technical Details
 
