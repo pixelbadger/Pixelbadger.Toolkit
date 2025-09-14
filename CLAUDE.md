@@ -17,8 +17,9 @@ The project is .NET 9, and uses Microsoft's System.CommandLine library for build
   - `dotnet run -- strings levenshtein-distance --string1 "hello" --string2 "world"`
   - `dotnet run -- search ingest --index-path ./index --content-path document.txt`
   - `dotnet run -- search query --index-path ./index --query "hello world"`
-  - `dotnet run -- llm openai --question "Hello, how are you?"`
-  - `dotnet run -- llm openai --question "Continue our conversation" --chat-history ./chat.json --model "gpt-4o-mini"`
+  - `dotnet run -- llm openai --message "Hello, how are you?"`
+  - `dotnet run -- llm openai --message "Continue our conversation" --chat-history ./chat.json --model "gpt-4o-mini"`
+  - `dotnet run -- llm translate --text "Hello, how are you?" --target-language "Spanish"`
 
 ## Architecture
 
@@ -43,7 +44,7 @@ Available topics and actions:
 - **interpreters**: brainfuck, ook
 - **images**: steganography
 - **web**: serve-html
-- **llm**: openai
+- **llm**: openai, translate
 
 ## Dependencies
 

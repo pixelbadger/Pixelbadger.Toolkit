@@ -10,6 +10,7 @@ public static class LlmCommand
         var command = new Command("llm", "Large Language Model utilities");
 
         command.AddCommand(CreateOpenAiCommand());
+        command.AddCommand(CreateTranslateCommand());
 
         return command;
     }
@@ -18,9 +19,9 @@ public static class LlmCommand
     {
         var command = new Command("openai", "Chat with OpenAI maintaining conversation history");
 
-        var questionOption = new Option<string>(
-            aliases: ["--question"],
-            description: "The question to ask the LLM")
+        var messageOption = new Option<string>(
+            aliases: ["--message"],
+            description: "The message to send to the LLM")
         {
             IsRequired = true
         };
@@ -40,16 +41,16 @@ public static class LlmCommand
             IsRequired = false
         };
 
-        command.AddOption(questionOption);
+        command.AddOption(messageOption);
         command.AddOption(chatHistoryOption);
         command.AddOption(modelOption);
 
-        command.SetHandler(async (string question, string? chatHistory, string model) =>
+        command.SetHandler(async (string message, string? chatHistory, string model) =>
         {
             try
             {
                 var llmComponent = new LlmComponent(model);
-                var response = await llmComponent.ChatAsync(question, chatHistory);
+                var response = await llmComponent.ChatAsync(message, chatHistory);
 
                 Console.WriteLine(response);
             }
@@ -58,7 +59,56 @@ public static class LlmCommand
                 Console.WriteLine($"Error: {ex.Message}");
                 Environment.Exit(1);
             }
-        }, questionOption, chatHistoryOption, modelOption);
+        }, messageOption, chatHistoryOption, modelOption);
+
+        return command;
+    }
+
+    private static Command CreateTranslateCommand()
+    {
+        var command = new Command("translate", "Translate text to a target language using OpenAI");
+
+        var textOption = new Option<string>(
+            aliases: ["--text"],
+            description: "The text to translate")
+        {
+            IsRequired = true
+        };
+
+        var targetLanguageOption = new Option<string>(
+            aliases: ["--target-language"],
+            description: "The target language to translate to")
+        {
+            IsRequired = true
+        };
+
+        var modelOption = new Option<string>(
+            aliases: ["--model"],
+            description: "The OpenAI model to use",
+            getDefaultValue: () => "gpt-5-nano")
+        {
+            IsRequired = false
+        };
+
+        command.AddOption(textOption);
+        command.AddOption(targetLanguageOption);
+        command.AddOption(modelOption);
+
+        command.SetHandler(async (string text, string targetLanguage, string model) =>
+        {
+            try
+            {
+                var llmComponent = new LlmComponent(model);
+                var translation = await llmComponent.TranslateAsync(text, targetLanguage);
+
+                Console.WriteLine(translation);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error: {ex.Message}");
+                Environment.Exit(1);
+            }
+        }, textOption, targetLanguageOption, modelOption);
 
         return command;
     }

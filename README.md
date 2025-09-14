@@ -1,6 +1,6 @@
 # Pixelbadger.Toolkit
 
-A CLI toolkit exposing varied functionality organized by topic, including string manipulation, distance calculations, esoteric programming language interpreters, image and MP3 steganography, web serving, LLM integration, and Model Context Protocol (MCP) servers.
+A CLI toolkit exposing varied functionality organized by topic, including string manipulation, distance calculations, esoteric programming language interpreters, image steganography, web serving, LLM integration, and Model Context Protocol (MCP) servers.
 
 ## Table of Contents
 
@@ -18,7 +18,6 @@ A CLI toolkit exposing varied functionality organized by topic, including string
     - [ook](#ook)
   - [images](#images)
     - [steganography](#steganography)
-    - [mp3-steganography](#mp3-steganography)
   - [web](#web)
     - [serve-html](#serve-html)
   - [llm](#llm)
@@ -196,36 +195,6 @@ dotnet run -- images steganography --mode encode --image photo.jpg --message "Th
 dotnet run -- images steganography --mode decode --image encoded.png
 ```
 
-#### mp3-steganography
-Encode or decode hidden messages in MP3 files using ID3 tags.
-
-**Usage:**
-
-**Encoding a message:**
-```bash
-dotnet run -- images mp3-steganography --mode encode --mp3 <input-mp3> --message <message> --output <output-mp3>
-```
-
-**Decoding a message:**
-```bash
-dotnet run -- images mp3-steganography --mode decode --mp3 <encoded-mp3>
-```
-
-**Examples:**
-```bash
-# Hide a secret message in an MP3 file
-dotnet run -- images mp3-steganography --mode encode --mp3 song.mp3 --message "Hidden in music!" --output encoded-song.mp3
-
-# Extract the hidden message
-dotnet run -- images mp3-steganography --mode decode --mp3 encoded-song.mp3
-```
-
-**Details:**
-- Uses ID3v2 tags with TXXX (user-defined text) frames to store hidden messages
-- Messages are Base64 encoded and stored with a special terminator for integrity
-- Compatible with most MP3 players while keeping the hidden data invisible to casual users
-- Creates or updates existing ID3v2 tags without affecting audio quality
-
 ### web
 Web server utilities.
 
@@ -258,30 +227,30 @@ Chat with OpenAI models maintaining conversation history.
 
 **Usage:**
 ```bash
-dotnet run -- llm openai --question <question> [--chat-history <history-file>] [--model <model-name>]
+dotnet run -- llm openai --message <message> [--chat-history <history-file>] [--model <model-name>]
 ```
 
 **Options:**
-- `--question`: The question to ask the LLM (required)
+- `--message`: The message to send to the LLM (required)
 - `--chat-history`: Path to JSON file containing chat history (optional, will be created if it doesn't exist)
 - `--model`: The OpenAI model to use (optional, default: gpt-5-nano)
 
 **Examples:**
 ```bash
-# Simple question without history
-dotnet run -- llm openai --question "What is the capital of France?"
+# Simple message without history
+dotnet run -- llm openai --message "What is the capital of France?"
 
 # Start a conversation with history tracking
-dotnet run -- llm openai --question "Hello, my name is Alice" --chat-history ./chat.json
+dotnet run -- llm openai --message "Hello, my name is Alice" --chat-history ./chat.json
 
 # Continue the conversation (remembers previous context)
-dotnet run -- llm openai --question "What's my name?" --chat-history ./chat.json
+dotnet run -- llm openai --message "What's my name?" --chat-history ./chat.json
 
 # Use a specific model
-dotnet run -- llm openai --question "Explain quantum computing" --model "gpt-4o-mini"
+dotnet run -- llm openai --message "Explain quantum computing" --model "gpt-4o-mini"
 
 # Complex conversation with specific model and history
-dotnet run -- llm openai --question "Continue our discussion about AI" --chat-history ./ai-chat.json --model "gpt-4o"
+dotnet run -- llm openai --message "Continue our discussion about AI" --chat-history ./ai-chat.json --model "gpt-4o"
 ```
 
 **Details:**
@@ -289,7 +258,7 @@ dotnet run -- llm openai --question "Continue our discussion about AI" --chat-hi
 - Chat history is stored in JSON format with role/content pairs
 - Maintains full conversation context across multiple interactions
 - Supports all OpenAI chat models (gpt-3.5-turbo, gpt-4, gpt-4o, gpt-5-nano, etc.)
-- Each conversation turn includes both user question and assistant response
+- Each conversation turn includes both user message and assistant response
 - History files are created automatically if they don't exist
 - Compatible with OpenAI API key authentication
 
@@ -299,7 +268,7 @@ dotnet run -- llm openai --question "Continue our discussion about AI" --chat-hi
 export OPENAI_API_KEY="your-api-key-here"
 
 # Then use the llm commands
-dotnet run -- llm openai --question "Hello!"
+dotnet run -- llm openai --message "Hello!"
 ```
 
 ### mcp
