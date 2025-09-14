@@ -22,6 +22,7 @@ A CLI toolkit exposing varied functionality organized by topic, including string
     - [serve-html](#serve-html)
   - [llm](#llm)
     - [openai](#openai)
+    - [translate](#translate)
   - [mcp](#mcp)
     - [rag-server](#rag-server)
 - [Help](#help)
@@ -262,6 +263,31 @@ dotnet run -- llm openai --message "Continue our discussion about AI" --chat-his
 - History files are created automatically if they don't exist
 - Compatible with OpenAI API key authentication
 
+#### translate
+Translate text to a target language using OpenAI.
+
+**Usage:**
+```bash
+dotnet run -- llm translate --text <text-to-translate> --target-language <target-language> [--model <model-name>]
+```
+
+**Options:**
+- `--text`: The text to translate (required)
+- `--target-language`: The target language to translate to (required)
+- `--model`: The OpenAI model to use (optional, default: gpt-5-nano)
+
+**Examples:**
+```bash
+# Translate text to Spanish
+dotnet run -- llm translate --text "Hello, how are you?" --target-language "Spanish"
+
+# Translate to French using a specific model
+dotnet run -- llm translate --text "Good morning" --target-language "French" --model "gpt-4o-mini"
+
+# Translate complex text
+dotnet run -- llm translate --text "The weather is beautiful today" --target-language "German"
+```
+
 **Environment Setup:**
 ```bash
 # Set your OpenAI API key
@@ -269,6 +295,7 @@ export OPENAI_API_KEY="your-api-key-here"
 
 # Then use the llm commands
 dotnet run -- llm openai --message "Hello!"
+dotnet run -- llm translate --text "Hello!" --target-language "Spanish"
 ```
 
 ### mcp
