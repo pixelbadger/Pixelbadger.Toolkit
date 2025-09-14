@@ -11,15 +11,18 @@ The project is .NET 9, and uses Microsoft's System.CommandLine library for build
 ## Development Commands
 
 - **Build**: `dotnet build`
-- **Run**: `dotnet run -- [topic] [action] [options]`
+- **Package**: `dotnet pack`
+- **Install as global tool**: `dotnet tool install --global --add-source ./bin/Release Pixelbadger.Toolkit`
+- **Run (from source)**: `dotnet run -- [topic] [action] [options]`
+- **Run (global tool)**: `pbtk [topic] [action] [options]`
 - **Run with examples**:
-  - `dotnet run -- strings reverse --in-file hello.txt --out-file hello-reversed.txt`
-  - `dotnet run -- strings levenshtein-distance --string1 "hello" --string2 "world"`
-  - `dotnet run -- search ingest --index-path ./index --content-path document.txt`
-  - `dotnet run -- search query --index-path ./index --query "hello world"`
-  - `dotnet run -- llm openai --message "Hello, how are you?"`
-  - `dotnet run -- llm openai --message "Continue our conversation" --chat-history ./chat.json --model "gpt-4o-mini"`
-  - `dotnet run -- llm translate --text "Hello, how are you?" --target-language "Spanish"`
+  - `pbtk strings reverse --in-file hello.txt --out-file hello-reversed.txt`
+  - `pbtk strings levenshtein-distance --string1 "hello" --string2 "world"`
+  - `pbtk search ingest --index-path ./index --content-path document.txt`
+  - `pbtk search query --index-path ./index --query "hello world"`
+  - `pbtk llm openai --message "Hello, how are you?"`
+  - `pbtk llm openai --message "Continue our conversation" --chat-history ./chat.json --model "gpt-4o-mini"`
+  - `pbtk llm translate --text "Hello, how are you?" --target-language "Spanish"`
 
 ## Architecture
 

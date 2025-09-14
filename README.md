@@ -33,14 +33,37 @@ A CLI toolkit exposing varied functionality organized by topic, including string
 
 ## Installation
 
-Build the project with:
+### Option 1: Install as .NET Global Tool (Recommended)
+
+Install the tool globally using the NuGet package:
 ```bash
+dotnet tool install --global Pixelbadger.Toolkit
+```
+
+Once installed, you can use the `pbtk` command from anywhere:
+```bash
+pbtk --help
+```
+
+### Option 2: Build from Source
+
+Clone the repository and build the project:
+```bash
+git clone https://github.com/pixelbadger/Pixelbadger.Toolkit.git
+cd Pixelbadger.Toolkit
 dotnet build
 ```
 
 ## Usage
 
+### Using the Global Tool (pbtk)
 Run commands using the topic-action pattern:
+```bash
+pbtk [topic] [action] [options]
+```
+
+### Using from Source
+If building from source, use:
 ```bash
 dotnet run -- [topic] [action] [options]
 ```
@@ -55,12 +78,16 @@ Reverses the content of a file.
 
 **Usage:**
 ```bash
+# Using global tool
+pbtk strings reverse --in-file <input-file> --out-file <output-file>
+
+# Using from source
 dotnet run -- strings reverse --in-file <input-file> --out-file <output-file>
 ```
 
 **Example:**
 ```bash
-dotnet run -- strings reverse --in-file hello.txt --out-file hello-reversed.txt
+pbtk strings reverse --in-file hello.txt --out-file hello-reversed.txt
 ```
 
 #### levenshtein-distance
@@ -74,10 +101,10 @@ dotnet run -- strings levenshtein-distance --string1 <string1> --string2 <string
 **Examples:**
 ```bash
 # Compare two strings directly
-dotnet run -- strings levenshtein-distance --string1 "hello" --string2 "world"
+pbtk strings levenshtein-distance --string1 "hello" --string2 "world"
 
 # Compare contents of two files
-dotnet run -- strings levenshtein-distance --string1 file1.txt --string2 file2.txt
+pbtk strings levenshtein-distance --string1 file1.txt --string2 file2.txt
 ```
 
 ### search
@@ -360,8 +387,13 @@ dotnet run -- mcp rag-server --index-path ./my-docs
 
 Get help for any command by adding `--help`:
 ```bash
-dotnet run -- --help                    # General help
-dotnet run -- reverse-string --help     # Command-specific help
+# Using global tool
+pbtk --help                              # General help
+pbtk strings reverse --help              # Command-specific help
+
+# Using from source
+dotnet run -- --help                     # General help
+dotnet run -- strings reverse --help     # Command-specific help
 ```
 
 ## Requirements

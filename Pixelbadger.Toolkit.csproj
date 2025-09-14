@@ -5,10 +5,26 @@
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+
+    <!-- .NET Tool configuration -->
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>pbtk</ToolCommandName>
+    <PackageId>Pixelbadger.Toolkit</PackageId>
+    <Version>1.0.1</Version>
+    <Authors>Pixelbadger</Authors>
+    <Description>A CLI toolkit exposing varied functionality organized by topic, including string manipulation, distance calculations, esoteric programming language interpreters, image steganography, web serving, and LLM integration.</Description>
+    <PackageTags>cli;toolkit;strings;search;interpreters;steganography;llm;openai</PackageTags>
+    <RepositoryUrl>https://github.com/pixelbadger/Pixelbadger.Toolkit</RepositoryUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\"/>
   </ItemGroup>
 
   <ItemGroup>
