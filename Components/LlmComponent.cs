@@ -71,6 +71,20 @@ public class LlmComponent
         return assistantMessage;
     }
 
+    public async Task<string> TranslateAsync(string text, string targetLanguage)
+    {
+        var systemPrompt = $"You are an advanced natural language translation tool. The user will supply a message in a non-specific language. You should translate that message to the language {targetLanguage}";
+
+        var messages = new List<ChatMessage>
+        {
+            ChatMessage.CreateSystemMessage(systemPrompt),
+            ChatMessage.CreateUserMessage(text)
+        };
+
+        var response = await _chatClient.CompleteChatAsync(messages);
+        return response.Value.Content[0].Text;
+    }
+
     private async Task SaveChatHistoryAsync(string chatHistoryPath, List<ChatHistoryMessage> messages)
     {
         // Ensure directory exists
