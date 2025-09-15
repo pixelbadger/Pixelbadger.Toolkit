@@ -12,6 +12,7 @@ The project is .NET 9, and uses Microsoft's System.CommandLine library for build
 
 - **Build**: `dotnet build`
 - **Package**: `dotnet pack`
+- **Publish to NuGet**: `dotnet nuget push bin/Release/Pixelbadger.Toolkit.*.nupkg --source https://api.nuget.org/v3/index.json --api-key $NUGET_API_KEY`
 - **Install as global tool**: `dotnet tool install --global --add-source ./bin/Release Pixelbadger.Toolkit`
 - **Run (from source)**: `dotnet run -- [topic] [action] [options]`
 - **Run (global tool)**: `pbtk [topic] [action] [options]`
@@ -23,6 +24,7 @@ The project is .NET 9, and uses Microsoft's System.CommandLine library for build
   - `pbtk llm openai --message "Hello, how are you?"`
   - `pbtk llm openai --message "Continue our conversation" --chat-history ./chat.json --model "gpt-4o-mini"`
   - `pbtk llm translate --text "Hello, how are you?" --target-language "Spanish"`
+  - `pbtk llm ocaaar --image-path ./image.jpg`
 
 ## Architecture
 
@@ -47,7 +49,7 @@ Available topics and actions:
 - **interpreters**: brainfuck, ook
 - **images**: steganography
 - **web**: serve-html
-- **llm**: openai, translate
+- **llm**: openai, translate, ocaaar
 
 ## Dependencies
 
@@ -59,6 +61,11 @@ Available topics and actions:
 - OpenAI (for LLM integration)
 - Microsoft.Extensions.AI (for AI abstractions)
 - Microsoft.Extensions.AI.OpenAI (for OpenAI integration)
+
+## Environment Variables
+
+- **OPENAI_API_KEY**: Required for LLM functionality (openai, translate, ocaaar actions)
+- **NUGET_API_KEY**: Required for publishing packages to NuGet
 
 ## Important Instructions
 
