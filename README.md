@@ -23,6 +23,7 @@ A CLI toolkit exposing varied functionality organized by topic, including string
   - [llm](#llm)
     - [openai](#openai)
     - [translate](#translate)
+    - [ocaaar](#ocaaar)
   - [mcp](#mcp)
     - [rag-server](#rag-server)
 - [Help](#help)
@@ -323,7 +324,40 @@ export OPENAI_API_KEY="your-api-key-here"
 # Then use the llm commands
 dotnet run -- llm openai --message "Hello!"
 dotnet run -- llm translate --text "Hello!" --target-language "Spanish"
+dotnet run -- llm ocaaar --image-path "./image.jpg"
 ```
+
+#### ocaaar
+Extract text from an image and translate it to pirate speak using OpenAI vision capabilities.
+
+**Usage:**
+```bash
+dotnet run -- llm ocaaar --image-path <image-file> [--model <model-name>]
+```
+
+**Options:**
+- `--image-path`: Path to the image file to process (required)
+- `--model`: The OpenAI model to use (optional, default: gpt-5-nano)
+
+**Examples:**
+```bash
+# Extract text from an image and get pirate translation
+dotnet run -- llm ocaaar --image-path poster.jpg
+
+# Use a specific model for better OCR accuracy
+dotnet run -- llm ocaaar --image-path document.png --model "gpt-4o"
+
+# Process a screenshot with text
+dotnet run -- llm ocaaar --image-path screenshot.png
+```
+
+**Details:**
+- Requires `OPENAI_API_KEY` environment variable to be set
+- Supports common image formats: JPEG, PNG, GIF, WebP
+- Uses OpenAI's vision capabilities for text extraction
+- Automatically translates extracted text to pirate dialect
+- Returns only the pirate-translated text without additional commentary
+- Perfect for humorous OCR processing of signs, documents, or any text-containing images
 
 ### mcp
 Model Context Protocol server utilities for AI integration.
