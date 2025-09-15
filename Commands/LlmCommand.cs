@@ -11,6 +11,7 @@ public static class LlmCommand
 
         command.AddCommand(CreateOpenAiCommand());
         command.AddCommand(CreateTranslateCommand());
+        command.AddCommand(CreateOcaaarCommand());
 
         return command;
     }
@@ -109,6 +110,47 @@ public static class LlmCommand
                 Environment.Exit(1);
             }
         }, textOption, targetLanguageOption, modelOption);
+
+        return command;
+    }
+
+    private static Command CreateOcaaarCommand()
+    {
+        var command = new Command("ocaaar", "Extract text from an image and translate it to pirate speak");
+
+        var imagePathOption = new Option<string>(
+            aliases: ["--image-path"],
+            description: "Path to the image file to process")
+        {
+            IsRequired = true
+        };
+
+        var modelOption = new Option<string>(
+            aliases: ["--model"],
+            description: "The OpenAI model to use",
+            getDefaultValue: () => "gpt-5-nano")
+        {
+            IsRequired = false
+        };
+
+        command.AddOption(imagePathOption);
+        command.AddOption(modelOption);
+
+        command.SetHandler(async (string imagePath, string model) =>
+        {
+            try
+            {
+                var llmComponent = new LlmComponent(model);
+                var response = await llmComponent.OcaaarAsync(imagePath);
+
+                Console.WriteLine(response);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error: {ex.Message}");
+                Environment.Exit(1);
+            }
+        }, imagePathOption, modelOption);
 
         return command;
     }
