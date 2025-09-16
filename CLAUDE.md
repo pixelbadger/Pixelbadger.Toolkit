@@ -28,17 +28,37 @@ The project is .NET 9, and uses Microsoft's System.CommandLine library for build
 
 ## Architecture
 
-The project follows a topic-based command architecture:
+The project follows a topic-based command architecture with a component-per-command pattern:
 
 - **Program.cs**: Entry point that registers all topic commands with the root command
 - **Commands/**: Contains topic command definitions, each topic has a static `Create()` method that registers sub-actions
 - **Components/**: Contains the core business logic implementations that commands delegate to
 
+## Component-Per-Command Pattern
+
+**IMPORTANT**: Each command action should have its own dedicated component class. This enforces single responsibility principle and improves maintainability.
+
+### Pattern Guidelines:
+1. **One Component Per Command**: Each command action (e.g., `chat`, `translate`, `ocaaar`) should have its own component class
+2. **Base Classes for Shared Logic**: Use base classes to share common functionality (e.g., `BaseOpenAiComponent` for OpenAI-related commands)
+3. **Clear Naming**: Component names should match the command action (e.g., `ChatComponent`, `TranslateComponent`, `OcaaarComponent`)
+4. **Single Responsibility**: Each component should handle only one specific functionality
+5. **Minimal Dependencies**: Components should only depend on what they actually need
+
+### Example Structure:
+```
+Components/
+├── BaseOpenAiComponent.cs      # Shared OpenAI functionality
+├── ChatComponent.cs            # Chat command logic
+├── TranslateComponent.cs       # Translate command logic
+└── OcaaarComponent.cs          # Ocaaar command logic
+```
+
 Each topic command follows the pattern:
 1. Create a main topic command with description
 2. Add sub-commands (actions) for each functionality within that topic
 3. Each action defines options/arguments with System.CommandLine
-4. Set up handlers that delegate to component classes
+4. Set up handlers that delegate to dedicated component classes (one per action)
 5. Handle errors and provide user feedback
 
 Topic commands are registered in Program.cs by calling their static `Create()` methods and adding them to the root command.

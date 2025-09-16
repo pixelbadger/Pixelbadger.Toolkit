@@ -50,8 +50,8 @@ public static class OpenAiCommand
         {
             try
             {
-                var openAiComponent = new OpenAiComponent(model);
-                var response = await openAiComponent.ChatAsync(message, chatHistory);
+                var chatComponent = new ChatComponent(model);
+                var response = await chatComponent.ChatAsync(message, chatHistory);
 
                 Console.WriteLine(response);
             }
@@ -99,8 +99,8 @@ public static class OpenAiCommand
         {
             try
             {
-                var openAiComponent = new OpenAiComponent(model);
-                var translation = await openAiComponent.TranslateAsync(text, targetLanguage);
+                var translateComponent = new TranslateComponent(model);
+                var translation = await translateComponent.TranslateAsync(text, targetLanguage);
 
                 Console.WriteLine(translation);
             }
@@ -140,8 +140,8 @@ public static class OpenAiCommand
         {
             try
             {
-                var openAiComponent = new OpenAiComponent(model);
-                var response = await openAiComponent.OcaaarAsync(imagePath);
+                var ocaaarComponent = new OcaaarComponent(model);
+                var response = await ocaaarComponent.OcaaarAsync(imagePath);
 
                 Console.WriteLine(response);
             }
