@@ -1,6 +1,6 @@
 # Pixelbadger.Toolkit
 
-A CLI toolkit exposing varied functionality organized by topic, including string manipulation, distance calculations, esoteric programming language interpreters, image steganography, web serving, LLM integration, and Model Context Protocol (MCP) servers.
+A CLI toolkit exposing varied functionality organized by topic, including string manipulation, distance calculations, esoteric programming language interpreters, image steganography, web serving, OpenAI integration, and Model Context Protocol (MCP) servers.
 
 ## Table of Contents
 
@@ -20,8 +20,8 @@ A CLI toolkit exposing varied functionality organized by topic, including string
     - [steganography](#steganography)
   - [web](#web)
     - [serve-html](#serve-html)
-  - [llm](#llm)
-    - [openai](#openai)
+  - [openai](#openai)
+    - [chat](#chat)
     - [translate](#translate)
     - [ocaaar](#ocaaar)
   - [mcp](#mcp)
@@ -248,15 +248,15 @@ dotnet run -- web serve-html --file index.html
 dotnet run -- web serve-html --file test.html --port 3000
 ```
 
-### llm
-Large Language Model utilities.
+### openai
+OpenAI utilities.
 
-#### openai
+#### chat
 Chat with OpenAI models maintaining conversation history.
 
 **Usage:**
 ```bash
-dotnet run -- llm openai --message <message> [--chat-history <history-file>] [--model <model-name>]
+dotnet run -- openai chat --message <message> [--chat-history <history-file>] [--model <model-name>]
 ```
 
 **Options:**
@@ -267,19 +267,19 @@ dotnet run -- llm openai --message <message> [--chat-history <history-file>] [--
 **Examples:**
 ```bash
 # Simple message without history
-dotnet run -- llm openai --message "What is the capital of France?"
+dotnet run -- openai chat --message "What is the capital of France?"
 
 # Start a conversation with history tracking
-dotnet run -- llm openai --message "Hello, my name is Alice" --chat-history ./chat.json
+dotnet run -- openai chat --message "Hello, my name is Alice" --chat-history ./chat.json
 
 # Continue the conversation (remembers previous context)
-dotnet run -- llm openai --message "What's my name?" --chat-history ./chat.json
+dotnet run -- openai chat --message "What's my name?" --chat-history ./chat.json
 
 # Use a specific model
-dotnet run -- llm openai --message "Explain quantum computing" --model "gpt-4o-mini"
+dotnet run -- openai chat --message "Explain quantum computing" --model "gpt-4o-mini"
 
 # Complex conversation with specific model and history
-dotnet run -- llm openai --message "Continue our discussion about AI" --chat-history ./ai-chat.json --model "gpt-4o"
+dotnet run -- openai chat --message "Continue our discussion about AI" --chat-history ./ai-chat.json --model "gpt-4o"
 ```
 
 **Details:**
@@ -296,7 +296,7 @@ Translate text to a target language using OpenAI.
 
 **Usage:**
 ```bash
-dotnet run -- llm translate --text <text-to-translate> --target-language <target-language> [--model <model-name>]
+dotnet run -- openai translate --text <text-to-translate> --target-language <target-language> [--model <model-name>]
 ```
 
 **Options:**
@@ -307,13 +307,13 @@ dotnet run -- llm translate --text <text-to-translate> --target-language <target
 **Examples:**
 ```bash
 # Translate text to Spanish
-dotnet run -- llm translate --text "Hello, how are you?" --target-language "Spanish"
+dotnet run -- openai translate --text "Hello, how are you?" --target-language "Spanish"
 
 # Translate to French using a specific model
-dotnet run -- llm translate --text "Good morning" --target-language "French" --model "gpt-4o-mini"
+dotnet run -- openai translate --text "Good morning" --target-language "French" --model "gpt-4o-mini"
 
 # Translate complex text
-dotnet run -- llm translate --text "The weather is beautiful today" --target-language "German"
+dotnet run -- openai translate --text "The weather is beautiful today" --target-language "German"
 ```
 
 **Environment Setup:**
@@ -321,10 +321,10 @@ dotnet run -- llm translate --text "The weather is beautiful today" --target-lan
 # Set your OpenAI API key
 export OPENAI_API_KEY="your-api-key-here"
 
-# Then use the llm commands
-dotnet run -- llm openai --message "Hello!"
-dotnet run -- llm translate --text "Hello!" --target-language "Spanish"
-dotnet run -- llm ocaaar --image-path "./image.jpg"
+# Then use the openai commands
+dotnet run -- openai chat --message "Hello!"
+dotnet run -- openai translate --text "Hello!" --target-language "Spanish"
+dotnet run -- openai ocaaar --image-path "./image.jpg"
 ```
 
 #### ocaaar
@@ -332,7 +332,7 @@ Extract text from an image and translate it to pirate speak using OpenAI vision 
 
 **Usage:**
 ```bash
-dotnet run -- llm ocaaar --image-path <image-file> [--model <model-name>]
+dotnet run -- openai ocaaar --image-path <image-file> [--model <model-name>]
 ```
 
 **Options:**
@@ -342,13 +342,13 @@ dotnet run -- llm ocaaar --image-path <image-file> [--model <model-name>]
 **Examples:**
 ```bash
 # Extract text from an image and get pirate translation
-dotnet run -- llm ocaaar --image-path poster.jpg
+dotnet run -- openai ocaaar --image-path poster.jpg
 
 # Use a specific model for better OCR accuracy
-dotnet run -- llm ocaaar --image-path document.png --model "gpt-4o"
+dotnet run -- openai ocaaar --image-path document.png --model "gpt-4o"
 
 # Process a screenshot with text
-dotnet run -- llm ocaaar --image-path screenshot.png
+dotnet run -- openai ocaaar --image-path screenshot.png
 ```
 
 **Details:**
@@ -434,7 +434,7 @@ dotnet run -- strings reverse --help     # Command-specific help
 
 - .NET 9.0
 - SixLabors.ImageSharp (for steganography features)
-- OpenAI API key (for LLM features)
+- OpenAI API key (for OpenAI features)
 
 ## Technical Details
 

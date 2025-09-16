@@ -21,10 +21,10 @@ The project is .NET 9, and uses Microsoft's System.CommandLine library for build
   - `pbtk strings levenshtein-distance --string1 "hello" --string2 "world"`
   - `pbtk search ingest --index-path ./index --content-path document.txt`
   - `pbtk search query --index-path ./index --query "hello world"`
-  - `pbtk llm openai --message "Hello, how are you?"`
-  - `pbtk llm openai --message "Continue our conversation" --chat-history ./chat.json --model "gpt-4o-mini"`
-  - `pbtk llm translate --text "Hello, how are you?" --target-language "Spanish"`
-  - `pbtk llm ocaaar --image-path ./image.jpg`
+  - `pbtk openai chat --message "Hello, how are you?"`
+  - `pbtk openai chat --message "Continue our conversation" --chat-history ./chat.json --model "gpt-4o-mini"`
+  - `pbtk openai translate --text "Hello, how are you?" --target-language "Spanish"`
+  - `pbtk openai ocaaar --image-path ./image.jpg`
 
 ## Architecture
 
@@ -49,7 +49,7 @@ Available topics and actions:
 - **interpreters**: brainfuck, ook
 - **images**: steganography
 - **web**: serve-html
-- **llm**: openai, translate, ocaaar
+- **openai**: chat, translate, ocaaar
 
 ## Dependencies
 

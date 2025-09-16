@@ -9,6 +9,6 @@ rootCommand.AddCommand(McpCommand.Create());
 rootCommand.AddCommand(InterpretersCommand.Create());
 rootCommand.AddCommand(ImagesCommand.Create());
 rootCommand.AddCommand(WebCommand.Create());
-rootCommand.AddCommand(LlmCommand.Create());
+rootCommand.AddCommand(OpenAiCommand.Create());
 
 return await rootCommand.InvokeAsync(args);

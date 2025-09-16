@@ -5,11 +5,11 @@ using System.Security;
 
 namespace Pixelbadger.Toolkit.Components;
 
-public class LlmComponent
+public class OpenAiComponent
 {
     private readonly ChatClient _chatClient;
 
-    public LlmComponent(string model = "gpt-5-nano")
+    public OpenAiComponent(string model = "gpt-5-nano")
     {
         var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
         if (string.IsNullOrEmpty(apiKey))

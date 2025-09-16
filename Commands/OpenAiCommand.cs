@@ -3,22 +3,22 @@ using Pixelbadger.Toolkit.Components;
 
 namespace Pixelbadger.Toolkit.Commands;
 
-public static class LlmCommand
+public static class OpenAiCommand
 {
     public static Command Create()
     {
-        var command = new Command("llm", "Large Language Model utilities");
+        var command = new Command("openai", "OpenAI utilities");
 
-        command.AddCommand(CreateOpenAiCommand());
+        command.AddCommand(CreateChatCommand());
         command.AddCommand(CreateTranslateCommand());
         command.AddCommand(CreateOcaaarCommand());
 
         return command;
     }
 
-    private static Command CreateOpenAiCommand()
+    private static Command CreateChatCommand()
     {
-        var command = new Command("openai", "Chat with OpenAI maintaining conversation history");
+        var command = new Command("chat", "Chat with OpenAI maintaining conversation history");
 
         var messageOption = new Option<string>(
             aliases: ["--message"],
@@ -50,8 +50,8 @@ public static class LlmCommand
         {
             try
             {
-                var llmComponent = new LlmComponent(model);
-                var response = await llmComponent.ChatAsync(message, chatHistory);
+                var openAiComponent = new OpenAiComponent(model);
+                var response = await openAiComponent.ChatAsync(message, chatHistory);
 
                 Console.WriteLine(response);
             }
@@ -99,8 +99,8 @@ public static class LlmCommand
         {
             try
             {
-                var llmComponent = new LlmComponent(model);
-                var translation = await llmComponent.TranslateAsync(text, targetLanguage);
+                var openAiComponent = new OpenAiComponent(model);
+                var translation = await openAiComponent.TranslateAsync(text, targetLanguage);
 
                 Console.WriteLine(translation);
             }
@@ -140,8 +140,8 @@ public static class LlmCommand
         {
             try
             {
-                var llmComponent = new LlmComponent(model);
-                var response = await llmComponent.OcaaarAsync(imagePath);
+                var openAiComponent = new OpenAiComponent(model);
+                var response = await openAiComponent.OcaaarAsync(imagePath);
 
                 Console.WriteLine(response);
             }
