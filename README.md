@@ -96,7 +96,7 @@ Calculates the Levenshtein distance between two strings or files.
 
 **Usage:**
 ```bash
-dotnet run -- strings levenshtein-distance --string1 <string1> --string2 <string2>
+pbtk strings levenshtein-distance --string1 <string1> --string2 <string2>
 ```
 
 **Examples:**
@@ -116,16 +116,16 @@ Ingest content into a Lucene.NET search index with intelligent chunking based on
 
 **Usage:**
 ```bash
-dotnet run -- search ingest --index-path <index-directory> --content-path <content-file>
+pbtk search ingest --index-path <index-directory> --content-path <content-file>
 ```
 
 **Examples:**
 ```bash
 # Ingest a text file into a search index (paragraph chunking)
-dotnet run -- search ingest --index-path ./search-index --content-path document.txt
+pbtk search ingest --index-path ./search-index --content-path document.txt
 
 # Ingest markdown content (header-based chunking)
-dotnet run -- search ingest --index-path ./docs-index --content-path README.md
+pbtk search ingest --index-path ./docs-index --content-path README.md
 ```
 
 **Details:**
@@ -141,22 +141,22 @@ Perform BM25 similarity search against a Lucene.NET index with optional source I
 
 **Usage:**
 ```bash
-dotnet run -- search query --index-path <index-directory> --query <search-terms> [--max-results <number>] [--sourceIds <id1> <id2> ...]
+pbtk search query --index-path <index-directory> --query <search-terms> [--max-results <number>] [--sourceIds <id1> <id2> ...]
 ```
 
 **Examples:**
 ```bash
 # Search for documents containing specific terms
-dotnet run -- search query --index-path ./search-index --query "hello world"
+pbtk search query --index-path ./search-index --query "hello world"
 
 # Limit results to 5 documents
-dotnet run -- search query --index-path ./docs-index --query "lucene search" --max-results 5
+pbtk search query --index-path ./docs-index --query "lucene search" --max-results 5
 
 # Complex query with operators
-dotnet run -- search query --index-path ./index --query "\"exact phrase\" OR keyword"
+pbtk search query --index-path ./index --query "\"exact phrase\" OR keyword"
 
 # Filter results by source IDs (based on filename without extension)
-dotnet run -- search query --index-path ./index --query "search terms" --sourceIds document1 readme
+pbtk search query --index-path ./index --query "search terms" --sourceIds document1 readme
 ```
 
 **Details:**
@@ -176,12 +176,12 @@ Executes a Brainfuck program from a file.
 
 **Usage:**
 ```bash
-dotnet run -- interpreters brainfuck --file <program-file>
+pbtk interpreters brainfuck --file <program-file>
 ```
 
 **Example:**
 ```bash
-dotnet run -- interpreters brainfuck --file hello-world.bf
+pbtk interpreters brainfuck --file hello-world.bf
 ```
 
 #### ook
@@ -189,12 +189,12 @@ Executes an Ook program from a file.
 
 **Usage:**
 ```bash
-dotnet run -- interpreters ook --file <program-file>
+pbtk interpreters ook --file <program-file>
 ```
 
 **Example:**
 ```bash
-dotnet run -- interpreters ook --file hello-world.ook
+pbtk interpreters ook --file hello-world.ook
 ```
 
 ### images
@@ -207,21 +207,21 @@ Encode or decode hidden messages in images using least significant bit (LSB) ste
 
 **Encoding a message:**
 ```bash
-dotnet run -- images steganography --mode encode --image <input-image> --message <message> --output <output-image>
+pbtk images steganography --mode encode --image <input-image> --message <message> --output <output-image>
 ```
 
 **Decoding a message:**
 ```bash
-dotnet run -- images steganography --mode decode --image <encoded-image>
+pbtk images steganography --mode decode --image <encoded-image>
 ```
 
 **Examples:**
 ```bash
 # Hide a secret message in an image
-dotnet run -- images steganography --mode encode --image photo.jpg --message "This is secret!" --output encoded.png
+pbtk images steganography --mode encode --image photo.jpg --message "This is secret!" --output encoded.png
 
 # Extract the hidden message
-dotnet run -- images steganography --mode decode --image encoded.png
+pbtk images steganography --mode decode --image encoded.png
 ```
 
 ### web
@@ -232,7 +232,7 @@ Serves a static HTML file via HTTP server.
 
 **Usage:**
 ```bash
-dotnet run -- web serve-html --file <html-file> [--port <port>]
+pbtk web serve-html --file <html-file> [--port <port>]
 ```
 
 **Options:**
@@ -242,10 +242,10 @@ dotnet run -- web serve-html --file <html-file> [--port <port>]
 **Examples:**
 ```bash
 # Serve an HTML file on default port 8080
-dotnet run -- web serve-html --file index.html
+pbtk web serve-html --file index.html
 
 # Serve on a specific port
-dotnet run -- web serve-html --file test.html --port 3000
+pbtk web serve-html --file test.html --port 3000
 ```
 
 ### openai
@@ -256,7 +256,7 @@ Chat with OpenAI models maintaining conversation history.
 
 **Usage:**
 ```bash
-dotnet run -- openai chat --message <message> [--chat-history <history-file>] [--model <model-name>]
+pbtk openai chat --message <message> [--chat-history <history-file>] [--model <model-name>]
 ```
 
 **Options:**
@@ -267,19 +267,19 @@ dotnet run -- openai chat --message <message> [--chat-history <history-file>] [-
 **Examples:**
 ```bash
 # Simple message without history
-dotnet run -- openai chat --message "What is the capital of France?"
+pbtk openai chat --message "What is the capital of France?"
 
 # Start a conversation with history tracking
-dotnet run -- openai chat --message "Hello, my name is Alice" --chat-history ./chat.json
+pbtk openai chat --message "Hello, my name is Alice" --chat-history ./chat.json
 
 # Continue the conversation (remembers previous context)
-dotnet run -- openai chat --message "What's my name?" --chat-history ./chat.json
+pbtk openai chat --message "What's my name?" --chat-history ./chat.json
 
 # Use a specific model
-dotnet run -- openai chat --message "Explain quantum computing" --model "gpt-4o-mini"
+pbtk openai chat --message "Explain quantum computing" --model "gpt-4o-mini"
 
 # Complex conversation with specific model and history
-dotnet run -- openai chat --message "Continue our discussion about AI" --chat-history ./ai-chat.json --model "gpt-4o"
+pbtk openai chat --message "Continue our discussion about AI" --chat-history ./ai-chat.json --model "gpt-4o"
 ```
 
 **Details:**
@@ -296,7 +296,7 @@ Translate text to a target language using OpenAI.
 
 **Usage:**
 ```bash
-dotnet run -- openai translate --text <text-to-translate> --target-language <target-language> [--model <model-name>]
+pbtk openai translate --text <text-to-translate> --target-language <target-language> [--model <model-name>]
 ```
 
 **Options:**
@@ -307,13 +307,13 @@ dotnet run -- openai translate --text <text-to-translate> --target-language <tar
 **Examples:**
 ```bash
 # Translate text to Spanish
-dotnet run -- openai translate --text "Hello, how are you?" --target-language "Spanish"
+pbtk openai translate --text "Hello, how are you?" --target-language "Spanish"
 
 # Translate to French using a specific model
-dotnet run -- openai translate --text "Good morning" --target-language "French" --model "gpt-4o-mini"
+pbtk openai translate --text "Good morning" --target-language "French" --model "gpt-4o-mini"
 
 # Translate complex text
-dotnet run -- openai translate --text "The weather is beautiful today" --target-language "German"
+pbtk openai translate --text "The weather is beautiful today" --target-language "German"
 ```
 
 **Environment Setup:**
@@ -322,9 +322,9 @@ dotnet run -- openai translate --text "The weather is beautiful today" --target-
 export OPENAI_API_KEY="your-api-key-here"
 
 # Then use the openai commands
-dotnet run -- openai chat --message "Hello!"
-dotnet run -- openai translate --text "Hello!" --target-language "Spanish"
-dotnet run -- openai ocaaar --image-path "./image.jpg"
+pbtk openai chat --message "Hello!"
+pbtk openai translate --text "Hello!" --target-language "Spanish"
+pbtk openai ocaaar --image-path "./image.jpg"
 ```
 
 #### ocaaar
@@ -332,7 +332,7 @@ Extract text from an image and translate it to pirate speak using OpenAI vision 
 
 **Usage:**
 ```bash
-dotnet run -- openai ocaaar --image-path <image-file> [--model <model-name>]
+pbtk openai ocaaar --image-path <image-file> [--model <model-name>]
 ```
 
 **Options:**
@@ -342,13 +342,13 @@ dotnet run -- openai ocaaar --image-path <image-file> [--model <model-name>]
 **Examples:**
 ```bash
 # Extract text from an image and get pirate translation
-dotnet run -- openai ocaaar --image-path poster.jpg
+pbtk openai ocaaar --image-path poster.jpg
 
 # Use a specific model for better OCR accuracy
-dotnet run -- openai ocaaar --image-path document.png --model "gpt-4o"
+pbtk openai ocaaar --image-path document.png --model "gpt-4o"
 
 # Process a screenshot with text
-dotnet run -- openai ocaaar --image-path screenshot.png
+pbtk openai ocaaar --image-path screenshot.png
 ```
 
 **Details:**
@@ -367,7 +367,7 @@ Hosts an MCP server that performs BM25 similarity search against a Lucene.NET in
 
 **Usage:**
 ```bash
-dotnet run -- mcp rag-server --index-path <index-directory>
+pbtk mcp rag-server --index-path <index-directory>
 ```
 
 **Options:**
@@ -376,10 +376,10 @@ dotnet run -- mcp rag-server --index-path <index-directory>
 **Examples:**
 ```bash
 # Start MCP server with an existing search index
-dotnet run -- mcp rag-server --index-path ./search-index
+pbtk mcp rag-server --index-path ./search-index
 
 # Use with Claude Desktop or other MCP clients
-dotnet run -- mcp rag-server --index-path ./docs-index
+pbtk mcp rag-server --index-path ./docs-index
 ```
 
 **Details:**
@@ -411,10 +411,10 @@ dotnet run -- mcp rag-server --index-path ./docs-index
 First create an index, then start the MCP server:
 ```bash
 # 1. Create search index from your documents
-dotnet run -- search ingest --index-path ./my-docs --content-path documentation.md
+pbtk search ingest --index-path ./my-docs --content-path documentation.md
 
 # 2. Start MCP server for AI integration
-dotnet run -- mcp rag-server --index-path ./my-docs
+pbtk mcp rag-server --index-path ./my-docs
 ```
 
 ## Help
