@@ -1,15 +1,19 @@
 using OpenAI.Chat;
 using System.Text.Json;
+using Pixelbadger.Toolkit.Services;
 
 namespace Pixelbadger.Toolkit.Components;
 
-public class ChatComponent : BaseOpenAiComponent
+public class ChatComponent
 {
-    public ChatComponent(string model = "gpt-5-nano") : base(model)
+    private readonly IOpenAiClientService _openAiClientService;
+
+    public ChatComponent(IOpenAiClientService openAiClientService)
     {
+        _openAiClientService = openAiClientService;
     }
 
-    public async Task<string> ChatAsync(string question, string? chatHistoryPath)
+    public async Task<string> ChatAsync(string question, string? chatHistoryPath, string model = "gpt-5-nano")
     {
         var messages = new List<ChatMessage>();
 
@@ -31,7 +35,8 @@ public class ChatComponent : BaseOpenAiComponent
         messages.Add(ChatMessage.CreateUserMessage(question));
 
         // Get response from OpenAI
-        var response = await _chatClient.CompleteChatAsync(messages);
+        var chatClient = _openAiClientService.GetChatClient(model);
+        var response = await chatClient.CompleteChatAsync(messages);
         var assistantMessage = response.Value.Content[0].Text;
 
         // Save updated conversation history

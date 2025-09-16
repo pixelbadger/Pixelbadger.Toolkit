@@ -40,19 +40,28 @@ The project follows a topic-based command architecture with a component-per-comm
 
 ### Pattern Guidelines:
 1. **One Component Per Command**: Each command action (e.g., `chat`, `translate`, `ocaaar`) should have its own component class
-2. **Base Classes for Shared Logic**: Use base classes to share common functionality (e.g., `BaseOpenAiComponent` for OpenAI-related commands)
+2. **Composition Over Inheritance**: Use dependency injection with service classes for shared functionality rather than base classes
 3. **Clear Naming**: Component names should match the command action (e.g., `ChatComponent`, `TranslateComponent`, `OcaaarComponent`)
 4. **Single Responsibility**: Each component should handle only one specific functionality
 5. **Minimal Dependencies**: Components should only depend on what they actually need
+6. **Interface-Based Services**: Create interfaces for shared services to enable easier testing and flexibility
 
 ### Example Structure:
 ```
+Services/
+└── OpenAiClientService.cs      # Shared OpenAI functionality (with interface)
+
 Components/
-├── BaseOpenAiComponent.cs      # Shared OpenAI functionality
-├── ChatComponent.cs            # Chat command logic
-├── TranslateComponent.cs       # Translate command logic
-└── OcaaarComponent.cs          # Ocaaar command logic
+├── ChatComponent.cs            # Chat command logic (injects IOpenAiClientService)
+├── TranslateComponent.cs       # Translate command logic (injects IOpenAiClientService)
+└── OcaaarComponent.cs          # Ocaaar command logic (injects IOpenAiClientService)
 ```
+
+### Dependency Injection Pattern:
+- Components receive dependencies through constructor injection
+- Shared functionality is provided through service classes with interfaces
+- Commands instantiate services and inject them into components
+- This approach makes components more testable and loosely coupled
 
 Each topic command follows the pattern:
 1. Create a main topic command with description

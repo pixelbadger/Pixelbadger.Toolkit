@@ -1,14 +1,18 @@
 using OpenAI.Chat;
+using Pixelbadger.Toolkit.Services;
 
 namespace Pixelbadger.Toolkit.Components;
 
-public class OcaaarComponent : BaseOpenAiComponent
+public class OcaaarComponent
 {
-    public OcaaarComponent(string model = "gpt-5-nano") : base(model)
+    private readonly IOpenAiClientService _openAiClientService;
+
+    public OcaaarComponent(IOpenAiClientService openAiClientService)
     {
+        _openAiClientService = openAiClientService;
     }
 
-    public async Task<string> OcaaarAsync(string imagePath)
+    public async Task<string> OcaaarAsync(string imagePath, string model = "gpt-5-nano")
     {
         if (!File.Exists(imagePath))
         {
@@ -28,7 +32,8 @@ public class OcaaarComponent : BaseOpenAiComponent
             )
         };
 
-        var response = await _chatClient.CompleteChatAsync(messages);
+        var chatClient = _openAiClientService.GetChatClient(model);
+        var response = await chatClient.CompleteChatAsync(messages);
         return response.Value.Content[0].Text;
     }
 

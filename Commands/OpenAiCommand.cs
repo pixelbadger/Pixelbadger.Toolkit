@@ -1,5 +1,6 @@
 using System.CommandLine;
 using Pixelbadger.Toolkit.Components;
+using Pixelbadger.Toolkit.Services;
 
 namespace Pixelbadger.Toolkit.Commands;
 
@@ -50,8 +51,9 @@ public static class OpenAiCommand
         {
             try
             {
-                var chatComponent = new ChatComponent(model);
-                var response = await chatComponent.ChatAsync(message, chatHistory);
+                var openAiClientService = new OpenAiClientService();
+                var chatComponent = new ChatComponent(openAiClientService);
+                var response = await chatComponent.ChatAsync(message, chatHistory, model);
 
                 Console.WriteLine(response);
             }
@@ -99,8 +101,9 @@ public static class OpenAiCommand
         {
             try
             {
-                var translateComponent = new TranslateComponent(model);
-                var translation = await translateComponent.TranslateAsync(text, targetLanguage);
+                var openAiClientService = new OpenAiClientService();
+                var translateComponent = new TranslateComponent(openAiClientService);
+                var translation = await translateComponent.TranslateAsync(text, targetLanguage, model);
 
                 Console.WriteLine(translation);
             }
@@ -140,8 +143,9 @@ public static class OpenAiCommand
         {
             try
             {
-                var ocaaarComponent = new OcaaarComponent(model);
-                var response = await ocaaarComponent.OcaaarAsync(imagePath);
+                var openAiClientService = new OpenAiClientService();
+                var ocaaarComponent = new OcaaarComponent(openAiClientService);
+                var response = await ocaaarComponent.OcaaarAsync(imagePath, model);
 
                 Console.WriteLine(response);
             }
