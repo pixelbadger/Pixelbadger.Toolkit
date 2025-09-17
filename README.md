@@ -327,6 +327,7 @@ pbtk openai chat --message "Hello!"
 pbtk openai translate --text "Hello!" --target-language "Spanish"
 pbtk openai ocaaar --image-path "./image.jpg"
 pbtk openai corpospeak --source "Hello!" --audience "csuite"
+pbtk openai corpospeak --source "./content.txt" --audience "engineering" --user-messages "./style.txt"
 ```
 
 #### ocaaar
@@ -366,25 +367,31 @@ Rewrite text for enterprise audiences with optional idiolect adaptation using Op
 
 **Usage:**
 ```bash
-pbtk openai corpospeak --source <source-text> --audience <target-audience> [--user-messages <message1> <message2> ...] [--model <model-name>]
+pbtk openai corpospeak --source <source-text-or-file> --audience <target-audience> [--user-messages <message1-or-file> <message2-or-file> ...] [--model <model-name>]
 ```
 
 **Options:**
-- `--source`: The source text to rewrite (required)
+- `--source`: The source text to rewrite (or path to file containing the text) (required)
 - `--audience`: Target audience - one of: csuite, engineering, product, sales, marketing, operations, finance, legal, hr, customer-success (required)
-- `--user-messages`: Optional user messages to learn writing style from (multiple values allowed)
+- `--user-messages`: Optional user messages to learn writing style from (text or file paths, multiple values allowed)
 - `--model`: The OpenAI model to use (optional, default: gpt-5-nano)
 
 **Examples:**
 ```bash
-# Basic audience conversion
+# Basic audience conversion with direct text
 pbtk openai corpospeak --source "API performance is great" --audience "csuite"
 
-# Convert for engineering team
-pbtk openai corpospeak --source "New feature deployed" --audience "engineering"
+# Convert for engineering team using file input
+pbtk openai corpospeak --source ./technical-update.txt --audience "engineering"
 
-# With idiolect adaptation using user writing examples
+# With idiolect adaptation using direct text examples
 pbtk openai corpospeak --source "System upgrade complete" --audience "sales" --user-messages "Hey team!" "Let's crush this quarter!"
+
+# With idiolect adaptation using file-based examples
+pbtk openai corpospeak --source ./announcement.txt --audience "product" --user-messages ./user-style1.txt ./user-style2.txt
+
+# Mixed file and text inputs
+pbtk openai corpospeak --source ./release-notes.txt --audience "marketing" --user-messages "Our users love this!" ./brand-voice.txt
 
 # Use specific model for better results
 pbtk openai corpospeak --source "Database migration finished" --audience "operations" --model "gpt-4o"
