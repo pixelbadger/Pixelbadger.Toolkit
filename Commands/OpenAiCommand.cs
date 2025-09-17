@@ -166,7 +166,7 @@ public static class OpenAiCommand
 
         var sourceOption = new Option<string>(
             aliases: ["--source"],
-            description: "The source text to rewrite")
+            description: "The source text to rewrite (or path to file containing the text)")
         {
             IsRequired = true
         };
@@ -180,7 +180,7 @@ public static class OpenAiCommand
 
         var userMessagesOption = new Option<string[]>(
             aliases: ["--user-messages"],
-            description: "Optional user messages to learn idiolect from (multiple values allowed)")
+            description: "Optional user messages to learn idiolect from (text or file paths, multiple values allowed)")
         {
             IsRequired = false,
             AllowMultipleArgumentsPerToken = true
