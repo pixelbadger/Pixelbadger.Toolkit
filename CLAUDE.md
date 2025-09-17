@@ -45,6 +45,8 @@ The project is .NET 9, and uses Microsoft's System.CommandLine library for build
   - `pbtk openai chat --message "Continue our conversation" --chat-history ./chat.json --model "gpt-4o-mini"`
   - `pbtk openai translate --text "Hello, how are you?" --target-language "Spanish"`
   - `pbtk openai ocaaar --image-path ./image.jpg`
+  - `pbtk openai corpospeak --source "API performance is great" --audience "csuite"`
+  - `pbtk openai corpospeak --source "New feature deployed" --audience "engineering" --user-messages "Hey team" "Let's ship this"`
 
 ## Architecture
 
@@ -98,7 +100,7 @@ Available topics and actions:
 - **interpreters**: brainfuck, ook
 - **images**: steganography
 - **web**: serve-html
-- **openai**: chat, translate, ocaaar
+- **openai**: chat, translate, ocaaar, corpospeak
 
 ## Dependencies
 
