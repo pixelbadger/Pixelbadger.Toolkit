@@ -28,6 +28,15 @@ The project is .NET 9, and uses Microsoft's System.CommandLine library for build
 - Update the `<Version>` element in `Pixelbadger.Toolkit.csproj`
 - PR validation will fail if version has not been incremented from the published NuGet package
 
+### README Maintenance
+
+**CRITICAL**: All new commands, topics, or modifications to existing functionality must trigger a README review and update:
+- **New topics or actions**: Add to table of contents and create detailed sections with usage examples
+- **Modified commands**: Update existing documentation, examples, and option descriptions
+- **Ensure consistency**: README examples must match CLAUDE.md examples and actual command behavior
+- **Complete documentation**: Include usage, options, examples, and technical details for each command
+- README updates are mandatory for any PR that adds or modifies CLI functionality
+
 ### Development Commands
 
 - **Build**: `dotnet build`
