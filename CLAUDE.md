@@ -19,6 +19,15 @@ The project is .NET 9, and uses Microsoft's System.CommandLine library for build
 - Complete the current feature branch before starting any new work
 - Merge feature branches back to master when complete
 
+### Version Management
+
+**CRITICAL**: All PRs must include a package version bump following semantic versioning (SemVer):
+- **PATCH** (x.x.X): Bug fixes, documentation updates, minor internal changes
+- **MINOR** (x.X.x): New features, new functionality, backward-compatible changes
+- **MAJOR** (X.x.x): Breaking changes, API changes that require user action
+- Update the `<Version>` element in `Pixelbadger.Toolkit.csproj`
+- PR validation will fail if version has not been incremented from the published NuGet package
+
 ### Development Commands
 
 - **Build**: `dotnet build`
