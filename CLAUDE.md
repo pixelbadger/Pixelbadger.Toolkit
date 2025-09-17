@@ -28,6 +28,15 @@ The project is .NET 9, and uses Microsoft's System.CommandLine library for build
 - Update the `<Version>` element in `Pixelbadger.Toolkit.csproj`
 - PR validation will fail if version has not been incremented from the published NuGet package
 
+### README Maintenance
+
+**CRITICAL**: All new commands, topics, or modifications to existing functionality must trigger a README review and update:
+- **New topics or actions**: Add to table of contents and create detailed sections with usage examples
+- **Modified commands**: Update existing documentation, examples, and option descriptions
+- **Ensure consistency**: README examples must match CLAUDE.md examples and actual command behavior
+- **Complete documentation**: Include usage, options, examples, and technical details for each command
+- README updates are mandatory for any PR that adds or modifies CLI functionality
+
 ### Development Commands
 
 - **Build**: `dotnet build`
@@ -45,6 +54,8 @@ The project is .NET 9, and uses Microsoft's System.CommandLine library for build
   - `pbtk openai chat --message "Continue our conversation" --chat-history ./chat.json --model "gpt-4o-mini"`
   - `pbtk openai translate --text "Hello, how are you?" --target-language "Spanish"`
   - `pbtk openai ocaaar --image-path ./image.jpg`
+  - `pbtk openai corpospeak --source "API performance is great" --audience "csuite"`
+  - `pbtk openai corpospeak --source "New feature deployed" --audience "engineering" --user-messages "Hey team" "Let's ship this"`
 
 ## Architecture
 
@@ -98,7 +109,7 @@ Available topics and actions:
 - **interpreters**: brainfuck, ook
 - **images**: steganography
 - **web**: serve-html
-- **openai**: chat, translate, ocaaar
+- **openai**: chat, translate, ocaaar, corpospeak
 
 ## Dependencies
 

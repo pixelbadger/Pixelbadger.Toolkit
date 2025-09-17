@@ -24,6 +24,7 @@ A CLI toolkit exposing varied functionality organized by topic, including string
     - [chat](#chat)
     - [translate](#translate)
     - [ocaaar](#ocaaar)
+    - [corpospeak](#corpospeak)
   - [mcp](#mcp)
     - [rag-server](#rag-server)
 - [Help](#help)
@@ -325,6 +326,7 @@ export OPENAI_API_KEY="your-api-key-here"
 pbtk openai chat --message "Hello!"
 pbtk openai translate --text "Hello!" --target-language "Spanish"
 pbtk openai ocaaar --image-path "./image.jpg"
+pbtk openai corpospeak --source "Hello!" --audience "csuite"
 ```
 
 #### ocaaar
@@ -358,6 +360,55 @@ pbtk openai ocaaar --image-path screenshot.png
 - Automatically translates extracted text to pirate dialect
 - Returns only the pirate-translated text without additional commentary
 - Perfect for humorous OCR processing of signs, documents, or any text-containing images
+
+#### corpospeak
+Rewrite text for enterprise audiences with optional idiolect adaptation using OpenAI.
+
+**Usage:**
+```bash
+pbtk openai corpospeak --source <source-text> --audience <target-audience> [--user-messages <message1> <message2> ...] [--model <model-name>]
+```
+
+**Options:**
+- `--source`: The source text to rewrite (required)
+- `--audience`: Target audience - one of: csuite, engineering, product, sales, marketing, operations, finance, legal, hr, customer-success (required)
+- `--user-messages`: Optional user messages to learn writing style from (multiple values allowed)
+- `--model`: The OpenAI model to use (optional, default: gpt-5-nano)
+
+**Examples:**
+```bash
+# Basic audience conversion
+pbtk openai corpospeak --source "API performance is great" --audience "csuite"
+
+# Convert for engineering team
+pbtk openai corpospeak --source "New feature deployed" --audience "engineering"
+
+# With idiolect adaptation using user writing examples
+pbtk openai corpospeak --source "System upgrade complete" --audience "sales" --user-messages "Hey team!" "Let's crush this quarter!"
+
+# Use specific model for better results
+pbtk openai corpospeak --source "Database migration finished" --audience "operations" --model "gpt-4o"
+```
+
+**Details:**
+- Requires `OPENAI_API_KEY` environment variable to be set
+- **Two-stage processing**: First converts text for target audience, then optionally adapts to user's writing style
+- **Separate chat instances**: Audience conversion and idiolect rewrite use independent OpenAI conversations
+- **Comprehensive audience support**: Covers major enterprise tech organization roles
+- **Robust validation**: Validates audience parameters with helpful error messages
+- Perfect for adapting technical content for different stakeholders while maintaining accuracy
+
+**Supported Audiences:**
+- **csuite/executive**: Strategic, business impact focused language
+- **engineering**: Technical precision and implementation details
+- **product**: User impact and feature strategy focus
+- **sales**: Value propositions and competitive advantages
+- **marketing**: Market appeal and customer messaging
+- **operations**: Scalability and reliability emphasis
+- **finance**: Cost implications and ROI focus
+- **legal**: Risk assessment and compliance considerations
+- **hr**: People impact and organizational dynamics
+- **customer-success**: Customer experience and support focus
 
 ### mcp
 Model Context Protocol server utilities for AI integration.

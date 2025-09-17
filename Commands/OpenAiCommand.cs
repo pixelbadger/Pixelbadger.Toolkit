@@ -13,6 +13,7 @@ public static class OpenAiCommand
         command.AddCommand(CreateChatCommand());
         command.AddCommand(CreateTranslateCommand());
         command.AddCommand(CreateOcaaarCommand());
+        command.AddCommand(CreateCorpospeakCommand());
 
         return command;
     }
@@ -155,6 +156,65 @@ public static class OpenAiCommand
                 Environment.Exit(1);
             }
         }, imagePathOption, modelOption);
+
+        return command;
+    }
+
+    private static Command CreateCorpospeakCommand()
+    {
+        var command = new Command("corpospeak", "Rewrite text for enterprise audiences with optional idiolect adaptation");
+
+        var sourceOption = new Option<string>(
+            aliases: ["--source"],
+            description: "The source text to rewrite")
+        {
+            IsRequired = true
+        };
+
+        var audienceOption = new Option<string>(
+            aliases: ["--audience"],
+            description: "Target audience (csuite, engineering, product, sales, marketing, operations, finance, legal, hr, customer-success)")
+        {
+            IsRequired = true
+        };
+
+        var userMessagesOption = new Option<string[]>(
+            aliases: ["--user-messages"],
+            description: "Optional user messages to learn idiolect from (multiple values allowed)")
+        {
+            IsRequired = false,
+            AllowMultipleArgumentsPerToken = true
+        };
+
+        var modelOption = new Option<string>(
+            aliases: ["--model"],
+            description: "The OpenAI model to use",
+            getDefaultValue: () => "gpt-5-nano")
+        {
+            IsRequired = false
+        };
+
+        command.AddOption(sourceOption);
+        command.AddOption(audienceOption);
+        command.AddOption(userMessagesOption);
+        command.AddOption(modelOption);
+
+        command.SetHandler(async (string source, string audience, string[] userMessages, string model) =>
+        {
+            try
+            {
+                var openAiClientService = new OpenAiClientService();
+                var corpospeakComponent = new CorpospeakComponent(openAiClientService);
+                var result = await corpospeakComponent.CorpospeakAsync(source, audience, userMessages ?? [], model);
+
+                Console.WriteLine(result);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error: {ex.Message}");
+                Environment.Exit(1);
+            }
+        }, sourceOption, audienceOption, userMessagesOption, modelOption);
 
         return command;
     }
