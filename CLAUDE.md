@@ -8,7 +8,18 @@ For example, the CLI arguments "strings reverse --in-file hw.txt --out-file hw-r
 
 The project is .NET 9, and uses Microsoft's System.CommandLine library for building argument sets.
 
-## Development Commands
+## Development Workflow
+
+### Feature Branch Process
+
+**IMPORTANT**: All new features must be developed in feature branches:
+- Create a new branch for each feature: `git checkout -b feature/feature-name`
+- Feature branch names must be prefixed with `feature/`
+- If you're in the middle of another feature, NEVER start a new one
+- Complete the current feature branch before starting any new work
+- Merge feature branches back to master when complete
+
+### Development Commands
 
 - **Build**: `dotnet build`
 - **Package**: `dotnet pack`
