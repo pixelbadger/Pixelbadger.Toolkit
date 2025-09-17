@@ -29,16 +29,12 @@ public class CorpospeakComponent
     {
         ValidateAudience(audience);
 
-        // Step 1: Convert source text for the target audience
-        var audienceText = await ConvertForAudienceAsync(source, audience, model);
+        var prompt = GetCombinedPrompt(audience, source, userMessages);
+        var messages = BuildChatMessages(userMessages, prompt);
 
-        // Step 2: Optional idiolect rewrite if user messages provided
-        if (userMessages.Length > 0)
-        {
-            return await RewriteForIdiolectAsync(audienceText, userMessages, model);
-        }
-
-        return audienceText;
+        var chatClient = _openAiClientService.GetChatClient(model);
+        var response = await chatClient.CompleteChatAsync(messages);
+        return response.Value.Content[0].Text;
     }
 
     private static void ValidateAudience(string audience)
@@ -51,47 +47,25 @@ public class CorpospeakComponent
         }
     }
 
-    private async Task<string> ConvertForAudienceAsync(string source, string audience, string model)
-    {
-        var prompt = GetAudiencePrompt(audience, source);
-
-        var messages = new List<ChatMessage>
-        {
-            ChatMessage.CreateUserMessage(prompt)
-        };
-
-        var chatClient = _openAiClientService.GetChatClient(model);
-        var response = await chatClient.CompleteChatAsync(messages);
-        return response.Value.Content[0].Text;
-    }
-
-    private async Task<string> RewriteForIdiolectAsync(string audienceText, string[] userMessages, string model)
+    private static List<ChatMessage> BuildChatMessages(string[] userMessages, string prompt)
     {
         var messages = new List<ChatMessage>();
 
-        // Add user messages as examples of the user's writing style
-        foreach (var userMessage in userMessages)
+        if (userMessages.Length > 0)
         {
-            messages.Add(ChatMessage.CreateUserMessage(userMessage));
-            // Add a placeholder assistant response to maintain conversation structure
-            messages.Add(ChatMessage.CreateAssistantMessage("I understand your writing style."));
+            // Add user messages as examples of the user's writing style
+            foreach (var userMessage in userMessages)
+            {
+                messages.Add(ChatMessage.CreateUserMessage(userMessage));
+                messages.Add(ChatMessage.CreateAssistantMessage("I understand your writing style."));
+            }
         }
 
-        // Add the main rewrite request
-        var rewritePrompt = $@"Based on the writing style demonstrated in the previous messages, please rewrite the following text to match that idiolect and tone:
-
-{audienceText}
-
-Maintain the core content and message, but adapt the language, tone, and style to match the user's demonstrated writing patterns.";
-
-        messages.Add(ChatMessage.CreateUserMessage(rewritePrompt));
-
-        var chatClient = _openAiClientService.GetChatClient(model);
-        var response = await chatClient.CompleteChatAsync(messages);
-        return response.Value.Content[0].Text;
+        messages.Add(ChatMessage.CreateUserMessage(prompt));
+        return messages;
     }
 
-    private static string GetAudiencePrompt(string audience, string source)
+    private static string GetCombinedPrompt(string audience, string source, string[] userMessages)
     {
         var normalizedAudience = audience.ToLowerInvariant().Trim();
 
@@ -130,7 +104,7 @@ Maintain the core content and message, but adapt the language, tone, and style t
             _ => "a professional enterprise technology audience"
         };
 
-        return $@"You are an expert technical communicator specializing in enterprise technology organizations.
+        var basePrompt = $@"You are an expert technical communicator specializing in enterprise technology organizations.
 
 Rewrite the following source text to be appropriate for {audienceContext}
 
@@ -142,8 +116,16 @@ Requirements:
 - Adapt tone, language, and emphasis for the target audience
 - Use terminology and framing that resonates with this audience
 - Keep the same general structure but optimize for audience comprehension and engagement
-- Be concise but comprehensive
+- Be concise but comprehensive";
 
-Provide only the rewritten text, no meta-commentary.";
+        if (userMessages.Length > 0)
+        {
+            basePrompt += @"
+- Additionally, adapt the writing style, tone, and idiolect to match the patterns demonstrated in the previous messages in this conversation
+- Maintain the core content and message while matching the user's demonstrated communication style";
+        }
+
+        basePrompt += "\n\nProvide only the rewritten text, no meta-commentary.";
+        return basePrompt;
     }
 }
