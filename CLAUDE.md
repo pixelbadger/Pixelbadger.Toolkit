@@ -8,7 +8,27 @@ For example, the CLI arguments "strings reverse --in-file hw.txt --out-file hw-r
 
 The project is .NET 9, and uses Microsoft's System.CommandLine library for building argument sets.
 
-## Development Commands
+## Development Workflow
+
+### Feature Branch Process
+
+**IMPORTANT**: All new features must be developed in feature branches:
+- Create a new branch for each feature: `git checkout -b feature/feature-name`
+- Feature branch names must be prefixed with `feature/`
+- If you're in the middle of another feature, NEVER start a new one
+- Complete the current feature branch before starting any new work
+- Merge feature branches back to master when complete
+
+### Version Management
+
+**CRITICAL**: All PRs must include a package version bump following semantic versioning (SemVer):
+- **PATCH** (x.x.X): Bug fixes, documentation updates, minor internal changes
+- **MINOR** (x.X.x): New features, new functionality, backward-compatible changes
+- **MAJOR** (X.x.x): Breaking changes, API changes that require user action
+- Update the `<Version>` element in `Pixelbadger.Toolkit.csproj`
+- PR validation will fail if version has not been incremented from the published NuGet package
+
+### Development Commands
 
 - **Build**: `dotnet build`
 - **Package**: `dotnet pack`
