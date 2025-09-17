@@ -29,8 +29,11 @@ public class CorpospeakComponent
     {
         ValidateAudience(audience);
 
-        var prompt = GetCombinedPrompt(audience, source, userMessages);
-        var messages = BuildChatMessages(userMessages, prompt);
+        var resolvedSource = await ResolveTextOrFilePath(source);
+        var resolvedUserMessages = await ResolveTextOrFilePathArray(userMessages);
+
+        var prompt = GetCombinedPrompt(audience, resolvedSource, resolvedUserMessages);
+        var messages = BuildChatMessages(resolvedUserMessages, prompt);
 
         var chatClient = _openAiClientService.GetChatClient(model);
         var response = await chatClient.CompleteChatAsync(messages);
@@ -127,5 +130,24 @@ Requirements:
 
         basePrompt += "\n\nProvide only the rewritten text, no meta-commentary.";
         return basePrompt;
+    }
+
+    private static async Task<string> ResolveTextOrFilePath(string input)
+    {
+        if (File.Exists(input))
+        {
+            return await File.ReadAllTextAsync(input);
+        }
+        return input;
+    }
+
+    private static async Task<string[]> ResolveTextOrFilePathArray(string[] inputs)
+    {
+        var resolvedInputs = new string[inputs.Length];
+        for (int i = 0; i < inputs.Length; i++)
+        {
+            resolvedInputs[i] = await ResolveTextOrFilePath(inputs[i]);
+        }
+        return resolvedInputs;
     }
 }

@@ -12,12 +12,22 @@ The project is .NET 9, and uses Microsoft's System.CommandLine library for build
 
 ### Feature Branch Process
 
-**IMPORTANT**: All new features must be developed in feature branches:
-- Create a new branch for each feature: `git checkout -b feature/feature-name`
-- Feature branch names must be prefixed with `feature/`
-- If you're in the middle of another feature, NEVER start a new one
-- Complete the current feature branch before starting any new work
-- Merge feature branches back to master when complete
+**CRITICAL - ALWAYS CHECK BRANCH FIRST**: All new features must be developed in feature branches:
+- **BEFORE starting any work**: Check current branch with `git status` or `git branch`
+- **Create a new branch for each feature**: `git checkout -b feature/feature-name`
+- **Feature branch names must be prefixed with `feature/`**
+- **If you're in the middle of another feature, NEVER start a new one**
+- **Complete the current feature branch before starting any new work**
+- **Merge feature branches back to master when complete**
+- **NEVER add unrelated features to existing feature branches**
+
+**Branch Workflow Checklist**:
+1. Check current branch status
+2. If on existing feature branch, complete that work first
+3. Create new feature branch for new work
+4. Implement feature on correct branch
+5. Test and validate changes
+6. Create PR when feature is complete
 
 ### Version Management
 
