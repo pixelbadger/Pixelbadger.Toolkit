@@ -3,6 +3,8 @@ name: Build, Pack, and Publish to NuGet
 on:
   push:
     branches: [ master ]
+    paths:
+      - 'Pixelbadger.Toolkit/**'
 
 jobs:
   build-and-test:
