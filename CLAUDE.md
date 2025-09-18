@@ -31,12 +31,20 @@ The project is .NET 9, and uses Microsoft's System.CommandLine library for build
 
 ### Version Management
 
-**CRITICAL**: All PRs must include a package version bump following semantic versioning (SemVer):
-- **PATCH** (x.x.X): Bug fixes, documentation updates, minor internal changes
+**CRITICAL**: PRs that modify the main project code must include a package version bump following semantic versioning (SemVer):
+- **PATCH** (x.x.X): Bug fixes, minor internal changes, non-breaking updates
 - **MINOR** (x.X.x): New features, new functionality, backward-compatible changes
 - **MAJOR** (X.x.x): Breaking changes, API changes that require user action
 - Update the `<Version>` element in `Pixelbadger.Toolkit.csproj`
 - PR validation will fail if version has not been incremented from the published NuGet package
+
+**Version bumps are NOT required for**:
+- Internal documentation changes (CLAUDE.md, code comments)
+- Test-only changes (adding/modifying files in `Pixelbadger.Toolkit.Tests/`)
+- GitHub Actions workflow changes (`.github/` folder)
+- Repository configuration files (.gitignore, .editorconfig, etc.)
+
+**Note**: README.md changes DO require version bumps as the README is published with the NuGet package.
 
 ### README Maintenance
 
@@ -50,6 +58,7 @@ The project is .NET 9, and uses Microsoft's System.CommandLine library for build
 ### Development Commands
 
 - **Build**: `dotnet build`
+- **Test**: `dotnet test`
 - **Package**: `dotnet pack`
 - **Publish to NuGet**: `dotnet nuget push bin/Release/Pixelbadger.Toolkit.*.nupkg --source https://api.nuget.org/v3/index.json --api-key $NUGET_API_KEY`
 - **Install as global tool**: `dotnet tool install --global --add-source ./bin/Release Pixelbadger.Toolkit`
@@ -66,6 +75,110 @@ The project is .NET 9, and uses Microsoft's System.CommandLine library for build
   - `pbtk openai ocaaar --image-path ./image.jpg`
   - `pbtk openai corpospeak --source "API performance is great" --audience "csuite"`
   - `pbtk openai corpospeak --source "New feature deployed" --audience "engineering" --user-messages "Hey team" "Let's ship this"`
+
+### Testing Requirements
+
+**CRITICAL**: All new functionality must include comprehensive unit tests following these requirements:
+
+#### Test Coverage Standards
+- **New Components**: All new component classes must have corresponding test classes with 100% method coverage
+- **New Commands**: All new command actions must have integration tests verifying proper option handling and error cases
+- **Refactoring**: When refactoring existing code, ensure tests exist or add them before refactoring
+- **Bug Fixes**: All bug fixes must include regression tests that would have caught the original issue
+
+#### Testing Framework and Tools
+- **Framework**: xUnit for all unit and integration tests
+- **Assertions**: FluentAssertions for improved readability and better error messages
+- **Mocking**: Moq for dependency mocking, especially for external service dependencies
+- **Test Project**: `Pixelbadger.Toolkit.Tests` - all tests must be in this project
+
+#### Test Organization and Naming
+- **Test Classes**: Named `{ComponentName}Tests.cs` (e.g., `ChatComponentTests.cs`)
+- **Test Methods**: Use descriptive names following pattern `MethodName_Should{ExpectedBehavior}_When{Condition}`
+- **Categories**: Use `[Theory]` and `[InlineData]` for parametrized tests with multiple scenarios
+- **Cleanup**: Implement `IDisposable` for tests requiring resource cleanup (files, directories, etc.)
+
+#### Test Quality Requirements
+- **Isolation**: Each test must be independent and not rely on other tests
+- **Deterministic**: Tests must produce consistent results across different environments
+- **Fast Execution**: Tests should complete quickly (< 1 second per test preferred)
+- **Comprehensive Coverage**: Test success paths, edge cases, error conditions, and security concerns
+
+#### Mocking and Dependency Injection
+- **Interface-Based Design**: All testable components must use dependency injection with interfaces
+- **Service Mocking**: External services (OpenAI, file system, network) must be mockable via interfaces
+- **Constructor Injection**: Components should receive dependencies through constructor injection
+- **Example Pattern**:
+  ```csharp
+  public class ExampleComponentTests
+  {
+      private readonly Mock<IExternalService> _mockService;
+      private readonly ExampleComponent _component;
+
+      public ExampleComponentTests()
+      {
+          _mockService = new Mock<IExternalService>();
+          _component = new ExampleComponent(_mockService.Object);
+      }
+  }
+  ```
+
+#### File and Resource Handling in Tests
+- **Temporary Files**: Use `Path.GetTempPath()` and `Guid.NewGuid()` for unique test directories
+- **Cleanup**: Always clean up temporary files and directories in test disposal
+- **Test Assets**: Store reusable test files in `test-assets/` folder (gitignored)
+- **Example Pattern**:
+  ```csharp
+  public class FileHandlingTests : IDisposable
+  {
+      private readonly string _testDirectory;
+
+      public FileHandlingTests()
+      {
+          _testDirectory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+          Directory.CreateDirectory(_testDirectory);
+      }
+
+      public void Dispose()
+      {
+          if (Directory.Exists(_testDirectory))
+              Directory.Delete(_testDirectory, true);
+      }
+  }
+  ```
+
+#### Test Categories and Scenarios
+1. **Success Path Tests**: Verify normal operation with valid inputs
+2. **Edge Case Tests**: Empty inputs, boundary values, special characters
+3. **Error Condition Tests**: Invalid inputs, missing files, network failures
+4. **Security Tests**: Input validation, XML escaping, prompt injection protection
+5. **Performance Tests**: Large inputs, memory usage, timeout scenarios
+6. **Integration Tests**: End-to-end command execution and option parsing
+
+#### Test Execution and CI/CD
+- **Local Development**: Run `dotnet test` before committing changes
+- **PR Validation**: All tests must pass before PR can be merged
+- **Coverage Reporting**: Maintain high test coverage (target 90%+ for new code)
+- **Performance**: Test suite should complete in under 30 seconds
+
+#### Example Test Structure
+```csharp
+[Fact]
+public async Task ComponentMethod_ShouldReturnExpectedResult_WhenValidInputProvided()
+{
+    // Arrange
+    var input = "test input";
+    var expectedOutput = "expected result";
+    _mockService.Setup(x => x.ProcessAsync(input)).ReturnsAsync(expectedOutput);
+
+    // Act
+    var result = await _component.ProcessAsync(input);
+
+    // Assert
+    result.Should().Be(expectedOutput);
+    _mockService.Verify(x => x.ProcessAsync(input), Times.Once);
+}
+```
 
 ## Architecture
 
