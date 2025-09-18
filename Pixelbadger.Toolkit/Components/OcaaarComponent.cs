@@ -12,7 +12,7 @@ public class OcaaarComponent
         _openAiClientService = openAiClientService;
     }
 
-    public async Task<string> OcaaarAsync(string imagePath, string model = "gpt-5-nano")
+    public async Task<string> OcaaarAsync(string imagePath)
     {
         if (!File.Exists(imagePath))
         {
@@ -32,9 +32,7 @@ public class OcaaarComponent
             )
         };
 
-        var chatClient = _openAiClientService.GetChatClient(model);
-        var response = await chatClient.CompleteChatAsync(messages);
-        return response.Value.Content[0].Text;
+        return await _openAiClientService.CompleteChatAsync(messages);
     }
 
     private static string GetImageMediaType(string imagePath)

@@ -25,7 +25,7 @@ public class CorpospeakComponent
         _openAiClientService = openAiClientService;
     }
 
-    public async Task<string> CorpospeakAsync(string source, string audience, string[] userMessages, string model = "gpt-5-nano")
+    public async Task<string> CorpospeakAsync(string source, string audience, string[] userMessages)
     {
         ValidateAudience(audience);
 
@@ -35,9 +35,7 @@ public class CorpospeakComponent
         var prompt = GetCombinedPrompt(audience, resolvedSource, resolvedUserMessages);
         var messages = BuildChatMessages(resolvedUserMessages, prompt);
 
-        var chatClient = _openAiClientService.GetChatClient(model);
-        var response = await chatClient.CompleteChatAsync(messages);
-        return response.Value.Content[0].Text;
+        return await _openAiClientService.CompleteChatAsync(messages);
     }
 
     private static void ValidateAudience(string audience)
