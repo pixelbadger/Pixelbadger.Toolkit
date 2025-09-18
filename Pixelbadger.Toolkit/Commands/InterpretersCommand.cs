@@ -11,6 +11,7 @@ public static class InterpretersCommand
 
         command.AddCommand(CreateBrainfuckCommand());
         command.AddCommand(CreateOokCommand());
+        command.AddCommand(CreateBfToOokCommand());
 
         return command;
     }
@@ -73,6 +74,45 @@ public static class InterpretersCommand
                 Environment.Exit(1);
             }
         }, fileOption);
+
+        return command;
+    }
+
+    private static Command CreateBfToOokCommand()
+    {
+        var command = new Command("bf-to-ook", "Converts a Brainfuck program to Ook language");
+
+        var sourceOption = new Option<string>(
+            aliases: ["--source"],
+            description: "Path to the source Brainfuck program file")
+        {
+            IsRequired = true
+        };
+
+        var outputOption = new Option<string>(
+            aliases: ["--output"],
+            description: "Path to the output Ook program file")
+        {
+            IsRequired = true
+        };
+
+        command.AddOption(sourceOption);
+        command.AddOption(outputOption);
+
+        command.SetHandler(async (string source, string output) =>
+        {
+            try
+            {
+                var component = new BfToOokComponent();
+                await component.TranslateFileAsync(source, output);
+                Console.WriteLine($"Successfully converted {source} to Ook language and saved to {output}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error: {ex.Message}");
+                Environment.Exit(1);
+            }
+        }, sourceOption, outputOption);
 
         return command;
     }
