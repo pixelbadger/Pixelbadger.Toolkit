@@ -52,9 +52,9 @@ public static class OpenAiCommand
         {
             try
             {
-                var openAiClientService = new OpenAiClientService();
+                var openAiClientService = new OpenAiClientService(model);
                 var chatComponent = new ChatComponent(openAiClientService);
-                var response = await chatComponent.ChatAsync(message, chatHistory, model);
+                var response = await chatComponent.ChatAsync(message, chatHistory);
 
                 Console.WriteLine(response);
             }
@@ -102,9 +102,9 @@ public static class OpenAiCommand
         {
             try
             {
-                var openAiClientService = new OpenAiClientService();
+                var openAiClientService = new OpenAiClientService(model);
                 var translateComponent = new TranslateComponent(openAiClientService);
-                var translation = await translateComponent.TranslateAsync(text, targetLanguage, model);
+                var translation = await translateComponent.TranslateAsync(text, targetLanguage);
 
                 Console.WriteLine(translation);
             }
@@ -144,9 +144,9 @@ public static class OpenAiCommand
         {
             try
             {
-                var openAiClientService = new OpenAiClientService();
+                var openAiClientService = new OpenAiClientService(model);
                 var ocaaarComponent = new OcaaarComponent(openAiClientService);
-                var response = await ocaaarComponent.OcaaarAsync(imagePath, model);
+                var response = await ocaaarComponent.OcaaarAsync(imagePath);
 
                 Console.WriteLine(response);
             }
@@ -203,9 +203,9 @@ public static class OpenAiCommand
         {
             try
             {
-                var openAiClientService = new OpenAiClientService();
+                var openAiClientService = new OpenAiClientService(model);
                 var corpospeakComponent = new CorpospeakComponent(openAiClientService);
-                var result = await corpospeakComponent.CorpospeakAsync(source, audience, userMessages ?? [], model);
+                var result = await corpospeakComponent.CorpospeakAsync(source, audience, userMessages ?? []);
 
                 Console.WriteLine(result);
             }

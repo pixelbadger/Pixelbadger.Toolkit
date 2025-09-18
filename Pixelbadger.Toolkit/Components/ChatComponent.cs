@@ -13,7 +13,7 @@ public class ChatComponent
         _openAiClientService = openAiClientService;
     }
 
-    public async Task<string> ChatAsync(string question, string? chatHistoryPath, string model = "gpt-5-nano")
+    public async Task<string> ChatAsync(string question, string? chatHistoryPath)
     {
         var messages = new List<ChatMessage>();
 
@@ -35,9 +35,7 @@ public class ChatComponent
         messages.Add(ChatMessage.CreateUserMessage(question));
 
         // Get response from OpenAI
-        var chatClient = _openAiClientService.GetChatClient(model);
-        var response = await chatClient.CompleteChatAsync(messages);
-        var assistantMessage = response.Value.Content[0].Text;
+        var assistantMessage = await _openAiClientService.CompleteChatAsync(messages);
 
         // Save updated conversation history
         if (!string.IsNullOrEmpty(chatHistoryPath))
