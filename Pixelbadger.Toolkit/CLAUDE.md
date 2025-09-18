@@ -39,10 +39,12 @@ The project is .NET 9, and uses Microsoft's System.CommandLine library for build
 - PR validation will fail if version has not been incremented from the published NuGet package
 
 **Version bumps are NOT required for**:
-- Documentation-only changes (README.md, CLAUDE.md, code comments)
+- Internal documentation changes (CLAUDE.md, code comments)
 - Test-only changes (adding/modifying files in `Pixelbadger.Toolkit.Tests/`)
 - GitHub Actions workflow changes (`.github/` folder)
 - Repository configuration files (.gitignore, .editorconfig, etc.)
+
+**Note**: README.md changes DO require version bumps as the README is published with the NuGet package.
 
 ### README Maintenance
 
