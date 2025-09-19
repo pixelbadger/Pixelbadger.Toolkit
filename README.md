@@ -16,6 +16,7 @@ A CLI toolkit exposing varied functionality organized by topic, including string
   - [interpreters](#interpreters)
     - [brainfuck](#brainfuck)
     - [ook](#ook)
+    - [bf-to-ook](#bf-to-ook)
   - [images](#images)
     - [steganography](#steganography)
   - [web](#web)
@@ -197,6 +198,42 @@ pbtk interpreters ook --file <program-file>
 ```bash
 pbtk interpreters ook --file hello-world.ook
 ```
+
+#### bf-to-ook
+Converts a Brainfuck program to Ook language.
+
+**Usage:**
+```bash
+pbtk interpreters bf-to-ook --source <brainfuck-file> --output <ook-file>
+```
+
+**Options:**
+- `--source`: Path to the source Brainfuck program file (required)
+- `--output`: Path to the output Ook program file (required)
+
+**Examples:**
+```bash
+# Convert a Brainfuck program to Ook
+pbtk interpreters bf-to-ook --source hello.bf --output hello.ook
+
+# Convert and then execute the Ook program
+pbtk interpreters bf-to-ook --source program.bf --output program.ook
+pbtk interpreters ook --file program.ook
+```
+
+**Details:**
+- Translates Brainfuck commands to their Ook equivalents:
+  - `>` → `Ook. Ook?`
+  - `<` → `Ook? Ook.`
+  - `+` → `Ook. Ook.`
+  - `-` → `Ook! Ook!`
+  - `.` → `Ook! Ook.`
+  - `,` → `Ook. Ook!`
+  - `[` → `Ook! Ook?`
+  - `]` → `Ook? Ook!`
+- Creates output directory if it doesn't exist
+- Generated Ook programs are functionally equivalent to the original Brainfuck programs
+- Perfect for converting existing Brainfuck code to Ook for educational or entertainment purposes
 
 ### images
 Image processing and manipulation utilities.
