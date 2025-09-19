@@ -11,6 +11,7 @@ public static class StringsCommand
 
         command.AddCommand(CreateReverseCommand());
         command.AddCommand(CreateLevenshteinDistanceCommand());
+        command.AddCommand(CreateAbjadifyCommand());
 
         return command;
     }
@@ -91,6 +92,46 @@ public static class StringsCommand
                 Environment.Exit(1);
             }
         }, string1Option, string2Option);
+
+        return command;
+    }
+
+    private static Command CreateAbjadifyCommand()
+    {
+        var command = new Command("abjadify", "Strips English vowels from text while preserving single vowel words");
+
+        var inFileOption = new Option<string>(
+            aliases: ["--in-file"],
+            description: "Input file path")
+        {
+            IsRequired = true
+        };
+
+        var outFileOption = new Option<string>(
+            aliases: ["--out-file"],
+            description: "Output file path")
+        {
+            IsRequired = true
+        };
+
+        command.AddOption(inFileOption);
+        command.AddOption(outFileOption);
+
+        command.SetHandler(async (string inFile, string outFile) =>
+        {
+            try
+            {
+                var abjadifyComponent = new AbjadifyComponent();
+                await abjadifyComponent.AbjadifyFileAsync(inFile, outFile);
+
+                Console.WriteLine($"Successfully abjadified content from '{inFile}' to '{outFile}'");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error: {ex.Message}");
+                Environment.Exit(1);
+            }
+        }, inFileOption, outFileOption);
 
         return command;
     }
