@@ -38,6 +38,9 @@ public class SearchIndexer
         var analyzer = new StandardAnalyzer(LUCENE_VERSION);
         var config = new IndexWriterConfig(LUCENE_VERSION, analyzer);
 
+        // Ensure consistent BM25 similarity for both indexing and searching
+        config.Similarity = new BM25Similarity();
+
         using var writer = new IndexWriter(indexDirectory, config);
 
         var sourceId = Path.GetFileNameWithoutExtension(contentPath);
@@ -83,7 +86,7 @@ public class SearchIndexer
         using var reader = DirectoryReader.Open(indexDirectory);
         var searcher = new IndexSearcher(reader);
 
-        // Use BM25 similarity (default in Lucene.NET 4.8)
+        // Use BM25 similarity to match indexing configuration
         searcher.Similarity = new BM25Similarity();
 
         var parser = new QueryParser(LUCENE_VERSION, "content", analyzer);
