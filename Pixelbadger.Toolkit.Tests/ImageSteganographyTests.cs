@@ -17,10 +17,14 @@ public class ImageSteganographyTests : IDisposable
         var sourceImagePath = Path.Combine("test-assets", "test-image.jpg");
         _testImagePath = Path.Combine(_testDirectory, "test-image.jpg");
 
-        if (File.Exists(sourceImagePath))
+        if (!File.Exists(sourceImagePath))
         {
-            File.Copy(sourceImagePath, _testImagePath);
+            throw new FileNotFoundException(
+                $"Required test asset not found at: {sourceImagePath}. " +
+                "Please ensure test-assets/test-image.jpg exists before running tests.");
         }
+
+        File.Copy(sourceImagePath, _testImagePath);
     }
 
     public void Dispose()
@@ -61,12 +65,6 @@ public class ImageSteganographyTests : IDisposable
     [Fact]
     public async Task EncodeAndDecodeMessage_ShouldPreserveMessage()
     {
-        // Skip test if test image is not available
-        if (!File.Exists(_testImagePath))
-        {
-            return;
-        }
-
         // Arrange
         var steganography = new ImageSteganography();
         var originalMessage = "This is a secret message!";
@@ -84,12 +82,6 @@ public class ImageSteganographyTests : IDisposable
     [Fact]
     public async Task EncodeMessage_ShouldCreateOutputFile()
     {
-        // Skip test if test image is not available
-        if (!File.Exists(_testImagePath))
-        {
-            return;
-        }
-
         // Arrange
         var steganography = new ImageSteganography();
         var message = "Test message";
@@ -101,18 +93,12 @@ public class ImageSteganographyTests : IDisposable
         // Assert
         File.Exists(outputPath).Should().BeTrue();
         var fileInfo = new FileInfo(outputPath);
-        fileInfo.Length.Should().BeGreaterThan(0);
+        // PNG output should be reasonable size - minimum 1KB, maximum 100KB for test image\n        fileInfo.Length.Should().BeInRange(1024, 102400);
     }
 
     [Fact]
     public async Task EncodeMessage_ShouldHandleEmptyMessage()
     {
-        // Skip test if test image is not available
-        if (!File.Exists(_testImagePath))
-        {
-            return;
-        }
-
         // Arrange
         var steganography = new ImageSteganography();
         var emptyMessage = "";
@@ -129,12 +115,6 @@ public class ImageSteganographyTests : IDisposable
     [Fact]
     public async Task EncodeMessage_ShouldHandleSpecialCharacters()
     {
-        // Skip test if test image is not available
-        if (!File.Exists(_testImagePath))
-        {
-            return;
-        }
-
         // Arrange
         var steganography = new ImageSteganography();
         var messageWithSpecialChars = "Hello! @#$%^&*()_+{}|:<>?[]\\;'\",./ 你好世界";
@@ -151,12 +131,6 @@ public class ImageSteganographyTests : IDisposable
     [Fact]
     public async Task EncodeMessage_ShouldHandleMultilineMessage()
     {
-        // Skip test if test image is not available
-        if (!File.Exists(_testImagePath))
-        {
-            return;
-        }
-
         // Arrange
         var steganography = new ImageSteganography();
         var multilineMessage = "Line 1\nLine 2\r\nLine 3\nFinal line";
@@ -173,12 +147,6 @@ public class ImageSteganographyTests : IDisposable
     [Fact]
     public async Task DecodeMessage_ShouldThrowForImageWithoutMessage()
     {
-        // Skip test if test image is not available
-        if (!File.Exists(_testImagePath))
-        {
-            return;
-        }
-
         // Arrange
         var steganography = new ImageSteganography();
 
@@ -191,12 +159,6 @@ public class ImageSteganographyTests : IDisposable
     [Fact]
     public async Task EncodeMessage_ShouldThrowForMessageTooLong()
     {
-        // Skip test if test image is not available
-        if (!File.Exists(_testImagePath))
-        {
-            return;
-        }
-
         // Arrange
         var steganography = new ImageSteganography();
         // Create a very long message that would exceed image capacity
@@ -212,12 +174,6 @@ public class ImageSteganographyTests : IDisposable
     [Fact]
     public async Task EncodeAndDecodeMessage_ShouldHandleLongerMessage()
     {
-        // Skip test if test image is not available
-        if (!File.Exists(_testImagePath))
-        {
-            return;
-        }
-
         // Arrange
         var steganography = new ImageSteganography();
         var longerMessage = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. " +

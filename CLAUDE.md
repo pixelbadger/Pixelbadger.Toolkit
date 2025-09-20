@@ -106,6 +106,9 @@ The project is .NET 9, and uses Microsoft's System.CommandLine library for build
 - **Deterministic**: Tests must produce consistent results across different environments
 - **Fast Execution**: Tests should complete quickly (< 1 second per test preferred)
 - **Comprehensive Coverage**: Test success paths, edge cases, error conditions, and security concerns
+- **Precision and Hard Pass/Fail**: Tests must always present a hard pass/fail scenario with fixed expectations
+- **No Asset Dependencies**: Tests must NEVER skip based on missing assets - all required assets must be present
+- **Timestamp Tolerance**: Only timestamps may vary by up to 5 seconds either way; all other outputs must be exact
 
 #### Mocking and Dependency Injection
 - **Interface-Based Design**: All testable components must use dependency injection with interfaces
@@ -149,6 +152,18 @@ The project is .NET 9, and uses Microsoft's System.CommandLine library for build
       }
   }
   ```
+
+#### Test Asset Management
+- **No Skipped Tests**: Tests must NEVER be skipped due to missing assets - all required test assets must be present in the repository
+- **Asset Location**: All test assets must be stored in the `test-assets/` folder which is gitignored
+- **Asset Size Limit**: Individual test assets must be under 512KB to keep repository size manageable
+- **Asset Creation**: When tests require assets that don't exist, they must be created or downloaded from reliable sources
+- **Asset Validation**: Test assets should be minimal viable examples that demonstrate the functionality being tested
+- **Asset Documentation**: Complex or non-obvious test assets should include a comment explaining their purpose and source
+- **Forbidden Patterns**:
+  - No `Skip.If()` or `Skip.Unless()` based on file existence
+  - No conditional test execution based on asset availability
+  - No dynamic asset download during test execution (assets must be pre-populated)
 
 #### Test Categories and Scenarios
 1. **Success Path Tests**: Verify normal operation with valid inputs

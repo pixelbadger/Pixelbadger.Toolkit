@@ -25,4 +25,8 @@
     <ProjectReference Include="..\Pixelbadger.Toolkit\Pixelbadger.Toolkit.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="test-assets\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

@@ -41,14 +41,14 @@ public class BrainfuckInterpreterTests : IDisposable
     {
         // Arrange
         var interpreter = new BrainfuckInterpreter();
-        // Program that outputs 'A' (ASCII 65)
+        // Program that outputs 'H' (ASCII 72): 8 * 9 = 72
         var program = "++++++++++[>+++++++>++++++++++>+++>+<<<<-]>++.";
 
         // Act
         var result = interpreter.Execute(program);
 
         // Assert
-        result.Should().NotBeEmpty();
+        result.Should().Be("H");
     }
 
     [Fact]
@@ -70,14 +70,14 @@ public class BrainfuckInterpreterTests : IDisposable
     {
         // Arrange
         var interpreter = new BrainfuckInterpreter();
-        // Program with comments and invalid characters
-        var program = "This is a comment +++++++++ Another comment [>++++[>++>+++>+++>+<<<<-]>+>+>->>+[<]<-] More comments >>.";
+        // Program with comments that should output 'P' when comments are ignored: 8 * 10 = 80
+        var program = "This is a comment ++++++++ Another comment [>++++++++++<-] More comments >.";
 
         // Act
         var result = interpreter.Execute(program);
 
         // Assert
-        result.Should().NotBeEmpty();
+        result.Should().Be("P"); // ASCII 80 (8 * 10)
     }
 
     [Fact]
@@ -85,14 +85,14 @@ public class BrainfuckInterpreterTests : IDisposable
     {
         // Arrange
         var interpreter = new BrainfuckInterpreter();
-        // Simple nested loop test
-        var program = "+++[>++[>+<-]<-]>>.";
+        // Nested loop: 3 * (2 * 1) = 6, then output ASCII 6 + 42 = 48 ('0')
+        var program = "+++[>++[>+<-]<-]>>++++++++++++++++++++++++++++++++++++++++++.";
 
         // Act
         var result = interpreter.Execute(program);
 
         // Assert
-        result.Should().NotBeEmpty();
+        result.Should().Be("0"); // ASCII 48 (6 + 42)
     }
 
     [Fact]
@@ -130,14 +130,82 @@ public class BrainfuckInterpreterTests : IDisposable
     {
         // Arrange
         var interpreter = new BrainfuckInterpreter();
-        // Test pointer wrapping - move left from position 0
+        // Test pointer wrapping - move left from position 0, increment 3 times, output
         var program = "<+++.";
 
         // Act
         var result = interpreter.Execute(program);
 
         // Assert
-        // Should wrap to end of memory and increment, then output
-        result.Should().NotBeEmpty();
+        // Should wrap to end of memory, increment to 3, then output ASCII 3 (ETX control character)
+        result.Should().Be("\u0003");
+    }
+
+    [Theory]
+    [InlineData("+.", "\u0001")] // 1
+    [InlineData("++.", "\u0002")] // 2
+    [InlineData("+++.", "\u0003")] // 3
+    [InlineData("++++.", "\u0004")] // 4
+    [InlineData("+++++.", "\u0005")] // 5
+    [InlineData("++++++.", "\u0006")] // 6
+    [InlineData("+++++++.", "\u0007")] // 7
+    [InlineData("++++++++.", "\u0008")] // 8
+    [InlineData("+++++++++.", "\u0009")] // 9
+    [InlineData("++++++++++.", "\u000A")] // 10 = \n
+    public void Execute_ShouldOutputCorrectLowAsciiCharacters(string program, string expectedOutput)
+    {
+        // Arrange
+        var interpreter = new BrainfuckInterpreter();
+
+        // Act
+        var result = interpreter.Execute(program);
+
+        // Assert
+        result.Should().Be(expectedOutput);
+    }
+
+    [Fact]
+    public void Execute_ShouldHandleMultipleOutputs()
+    {
+        // Arrange
+        var interpreter = new BrainfuckInterpreter();
+        // Program that outputs "He": 72 (H) and 101 (e)
+        var program = "++++++++++[>+++++++>++++++++++<<-]>++.>+.";
+
+        // Act
+        var result = interpreter.Execute(program);
+
+        // Assert
+        result.Should().Be("He");
+    }
+
+    [Fact]
+    public void Execute_ShouldHandleSimpleCharacterOutput()
+    {
+        // Arrange
+        var interpreter = new BrainfuckInterpreter();
+        // Program that outputs 'A' (ASCII 65): 5 * 13 = 65
+        var program = "+++++[>+++++++++++++<-]>.";
+
+        // Act
+        var result = interpreter.Execute(program);
+
+        // Assert
+        result.Should().Be("A");
+    }
+
+    [Fact]
+    public void Execute_ShouldHandleLoopWithNoExecution()
+    {
+        // Arrange
+        var interpreter = new BrainfuckInterpreter();
+        // Loop that should never execute because cell starts at 0
+        var program = "[+++.]";
+
+        // Act
+        var result = interpreter.Execute(program);
+
+        // Assert
+        result.Should().Be("");
     }
 }
