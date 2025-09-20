@@ -33,7 +33,9 @@ public class SearchIndexerTests : IDisposable
         await _indexer.IngestContentAsync(_indexPath, contentFile);
 
         Directory.Exists(_indexPath).Should().BeTrue();
-        Directory.GetFiles(_indexPath).Should().NotBeEmpty();
+        var indexFiles = Directory.GetFiles(_indexPath);
+        indexFiles.Should().HaveCountGreaterThan(0);
+        indexFiles.Should().Contain(f => f.Contains("segments") || f.Contains(".cfs") || f.Contains(".si"));
     }
 
     [Fact]
@@ -57,9 +59,9 @@ public class SearchIndexerTests : IDisposable
         await _indexer.IngestContentAsync(_indexPath, contentFile);
         var results = await _indexer.QueryAsync(_indexPath, "fox", 10);
 
-        results.Should().NotBeEmpty();
-        results[0].Content.Should().Contain("fox");
-        results[0].Score.Should().BeGreaterThan(0);
+        results.Should().HaveCount(1);
+        results[0].Content.Should().Be("The quick brown fox jumps over the lazy dog.");
+        results[0].Score.Should().BeInRange(0.1f, 1.0f);
     }
 
     [Fact]
@@ -113,8 +115,9 @@ public class SearchIndexerTests : IDisposable
 
         var results = await _indexer.QueryAsync(_indexPath, "cats", 10, new[] { "content1" });
 
-        results.Should().NotBeEmpty();
+        results.Should().HaveCount(1);
         results.Should().OnlyContain(r => r.SourceId == "content1");
+        results[0].Content.Should().Be("This document mentions cats.");
     }
 
     [Fact]
@@ -127,14 +130,14 @@ public class SearchIndexerTests : IDisposable
         await _indexer.IngestContentAsync(_indexPath, contentFile);
         var results = await _indexer.QueryAsync(_indexPath, "testing", 10);
 
-        results.Should().NotBeEmpty();
+        results.Should().HaveCount(1);
         var result = results[0];
         result.SourceFile.Should().Be("test-doc.txt");
         result.SourcePath.Should().Be(contentFile);
         result.SourceId.Should().Be("test-doc");
-        result.ParagraphNumber.Should().BeGreaterThanOrEqualTo(0);
-        result.DocumentId.Should().NotBeNullOrEmpty();
-        result.Content.Should().NotBeNullOrEmpty();
+        result.ParagraphNumber.Should().Be(1);
+        result.DocumentId.Should().MatchRegex(@"^test-doc\.txt_\d+$");
+        result.Content.Should().Be("First paragraph about testing.");
     }
 
     [Theory]
@@ -149,8 +152,9 @@ public class SearchIndexerTests : IDisposable
         await _indexer.IngestContentAsync(_indexPath, contentFile);
         var results = await _indexer.QueryAsync(_indexPath, searchTerm, 10);
 
-        results.Should().NotBeEmpty();
-        results[0].Content.Should().ContainEquivalentOf(searchTerm);
+        results.Should().HaveCount(1);
+        results[0].Content.Should().Be(content);
+        results[0].Score.Should().BeInRange(0.1f, 1.0f);
     }
 
     [Fact]
@@ -169,13 +173,13 @@ Complex problems require innovative solutions.";
         await _indexer.IngestContentAsync(_indexPath, contentFile);
         var results = await _indexer.QueryAsync(_indexPath, "machine learning", 10);
 
-        results.Should().NotBeEmpty();
+        results.Should().HaveCountGreaterThanOrEqualTo(2);
         results.Should().BeInDescendingOrder(r => r.Score);
 
         // Results mentioning both terms should score higher than single term matches
         var topResult = results[0];
-        topResult.Content.Should().ContainEquivalentOf("machine");
-        topResult.Content.Should().ContainEquivalentOf("learning");
+        topResult.Content.Should().Be("Machine learning is fascinating.");
+        topResult.Score.Should().BeInRange(1.0f, 2.0f);
     }
 
     [Fact]
@@ -188,8 +192,8 @@ Complex problems require innovative solutions.";
         await _indexer.IngestContentAsync(_indexPath, contentFile);
         var results = await _indexer.QueryAsync(_indexPath, "special", 10);
 
-        results.Should().NotBeEmpty();
-        results[0].Content.Should().Contain("special");
+        results.Should().HaveCount(1);
+        results[0].Content.Should().Be("This is a test with special characters: éñ@#$%^&*()!? 测试内容");
     }
 
     [Fact]
@@ -202,8 +206,10 @@ Complex problems require innovative solutions.";
         await _indexer.IngestContentAsync(_indexPath, contentFile);
         var results = await _indexer.QueryAsync(_indexPath, "paragraph", 10);
 
-        results.Should().NotBeEmpty();
+        results.Should().HaveCount(2);
         results.Should().OnlyContain(r => !string.IsNullOrWhiteSpace(r.Content));
+        results.Should().Contain(r => r.Content == "First paragraph.");
+        results.Should().Contain(r => r.Content == "Second paragraph after empty lines.");
     }
 
     [Fact]
@@ -220,11 +226,12 @@ Document about cats and dogs together.";
         await _indexer.IngestContentAsync(_indexPath, contentFile);
         var results = await _indexer.QueryAsync(_indexPath, "cats", 10);
 
-        results.Should().NotBeEmpty();
+        results.Should().HaveCount(2);
         results.Should().BeInDescendingOrder(r => r.Score);
 
         // Document with more mentions of "cats" should score higher due to BM25 term frequency component
         var topResult = results[0];
-        topResult.Content.Should().Contain("cats cats cats");
+        topResult.Content.Should().Be("Document about cats cats cats.");
+        topResult.Score.Should().BeGreaterThan(results[1].Score);
     }
 }

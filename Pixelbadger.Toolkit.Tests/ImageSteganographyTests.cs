@@ -93,7 +93,7 @@ public class ImageSteganographyTests : IDisposable
         // Assert
         File.Exists(outputPath).Should().BeTrue();
         var fileInfo = new FileInfo(outputPath);
-        fileInfo.Length.Should().BeGreaterThan(0);
+        // PNG output should be reasonable size - minimum 1KB, maximum 100KB for test image\n        fileInfo.Length.Should().BeInRange(1024, 102400);
     }
 
     [Fact]
