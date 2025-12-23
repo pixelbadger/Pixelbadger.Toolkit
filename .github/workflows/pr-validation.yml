@@ -22,8 +22,10 @@ jobs:
           main-project:
             - 'Pixelbadger.Toolkit/**'
             - '!Pixelbadger.Toolkit.Rag/**'
+            - '!Pixelbadger.Toolkit.Rag.Tests/**'
           rag-project:
             - 'Pixelbadger.Toolkit.Rag/**'
+            - 'Pixelbadger.Toolkit.Rag.Tests/**'
 
   check-version:
     runs-on: ubuntu-latest
