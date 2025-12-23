@@ -1,6 +1,6 @@
 # Pixelbadger.Toolkit.Rag
 
-A CLI toolkit for RAG (Retrieval-Augmented Generation) workflows, providing BM25 search indexing, querying, and MCP server functionality powered by Lucene.NET.
+A CLI toolkit for RAG (Retrieval-Augmented Generation) workflows, providing BM25 search indexing, querying, semantic chunking, and MCP server functionality powered by Lucene.NET.
 
 ## Table of Contents
 
@@ -69,14 +69,19 @@ pbrag ingest --index-path <index-directory> --content-path <content-file>
 **Options:**
 - `--index-path`: Path to the Lucene.NET index directory (required)
 - `--content-path`: Path to the content file to ingest (required)
+- `--chunking-strategy`: Chunking strategy to use: `semantic`, `markdown`, or `paragraph` (optional, default: auto-detect)
 
 **Examples:**
 ```bash
-# Ingest a text document
+# Ingest a text document (auto-detect chunking strategy)
 pbrag ingest --index-path ./search-index --content-path document.txt
 
-# Ingest a markdown file with header-based chunking
-pbrag ingest --index-path ./search-index --content-path readme.md
+# Ingest a markdown file with explicit markdown chunking
+pbrag ingest --index-path ./search-index --content-path readme.md --chunking-strategy markdown
+
+# Ingest with semantic chunking (requires OPENAI_API_KEY environment variable)
+export OPENAI_API_KEY="sk-..."
+pbrag ingest --index-path ./search-index --content-path document.txt --chunking-strategy semantic
 
 # Build an index from multiple files
 pbrag ingest --index-path ./search-index --content-path doc1.txt
@@ -242,19 +247,31 @@ BM25 (Best Matching 25) is a probabilistic ranking function used to estimate the
 
 ### Content Chunking
 
-Content is intelligently chunked based on file type to preserve semantic boundaries:
+Content is intelligently chunked using one of three strategies. By default, chunking strategy is auto-detected based on file type, but can be explicitly specified:
 
-**Markdown Files (.md):**
+**Semantic Chunking (`--chunking-strategy semantic`):**
+- **Embedding-based chunking** using OpenAI's text-embedding-3-large model
+- Splits text into sentences and generates embeddings for each with buffer context
+- Calculates cosine distances between consecutive sentence embeddings
+- Identifies semantic breakpoints using percentile-based threshold detection (95th percentile default)
+- Groups sentences into chunks where semantic coherence is highest
+- **Requires OpenAI API key** (set via OPENAI_API_KEY environment variable)
+- **Embeddings are discarded after chunking** (BM25 search doesn't use them)
+- **Best for:** Complex documents where semantic boundaries don't align with structural markers
+
+**Markdown Chunking (`--chunking-strategy markdown`, auto-detected for .md files):**
 - Header-based chunking using markdown headers (# ## ### etc.)
 - Preserves document structure and hierarchy
 - Each section becomes a searchable chunk
 - Maintains context within logical document divisions
+- **Best for:** Well-structured markdown documentation
 
-**Text Files (.txt):**
+**Paragraph Chunking (`--chunking-strategy paragraph`, auto-detected for .txt files):**
 - Paragraph-based chunking splitting on double newlines (`\n\n`)
 - Preserves natural paragraph boundaries
 - Suitable for prose, documentation, and unstructured text
 - Maintains readability and context in search results
+- **Best for:** Plain text documents with clear paragraph structure
 
 ### Index Structure
 
