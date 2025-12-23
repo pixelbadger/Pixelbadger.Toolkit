@@ -6,6 +6,8 @@ on:
     paths:
       - 'Pixelbadger.Toolkit/**'
       - 'Pixelbadger.Toolkit.Rag/**'
+      - '!**/*.Tests/**'
+      - '!.github/**'
 
 jobs:
   check-changes:

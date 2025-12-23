@@ -3,6 +3,11 @@ name: PR Validation
 on:
   pull_request:
     branches: [ master ]
+    paths:
+      - 'Pixelbadger.Toolkit/**'
+      - 'Pixelbadger.Toolkit.Rag/**'
+      - '!**/*.Tests/**'
+      - '!.github/**'
 
 jobs:
   check-changes:
