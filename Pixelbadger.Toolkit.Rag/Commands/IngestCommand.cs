@@ -23,24 +23,33 @@ public static class IngestCommand
             IsRequired = true
         };
 
+        var chunkingStrategyOption = new Option<string?>(
+            aliases: ["--chunking-strategy"],
+            description: "Chunking strategy: 'semantic', 'markdown', or 'paragraph' (default: auto-detect based on file extension)")
+        {
+            IsRequired = false
+        };
+
         command.AddOption(indexPathOption);
         command.AddOption(contentPathOption);
+        command.AddOption(chunkingStrategyOption);
 
-        command.SetHandler(async (string indexPath, string contentPath) =>
+        command.SetHandler(async (string indexPath, string contentPath, string? chunkingStrategy) =>
         {
             try
             {
                 var indexer = new SearchIndexer();
-                await indexer.IngestContentAsync(indexPath, contentPath);
+                await indexer.IngestContentAsync(indexPath, contentPath, chunkingStrategy);
 
-                Console.WriteLine($"Successfully ingested content from '{contentPath}' into index at '{indexPath}'");
+                var strategyUsed = chunkingStrategy ?? "auto-detected";
+                Console.WriteLine($"Successfully ingested content from '{contentPath}' into index at '{indexPath}' using {strategyUsed} chunking");
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error: {ex.Message}");
                 Environment.Exit(1);
             }
-        }, indexPathOption, contentPathOption);
+        }, indexPathOption, contentPathOption, chunkingStrategyOption);
 
         return command;
     }

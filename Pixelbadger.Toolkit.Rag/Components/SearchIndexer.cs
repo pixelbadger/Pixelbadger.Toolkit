@@ -24,7 +24,7 @@ public class SearchIndexer
 {
     private const LuceneVersion LUCENE_VERSION = LuceneVersion.LUCENE_48;
 
-    public async Task IngestContentAsync(string indexPath, string contentPath)
+    public async Task IngestContentAsync(string indexPath, string contentPath, string? chunkingStrategy = null)
     {
         if (!File.Exists(contentPath))
         {
@@ -32,7 +32,7 @@ public class SearchIndexer
         }
 
         var content = await File.ReadAllTextAsync(contentPath);
-        var chunks = GetChunksForFile(contentPath, content);
+        var chunks = await GetChunksForFileAsync(contentPath, content, chunkingStrategy);
 
         var indexDirectory = FSDirectory.Open(indexPath);
         var analyzer = new StandardAnalyzer(LUCENE_VERSION);
@@ -139,16 +139,32 @@ public class SearchIndexer
         return Task.FromResult(results);
     }
 
-    private static List<IChunk> GetChunksForFile(string filePath, string content)
+    private static async Task<List<IChunk>> GetChunksForFileAsync(string filePath, string content, string? chunkingStrategy = null)
     {
-        var extension = Path.GetExtension(filePath).ToLowerInvariant();
+        ITextChunker chunker;
 
-        ITextChunker chunker = extension switch
+        // If explicit strategy is provided, use it
+        if (!string.IsNullOrEmpty(chunkingStrategy))
         {
-            ".md" or ".markdown" => new MarkdownTextChunker(),
-            _ => new ParagraphTextChunker()
-        };
+            chunker = chunkingStrategy.ToLowerInvariant() switch
+            {
+                "semantic" => new SemanticTextChunker(),
+                "markdown" => new MarkdownTextChunker(),
+                "paragraph" => new ParagraphTextChunker(),
+                _ => throw new ArgumentException($"Unknown chunking strategy: {chunkingStrategy}")
+            };
+        }
+        else
+        {
+            // Auto-detect based on file extension
+            var extension = Path.GetExtension(filePath).ToLowerInvariant();
+            chunker = extension switch
+            {
+                ".md" or ".markdown" => new MarkdownTextChunker(),
+                _ => new ParagraphTextChunker()
+            };
+        }
 
-        return chunker.ChunkText(content);
+        return await chunker.ChunkTextAsync(content);
     }
 }

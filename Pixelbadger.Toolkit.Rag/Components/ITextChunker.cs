@@ -8,7 +8,7 @@ public interface IChunk
 
 public interface ITextChunker
 {
-    List<IChunk> ChunkText(string content);
+    Task<List<IChunk>> ChunkTextAsync(string content);
 }
 
 public class MarkdownChunkWrapper : IChunk
@@ -38,20 +38,61 @@ public class ParagraphChunkWrapper : IChunk
     public ParagraphChunk OriginalChunk => _chunk;
 }
 
+public class SemanticChunkWrapper : IChunk
+{
+    private readonly SemanticChunk _chunk;
+    public SemanticChunkWrapper(SemanticChunk chunk)
+    {
+        _chunk = chunk;
+    }
+
+    public string Content => _chunk.Content;
+    public int ChunkNumber => _chunk.ChunkNumber;
+    public SemanticChunk OriginalChunk => _chunk;
+}
+
 public class MarkdownTextChunker : ITextChunker
 {
-    public List<IChunk> ChunkText(string content)
+    public Task<List<IChunk>> ChunkTextAsync(string content)
     {
         var chunks = MarkdownChunker.ChunkByHeaders(content);
-        return chunks.Select((chunk, index) => (IChunk)new MarkdownChunkWrapper(chunk, index + 1)).ToList();
+        var result = chunks.Select((chunk, index) => (IChunk)new MarkdownChunkWrapper(chunk, index + 1)).ToList();
+        return Task.FromResult(result);
     }
 }
 
 public class ParagraphTextChunker : ITextChunker
 {
-    public List<IChunk> ChunkText(string content)
+    public Task<List<IChunk>> ChunkTextAsync(string content)
     {
         var chunks = ParagraphChunker.ChunkByParagraphs(content);
-        return chunks.Select(chunk => (IChunk)new ParagraphChunkWrapper(chunk)).ToList();
+        var result = chunks.Select(chunk => (IChunk)new ParagraphChunkWrapper(chunk)).ToList();
+        return Task.FromResult(result);
+    }
+}
+
+public class SemanticTextChunker : ITextChunker
+{
+    private readonly string? _apiKey;
+    private readonly double _percentileThreshold;
+    private readonly int _bufferSize;
+
+    public SemanticTextChunker(string? apiKey = null, double percentileThreshold = 0.95, int bufferSize = 1)
+    {
+        _apiKey = apiKey;
+        _percentileThreshold = percentileThreshold;
+        _bufferSize = bufferSize;
+    }
+
+    public async Task<List<IChunk>> ChunkTextAsync(string content)
+    {
+        var chunks = await SemanticChunker.ChunkBySemanticSimilarityAsync(
+            content,
+            _apiKey,
+            _percentileThreshold,
+            _bufferSize
+        );
+
+        return chunks.Select(chunk => (IChunk)new SemanticChunkWrapper(chunk)).ToList();
     }
 }
