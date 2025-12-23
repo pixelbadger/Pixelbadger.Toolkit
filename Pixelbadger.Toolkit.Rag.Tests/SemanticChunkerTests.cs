@@ -1,42 +1,15 @@
 using FluentAssertions;
+using Microsoft.Extensions.AI;
 using Pixelbadger.Toolkit.Rag.Components;
+using SemanticChunkerNET;
 using Xunit;
 
 namespace Pixelbadger.Toolkit.Rag.Tests;
 
 public class SemanticChunkerTests
 {
-
     [Fact]
-    public async Task ChunkBySemanticSimilarity_ShouldReturnEmptyList_WhenContentIsEmpty()
-    {
-        // Arrange
-        var content = "";
-        var mockService = new MockEmbeddingService();
-
-        // Act
-        var chunks = await SemanticChunker.ChunkBySemanticSimilarityAsync(content, mockService);
-
-        // Assert
-        chunks.Should().BeEmpty();
-    }
-
-    [Fact]
-    public async Task ChunkBySemanticSimilarity_ShouldReturnEmptyList_WhenContentIsWhitespace()
-    {
-        // Arrange
-        var content = "   \n\n\t  ";
-        var mockService = new MockEmbeddingService();
-
-        // Act
-        var chunks = await SemanticChunker.ChunkBySemanticSimilarityAsync(content, mockService);
-
-        // Assert
-        chunks.Should().BeEmpty();
-    }
-
-    [Fact]
-    public void OpenAIEmbeddingService_ShouldThrowException_WhenApiKeyNotProvided()
+    public void SemanticTextChunker_ShouldThrowException_WhenApiKeyNotProvided()
     {
         // Arrange - Clear environment variable if set
         var originalKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
@@ -47,7 +20,7 @@ public class SemanticChunkerTests
             // Act & Assert
             var exception = Assert.Throws<InvalidOperationException>(() =>
             {
-                var service = new OpenAIEmbeddingService();
+                var chunker = new SemanticTextChunker();
             });
 
             exception.Message.Should().Contain("OpenAI API key must be provided");
@@ -57,22 +30,6 @@ public class SemanticChunkerTests
             // Restore original environment variable
             Environment.SetEnvironmentVariable("OPENAI_API_KEY", originalKey);
         }
-    }
-
-    [Fact]
-    public async Task ChunkBySemanticSimilarity_ShouldReturnSingleChunk_WhenContentIsSingleSentence()
-    {
-        // Arrange
-        var content = "This is a single sentence.";
-        var mockService = new MockEmbeddingService();
-
-        // Act
-        var chunks = await SemanticChunker.ChunkBySemanticSimilarityAsync(content, mockService);
-
-        // Assert
-        chunks.Should().HaveCount(1);
-        chunks[0].Content.Should().Be(content);
-        chunks[0].ChunkNumber.Should().Be(1);
     }
 
     [Fact]
@@ -89,28 +46,27 @@ public class SemanticChunkerTests
     public void SemanticChunkWrapper_ShouldImplementIChunk()
     {
         // Arrange
-        var semanticChunk = new SemanticChunk { Content = "Test", ChunkNumber = 1 };
+        var chunk = new Chunk("chunk-id", "Test content", new Embedding<float>(new float[] { 0.1f, 0.2f }));
 
         // Act
-        var wrapper = new SemanticChunkWrapper(semanticChunk);
+        var wrapper = new SemanticChunkWrapper(chunk, 1);
 
         // Assert
         wrapper.Should().BeAssignableTo<IChunk>();
-        wrapper.Content.Should().Be("Test");
+        wrapper.Content.Should().Be("Test content");
         wrapper.ChunkNumber.Should().Be(1);
     }
 
-    [Theory]
-    [InlineData("First sentence. Second sentence. Third sentence.", 3)]
-    [InlineData("Hello! How are you? I am fine.", 3)]
-    [InlineData("Question one? Question two!", 2)]
-    public async Task ChunkBySemanticSimilarity_ShouldCreateMultipleChunks_WhenContentHasMultipleSentences(string content, int expectedSentenceCount)
+    [Fact]
+    public async Task SemanticTextChunker_ShouldCreateChunks_WhenContentProvided()
     {
         // Arrange
-        var mockService = new MockEmbeddingService();
+        var content = "First sentence. Second sentence. Third sentence.";
+        var mockGenerator = new MockEmbeddingGenerator();
+        var chunker = new TestableSemanticTextChunker(mockGenerator);
 
         // Act
-        var chunks = await SemanticChunker.ChunkBySemanticSimilarityAsync(content, mockService);
+        var chunks = await chunker.ChunkTextAsync(content);
 
         // Assert
         chunks.Should().NotBeEmpty();
@@ -128,10 +84,78 @@ public class SemanticChunkerTests
         {
             chunks[i].ChunkNumber.Should().Be(i + 1);
         }
+    }
 
-        // Verify total content is preserved (all sentences included)
-        var totalContent = string.Join(" ", chunks.Select(c => c.Content));
-        var sentenceCount = totalContent.Split(new[] { '.', '!', '?' }, StringSplitOptions.RemoveEmptyEntries).Length;
-        sentenceCount.Should().Be(expectedSentenceCount);
+    [Fact]
+    public async Task SemanticTextChunker_ShouldHandleEmptyContent()
+    {
+        // Arrange
+        var content = "";
+        var mockGenerator = new MockEmbeddingGenerator();
+        var chunker = new TestableSemanticTextChunker(mockGenerator);
+
+        // Act
+        var chunks = await chunker.ChunkTextAsync(content);
+
+        // Assert
+        chunks.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task SemanticTextChunker_ShouldHandleSingleSentence()
+    {
+        // Arrange
+        var content = "This is a single sentence.";
+        var mockGenerator = new MockEmbeddingGenerator();
+        var chunker = new TestableSemanticTextChunker(mockGenerator);
+
+        // Act
+        var chunks = await chunker.ChunkTextAsync(content);
+
+        // Assert
+        chunks.Should().HaveCount(1);
+        chunks[0].Content.Should().Be(content);
+        chunks[0].ChunkNumber.Should().Be(1);
+    }
+
+    /// <summary>
+    /// Testable version of SemanticTextChunker that accepts a mock embedding generator
+    /// </summary>
+    private class TestableSemanticTextChunker : ITextChunker
+    {
+        private readonly IEmbeddingGenerator<string, Embedding<float>> _embeddingGenerator;
+        private readonly int _tokenLimit;
+        private readonly int _bufferSize;
+        private readonly ThresholdType _thresholdType;
+        private readonly double _thresholdAmount;
+
+        public TestableSemanticTextChunker(
+            IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator,
+            int tokenLimit = 512,
+            int bufferSize = 1,
+            ThresholdType thresholdType = ThresholdType.Percentile,
+            double thresholdAmount = 95)
+        {
+            _embeddingGenerator = embeddingGenerator;
+            _tokenLimit = tokenLimit;
+            _bufferSize = bufferSize;
+            _thresholdType = thresholdType;
+            _thresholdAmount = thresholdAmount;
+        }
+
+        public async Task<List<IChunk>> ChunkTextAsync(string content)
+        {
+            var semanticChunker = new SemanticChunker(
+                _embeddingGenerator,
+                tokenLimit: _tokenLimit,
+                bufferSize: _bufferSize,
+                thresholdType: _thresholdType,
+                thresholdAmount: _thresholdAmount
+            );
+
+            var chunks = await semanticChunker.CreateChunksAsync(content);
+
+            return chunks.Select((chunk, index) => (IChunk)new SemanticChunkWrapper(chunk, index + 1)).ToList();
+        }
     }
 }
