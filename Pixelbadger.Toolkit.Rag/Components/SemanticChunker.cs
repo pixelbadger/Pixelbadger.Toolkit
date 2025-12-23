@@ -48,9 +48,12 @@ public static class SemanticChunker
         }
 
         // Step 2: Generate embeddings with buffer context
+        // Create client and clear API key from memory for security
         var client = new EmbeddingClient(DefaultModel, apiKey);
+        apiKey = null; // Clear API key to prevent exposure in stack traces
+
         var sentencesWithContext = GenerateSentencesWithContext(sentences, bufferSize);
-        var embeddings = await GenerateEmbeddingsAsync(client, sentencesWithContext);
+        var embeddings = await GenerateEmbeddingsBatchedAsync(client, sentencesWithContext);
 
         // Step 3: Calculate distances between consecutive embeddings
         var distances = CalculateCosineDistances(embeddings);
@@ -99,20 +102,28 @@ public static class SemanticChunker
         return sentencesWithContext;
     }
 
-    private static async Task<List<float[]>> GenerateEmbeddingsAsync(
+    private static async Task<List<float[]>> GenerateEmbeddingsBatchedAsync(
         EmbeddingClient client,
         List<string> texts)
     {
-        var embeddings = new List<float[]>();
+        const int batchSize = 100; // Process 100 sentences per batch for optimal performance
+        var allEmbeddings = new List<float[]>();
 
-        foreach (var text in texts)
+        // Process in batches to avoid rate limits and improve performance
+        for (int i = 0; i < texts.Count; i += batchSize)
         {
-            var response = await client.GenerateEmbeddingAsync(text);
-            var embedding = response.Value.ToFloats().ToArray();
-            embeddings.Add(embedding);
+            var batch = texts.Skip(i).Take(batchSize).ToList();
+
+            // Generate embeddings for entire batch at once
+            var response = await client.GenerateEmbeddingsAsync(batch);
+
+            foreach (var embedding in response.Value)
+            {
+                allEmbeddings.Add(embedding.ToFloats().ToArray());
+            }
         }
 
-        return embeddings;
+        return allEmbeddings;
     }
 
     private static List<double> CalculateCosineDistances(List<float[]> embeddings)
@@ -190,14 +201,16 @@ public static class SemanticChunker
         var chunks = new List<SemanticChunk>();
         var currentChunkSentences = new List<string>();
         var chunkNumber = 1;
-        var sentenceIndex = 0;
 
-        foreach (var sentence in sentences)
+        for (int i = 0; i < sentences.Count; i++)
         {
-            currentChunkSentences.Add(sentence);
+            currentChunkSentences.Add(sentences[i]);
 
-            // Check if we've reached a breakpoint
-            if (breakpoints.Contains(sentenceIndex + 1) || sentenceIndex == sentences.Count - 1)
+            // Check if we've reached a breakpoint or the end of sentences
+            bool isBreakpoint = breakpoints.Contains(i + 1);
+            bool isLastSentence = i == sentences.Count - 1;
+
+            if (isBreakpoint || isLastSentence)
             {
                 chunks.Add(new SemanticChunk
                 {
@@ -206,18 +219,6 @@ public static class SemanticChunker
                 });
                 currentChunkSentences.Clear();
             }
-
-            sentenceIndex++;
-        }
-
-        // Add any remaining sentences as final chunk
-        if (currentChunkSentences.Count > 0)
-        {
-            chunks.Add(new SemanticChunk
-            {
-                Content = string.Join(" ", currentChunkSentences),
-                ChunkNumber = chunkNumber
-            });
         }
 
         return chunks;
