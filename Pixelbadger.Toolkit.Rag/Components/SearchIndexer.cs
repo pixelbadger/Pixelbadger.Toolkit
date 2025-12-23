@@ -7,7 +7,7 @@ using Lucene.Net.Search.Similarities;
 using Lucene.Net.Store;
 using Lucene.Net.Util;
 
-namespace Pixelbadger.Toolkit.Components;
+namespace Pixelbadger.Toolkit.Rag.Components;
 
 public class SearchResult
 {
@@ -44,7 +44,7 @@ public class SearchIndexer
         using var writer = new IndexWriter(indexDirectory, config);
 
         var sourceId = Path.GetFileNameWithoutExtension(contentPath);
-        
+
         for (int i = 0; i < chunks.Count; i++)
         {
             var chunk = chunks[i];
@@ -142,7 +142,7 @@ public class SearchIndexer
     private static List<IChunk> GetChunksForFile(string filePath, string content)
     {
         var extension = Path.GetExtension(filePath).ToLowerInvariant();
-        
+
         ITextChunker chunker = extension switch
         {
             ".md" or ".markdown" => new MarkdownTextChunker(),

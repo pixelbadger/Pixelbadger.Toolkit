@@ -1,6 +1,8 @@
 # Pixelbadger.Toolkit
 
-A CLI toolkit exposing varied functionality organized by topic, including string manipulation, distance calculations, esoteric programming language interpreters, image steganography, web serving, OpenAI integration, and Model Context Protocol (MCP) servers.
+A CLI toolkit exposing varied functionality organized by topic, including string manipulation, distance calculations, esoteric programming language interpreters, image steganography, web serving, and OpenAI integration.
+
+> **Note**: Search and MCP RAG functionality has been extracted to the separate [Pixelbadger.Toolkit.Rag](https://www.nuget.org/packages/Pixelbadger.Toolkit.Rag) package (`pbrag` CLI tool).
 
 ## Table of Contents
 
@@ -10,9 +12,6 @@ A CLI toolkit exposing varied functionality organized by topic, including string
   - [strings](#strings)
     - [reverse](#reverse)
     - [levenshtein-distance](#levenshtein-distance)
-  - [search](#search)
-    - [ingest](#ingest)
-    - [query](#query)
   - [interpreters](#interpreters)
     - [brainfuck](#brainfuck)
     - [ook](#ook)
@@ -26,8 +25,6 @@ A CLI toolkit exposing varied functionality organized by topic, including string
     - [translate](#translate)
     - [ocaaar](#ocaaar)
     - [corpospeak](#corpospeak)
-  - [mcp](#mcp)
-    - [rag-server](#rag-server)
 - [Help](#help)
 - [Requirements](#requirements)
 - [Technical Details](#technical-details)
@@ -109,66 +106,6 @@ pbtk strings levenshtein-distance --string1 "hello" --string2 "world"
 # Compare contents of two files
 pbtk strings levenshtein-distance --string1 file1.txt --string2 file2.txt
 ```
-
-### search
-Search indexing and querying utilities.
-
-#### ingest
-Ingest content into a Lucene.NET search index with intelligent chunking based on file type.
-
-**Usage:**
-```bash
-pbtk search ingest --index-path <index-directory> --content-path <content-file>
-```
-
-**Examples:**
-```bash
-# Ingest a text file into a search index (paragraph chunking)
-pbtk search ingest --index-path ./search-index --content-path document.txt
-
-# Ingest markdown content (header-based chunking)
-pbtk search ingest --index-path ./docs-index --content-path README.md
-```
-
-**Details:**
-- **Markdown files** (.md, .markdown): Automatically chunked by headers (# ## ###) for semantic organization
-- **Other files**: Split into paragraphs (separated by double newlines, or single newlines if no double newlines found)
-- Each chunk becomes a separate searchable document in the index
-- Metadata is stored including source file, chunk/paragraph number, and document ID
-- Creates a new index if it doesn't exist, or adds to an existing index
-- Markdown chunks preserve header context and hierarchy information
-
-#### query
-Perform BM25 similarity search against a Lucene.NET index with optional source ID filtering.
-
-**Usage:**
-```bash
-pbtk search query --index-path <index-directory> --query <search-terms> [--max-results <number>] [--sourceIds <id1> <id2> ...]
-```
-
-**Examples:**
-```bash
-# Search for documents containing specific terms
-pbtk search query --index-path ./search-index --query "hello world"
-
-# Limit results to 5 documents
-pbtk search query --index-path ./docs-index --query "lucene search" --max-results 5
-
-# Complex query with operators
-pbtk search query --index-path ./index --query "\"exact phrase\" OR keyword"
-
-# Filter results by source IDs (based on filename without extension)
-pbtk search query --index-path ./index --query "search terms" --sourceIds document1 readme
-```
-
-**Details:**
-- Uses BM25 similarity ranking for relevance scoring
-- Returns results sorted by relevance score (highest first)
-- Supports Lucene query syntax including phrases, boolean operators, wildcards
-- Shows source file, paragraph number, relevance score, and content for each result
-- Default maximum results is 10
-- Optional source ID filtering constrains results to documents from specific files
-- Source IDs are derived from filenames (without extension) during ingestion
 
 ### interpreters
 Esoteric programming language interpreters.
@@ -453,64 +390,6 @@ pbtk openai corpospeak --source "Database migration finished" --audience "operat
 - **legal**: Risk assessment and compliance considerations
 - **hr**: People impact and organizational dynamics
 - **customer-success**: Customer experience and support focus
-
-### mcp
-Model Context Protocol server utilities for AI integration.
-
-#### rag-server
-Hosts an MCP server that performs BM25 similarity search against a Lucene.NET index, enabling AI assistants to retrieve relevant context from your documents.
-
-**Usage:**
-```bash
-pbtk mcp rag-server --index-path <index-directory>
-```
-
-**Options:**
-- `--index-path`: Path to the Lucene.NET index directory (required)
-
-**Examples:**
-```bash
-# Start MCP server with an existing search index
-pbtk mcp rag-server --index-path ./search-index
-
-# Use with Claude Desktop or other MCP clients
-pbtk mcp rag-server --index-path ./docs-index
-```
-
-**Details:**
-- Communicates via stdin/stdout using JSON-RPC protocol
-- Provides the `search` MCP tool that performs BM25 queries against the index with configurable result limits and source ID filtering
-- Returns formatted search results with relevance scores, source files, paragraph numbers, source IDs, and content
-- Supports optional source ID filtering to constrain results to specific documents
-- Compatible with MCP clients like Claude Desktop, Continue, and other AI development tools
-- Requires an existing Lucene index created with the `search ingest` command
-
-**MCP Tool Parameters:**
-- `query` (required): The search query text
-- `maxResults` (optional, default: 5): Maximum number of results to return
-- `sourceIds` (optional): Array of source IDs to filter results to specific documents
-
-**Example MCP Tool Usage:**
-```json
-{
-  "name": "search",
-  "arguments": {
-    "query": "programming concepts",
-    "maxResults": 3,
-    "sourceIds": ["document1", "readme"]
-  }
-}
-```
-
-**Integration Example:**
-First create an index, then start the MCP server:
-```bash
-# 1. Create search index from your documents
-pbtk search ingest --index-path ./my-docs --content-path documentation.md
-
-# 2. Start MCP server for AI integration
-pbtk mcp rag-server --index-path ./my-docs
-```
 
 ## Help
 

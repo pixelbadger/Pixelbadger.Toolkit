@@ -1,7 +1,7 @@
 using FluentAssertions;
-using Pixelbadger.Toolkit.Components;
+using Pixelbadger.Toolkit.Rag.Components;
 
-namespace Pixelbadger.Toolkit.Tests;
+namespace Pixelbadger.Toolkit.Rag.Tests;
 
 public class SearchSimilarityConsistencyTests : IDisposable
 {

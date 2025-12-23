@@ -9,6 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       main-project-changed: ${{ steps.changes.outputs.main-project }}
+      rag-project-changed: ${{ steps.changes.outputs.rag-project }}
     steps:
     - uses: actions/checkout@v4
       with:
@@ -20,6 +21,9 @@ jobs:
         filters: |
           main-project:
             - 'Pixelbadger.Toolkit/**'
+            - '!Pixelbadger.Toolkit.Rag/**'
+          rag-project:
+            - 'Pixelbadger.Toolkit.Rag/**'
 
   check-version:
     runs-on: ubuntu-latest
@@ -39,10 +43,28 @@ jobs:
       run: |
         ./.github/scripts/check-version-increment.ps1 -ProjectFile "Pixelbadger.Toolkit/Pixelbadger.Toolkit.csproj" -PackageId "Pixelbadger.Toolkit"
 
+  check-rag-version:
+    runs-on: ubuntu-latest
+    needs: [check-changes]
+    if: needs.check-changes.outputs.rag-project-changed == 'true'
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '9.0.x'
+
+    - name: Check version increment
+      shell: pwsh
+      run: |
+        ./.github/scripts/check-version-increment.ps1 -ProjectFile "Pixelbadger.Toolkit.Rag/Pixelbadger.Toolkit.Rag.csproj" -PackageId "Pixelbadger.Toolkit.Rag"
+
   build-and-test:
     runs-on: ubuntu-latest
-    needs: [check-changes, check-version]
-    if: always() && (needs.check-version.result == 'success' || needs.check-version.result == 'skipped')
+    needs: [check-changes, check-version, check-rag-version]
+    if: always() && (needs.check-version.result == 'success' || needs.check-version.result == 'skipped') && (needs.check-rag-version.result == 'success' || needs.check-rag-version.result == 'skipped')
 
     steps:
     - uses: actions/checkout@v4

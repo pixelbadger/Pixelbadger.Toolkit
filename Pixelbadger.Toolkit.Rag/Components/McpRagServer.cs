@@ -5,7 +5,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
 
-namespace Pixelbadger.Toolkit.Components;
+namespace Pixelbadger.Toolkit.Rag.Components;
 
 public class McpRagServer
 {

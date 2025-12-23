@@ -1,61 +1,11 @@
 using System.CommandLine;
-using Pixelbadger.Toolkit.Components;
+using Pixelbadger.Toolkit.Rag.Components;
 
-namespace Pixelbadger.Toolkit.Commands;
+namespace Pixelbadger.Toolkit.Rag.Commands;
 
-public static class SearchCommand
+public static class QueryCommand
 {
     public static Command Create()
-    {
-        var command = new Command("search", "Search indexing and querying utilities");
-
-        command.AddCommand(CreateIngestCommand());
-        command.AddCommand(CreateQueryCommand());
-
-        return command;
-    }
-
-    private static Command CreateIngestCommand()
-    {
-        var command = new Command("ingest", "Ingest content into a search index by paragraph chunks");
-
-        var indexPathOption = new Option<string>(
-            aliases: ["--index-path"],
-            description: "Path to the Lucene.NET index directory")
-        {
-            IsRequired = true
-        };
-
-        var contentPathOption = new Option<string>(
-            aliases: ["--content-path"],
-            description: "Path to the content file to ingest")
-        {
-            IsRequired = true
-        };
-
-        command.AddOption(indexPathOption);
-        command.AddOption(contentPathOption);
-
-        command.SetHandler(async (string indexPath, string contentPath) =>
-        {
-            try
-            {
-                var indexer = new SearchIndexer();
-                await indexer.IngestContentAsync(indexPath, contentPath);
-                
-                Console.WriteLine($"Successfully ingested content from '{contentPath}' into index at '{indexPath}'");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error: {ex.Message}");
-                Environment.Exit(1);
-            }
-        }, indexPathOption, contentPathOption);
-
-        return command;
-    }
-
-    private static Command CreateQueryCommand()
     {
         var command = new Command("query", "Perform BM25 similarity search against a Lucene.NET index");
 
@@ -99,7 +49,7 @@ public static class SearchCommand
             {
                 var indexer = new SearchIndexer();
                 var results = await indexer.QueryAsync(indexPath, query, maxResults, sourceIds);
-                
+
                 if (results.Count == 0)
                 {
                     Console.WriteLine("No results found.");
@@ -115,7 +65,7 @@ public static class SearchCommand
                     Console.WriteLine($"Result {i + 1} (Score: {result.Score:F4})");
                     Console.WriteLine($"Source: {result.SourceFile} (Paragraph {result.ParagraphNumber})");
                     Console.WriteLine($"Content: {result.Content}");
-                    
+
                     if (i < results.Count - 1)
                     {
                         Console.WriteLine(new string('-', 60));

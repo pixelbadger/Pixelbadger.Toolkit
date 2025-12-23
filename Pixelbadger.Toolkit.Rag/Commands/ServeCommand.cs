@@ -1,22 +1,13 @@
 using System.CommandLine;
-using Pixelbadger.Toolkit.Components;
+using Pixelbadger.Toolkit.Rag.Components;
 
-namespace Pixelbadger.Toolkit.Commands;
+namespace Pixelbadger.Toolkit.Rag.Commands;
 
-public static class McpCommand
+public static class ServeCommand
 {
     public static Command Create()
     {
-        var command = new Command("mcp", "Model Context Protocol server utilities");
-
-        command.AddCommand(CreateRagServerCommand());
-
-        return command;
-    }
-
-    private static Command CreateRagServerCommand()
-    {
-        var command = new Command("rag-server", "Host an MCP server that performs BM25 queries against a Lucene.NET index");
+        var command = new Command("serve", "Host an MCP server that performs BM25 queries against a Lucene.NET index");
 
         var indexPathOption = new Option<string>(
             aliases: ["--index-path"],
@@ -35,7 +26,6 @@ public static class McpCommand
                 {
                     Console.WriteLine($"Error: Index directory '{indexPath}' not found.");
                     Environment.Exit(1);
-                    return;
                 }
 
                 var server = new McpRagServer(indexPath);
