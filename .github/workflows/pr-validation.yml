@@ -3,13 +3,20 @@ name: PR Validation
 on:
   pull_request:
     branches: [ master ]
+    paths:
+      - 'Pixelbadger.Toolkit/**'
+      - 'Pixelbadger.Toolkit.Rag/**'
+      - '!**/*.Tests/**'
+      - '!.github/**'
 
 jobs:
   check-changes:
     runs-on: ubuntu-latest
     outputs:
-      main-project-changed: ${{ steps.changes.outputs.main-project }}
-      rag-project-changed: ${{ steps.changes.outputs.rag-project }}
+      main-code-changed: ${{ steps.changes.outputs.main-code }}
+      main-any-changed: ${{ steps.changes.outputs.main-any }}
+      rag-code-changed: ${{ steps.changes.outputs.rag-code }}
+      rag-any-changed: ${{ steps.changes.outputs.rag-any }}
     steps:
     - uses: actions/checkout@v4
       with:
@@ -19,17 +26,27 @@ jobs:
       id: changes
       with:
         filters: |
-          main-project:
+          main-code:
+            - 'Pixelbadger.Toolkit/**'
+            - '!Pixelbadger.Toolkit.Tests/**'
+            - '!.github/**'
+          main-any:
             - 'Pixelbadger.Toolkit/**'
             - 'Pixelbadger.Toolkit.Tests/**'
-          rag-project:
+            - '!.github/**'
+          rag-code:
+            - 'Pixelbadger.Toolkit.Rag/**'
+            - '!Pixelbadger.Toolkit.Rag.Tests/**'
+            - '!.github/**'
+          rag-any:
             - 'Pixelbadger.Toolkit.Rag/**'
             - 'Pixelbadger.Toolkit.Rag.Tests/**'
+            - '!.github/**'
 
   check-version:
     runs-on: ubuntu-latest
     needs: [check-changes]
-    if: needs.check-changes.outputs.main-project-changed == 'true'
+    if: needs.check-changes.outputs.main-code-changed == 'true'
 
     steps:
     - uses: actions/checkout@v4
@@ -47,7 +64,7 @@ jobs:
   check-rag-version:
     runs-on: ubuntu-latest
     needs: [check-changes]
-    if: needs.check-changes.outputs.rag-project-changed == 'true'
+    if: needs.check-changes.outputs.rag-code-changed == 'true'
 
     steps:
     - uses: actions/checkout@v4

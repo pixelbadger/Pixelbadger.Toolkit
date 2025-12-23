@@ -6,10 +6,36 @@ on:
     paths:
       - 'Pixelbadger.Toolkit/**'
       - 'Pixelbadger.Toolkit.Rag/**'
+      - '!**/*.Tests/**'
+      - '!.github/**'
 
 jobs:
+  check-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      main-code-changed: ${{ steps.changes.outputs.main-code }}
+      rag-code-changed: ${{ steps.changes.outputs.rag-code }}
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - uses: dorny/paths-filter@v3
+      id: changes
+      with:
+        filters: |
+          main-code:
+            - 'Pixelbadger.Toolkit/**'
+            - '!Pixelbadger.Toolkit.Tests/**'
+            - '!.github/**'
+          rag-code:
+            - 'Pixelbadger.Toolkit.Rag/**'
+            - '!Pixelbadger.Toolkit.Rag.Tests/**'
+            - '!.github/**'
+
   build-and-test:
     runs-on: ubuntu-latest
+    needs: [check-changes]
 
     steps:
     - uses: actions/checkout@v4
@@ -31,7 +57,8 @@ jobs:
 
   publish-main:
     runs-on: ubuntu-latest
-    needs: [build-and-test]
+    needs: [check-changes, build-and-test]
+    if: needs.check-changes.outputs.main-code-changed == 'true'
 
     steps:
     - uses: actions/checkout@v4
@@ -61,7 +88,8 @@ jobs:
 
   publish-rag:
     runs-on: ubuntu-latest
-    needs: [build-and-test]
+    needs: [check-changes, build-and-test]
+    if: needs.check-changes.outputs.rag-code-changed == 'true'
 
     steps:
     - uses: actions/checkout@v4
