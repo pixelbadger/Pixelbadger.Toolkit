@@ -1,5 +1,7 @@
 using FluentAssertions;
 using Pixelbadger.Toolkit.Components;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
 
 namespace Pixelbadger.Toolkit.Tests;
 
@@ -13,18 +15,30 @@ public class ImageSteganographyTests : IDisposable
         _testDirectory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
         Directory.CreateDirectory(_testDirectory);
 
-        // Copy test image to temp directory
-        var sourceImagePath = Path.Combine("test-assets", "test-image.jpg");
+        // Generate a test image programmatically (200x200 gradient)
+        // This eliminates the need for external test assets
         _testImagePath = Path.Combine(_testDirectory, "test-image.jpg");
+        CreateTestImage(_testImagePath);
+    }
 
-        if (!File.Exists(sourceImagePath))
+    private static void CreateTestImage(string path)
+    {
+        // Create a 200x200 test image with a gradient pattern
+        // Large enough to store test messages (200*200*3 = 120,000 bits = 15,000 bytes)
+        using var image = new Image<Rgba32>(200, 200);
+
+        for (int y = 0; y < image.Height; y++)
         {
-            throw new FileNotFoundException(
-                $"Required test asset not found at: {sourceImagePath}. " +
-                "Please ensure test-assets/test-image.jpg exists before running tests.");
+            for (int x = 0; x < image.Width; x++)
+            {
+                byte r = (byte)((x * 255) / image.Width);
+                byte g = (byte)((y * 255) / image.Height);
+                byte b = (byte)(((x + y) * 128) / (image.Width + image.Height));
+                image[x, y] = new Rgba32(r, g, b, 255);
+            }
         }
 
-        File.Copy(sourceImagePath, _testImagePath);
+        image.SaveAsJpeg(path);
     }
 
     public void Dispose()
