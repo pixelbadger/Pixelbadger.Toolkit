@@ -26,7 +26,6 @@ public static class ServeCommand
                 {
                     Console.WriteLine($"Error: Index directory '{indexPath}' not found.");
                     Environment.Exit(1);
-                    return;
                 }
 
                 var server = new McpRagServer(indexPath);

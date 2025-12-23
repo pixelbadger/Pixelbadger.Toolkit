@@ -5,6 +5,7 @@ on:
     branches: [ master ]
     paths:
       - 'Pixelbadger.Toolkit/**'
+      - 'Pixelbadger.Toolkit.Rag/**'
 
 jobs:
   build-and-test:
@@ -28,7 +29,7 @@ jobs:
       run: dotnet test --no-build --configuration Release --verbosity normal
       continue-on-error: true  # Continue even if no tests exist
 
-  publish:
+  publish-main:
     runs-on: ubuntu-latest
     needs: [build-and-test]
 
@@ -41,17 +42,47 @@ jobs:
         dotnet-version: '9.0.x'
 
     - name: Restore dependencies
-      run: dotnet restore
+      run: dotnet restore Pixelbadger.Toolkit/Pixelbadger.Toolkit.csproj
 
     - name: Build
-      run: dotnet build --no-restore --configuration Release
+      run: dotnet build Pixelbadger.Toolkit/Pixelbadger.Toolkit.csproj --no-restore --configuration Release
 
     - name: Pack
-      run: dotnet pack --no-build --configuration Release --output ./artifacts
+      run: dotnet pack Pixelbadger.Toolkit/Pixelbadger.Toolkit.csproj --no-build --configuration Release --output ./artifacts
 
     - name: Publish to NuGet
       run: |
         dotnet nuget push ./artifacts/Pixelbadger.Toolkit.*.nupkg \
+          --source https://api.nuget.org/v3/index.json \
+          --api-key ${{ secrets.NUGET_API_KEY }} \
+          --skip-duplicate
+      env:
+        NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+
+  publish-rag:
+    runs-on: ubuntu-latest
+    needs: [build-and-test]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '9.0.x'
+
+    - name: Restore dependencies
+      run: dotnet restore Pixelbadger.Toolkit.Rag/Pixelbadger.Toolkit.Rag.csproj
+
+    - name: Build
+      run: dotnet build Pixelbadger.Toolkit.Rag/Pixelbadger.Toolkit.Rag.csproj --no-restore --configuration Release
+
+    - name: Pack
+      run: dotnet pack Pixelbadger.Toolkit.Rag/Pixelbadger.Toolkit.Rag.csproj --no-build --configuration Release --output ./artifacts
+
+    - name: Publish to NuGet
+      run: |
+        dotnet nuget push ./artifacts/Pixelbadger.Toolkit.Rag.*.nupkg \
           --source https://api.nuget.org/v3/index.json \
           --api-key ${{ secrets.NUGET_API_KEY }} \
           --skip-duplicate

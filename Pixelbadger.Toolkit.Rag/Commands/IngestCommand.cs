@@ -7,7 +7,7 @@ public static class IngestCommand
 {
     public static Command Create()
     {
-        var command = new Command("ingest", "Ingest content into a search index by paragraph chunks");
+        var command = new Command("ingest", "Ingest content into a search index with intelligent chunking based on file type");
 
         var indexPathOption = new Option<string>(
             aliases: ["--index-path"],

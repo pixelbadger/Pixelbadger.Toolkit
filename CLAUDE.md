@@ -31,20 +31,22 @@ The project is .NET 9, and uses Microsoft's System.CommandLine library for build
 
 ### Version Management
 
-**CRITICAL**: PRs that modify the main project code must include a package version bump following semantic versioning (SemVer):
+**CRITICAL**: PRs that modify project code must include a package version bump following semantic versioning (SemVer):
 - **PATCH** (x.x.X): Bug fixes, minor internal changes, non-breaking updates
 - **MINOR** (x.X.x): New features, new functionality, backward-compatible changes
 - **MAJOR** (X.x.x): Breaking changes, API changes that require user action
-- Update the `<Version>` element in `Pixelbadger.Toolkit.csproj`
+- Update the `<Version>` element in the appropriate project file:
+  - Main toolkit: `Pixelbadger.Toolkit/Pixelbadger.Toolkit.csproj`
+  - RAG toolkit: `Pixelbadger.Toolkit.Rag/Pixelbadger.Toolkit.Rag.csproj`
 - PR validation will fail if version has not been incremented from the published NuGet package
 
 **Version bumps are NOT required for**:
 - Internal documentation changes (CLAUDE.md, code comments)
-- Test-only changes (adding/modifying files in `Pixelbadger.Toolkit.Tests/`)
+- Test-only changes (adding/modifying test files)
 - GitHub Actions workflow changes (`.github/` folder)
 - Repository configuration files (.gitignore, .editorconfig, etc.)
 
-**Note**: README.md changes DO require version bumps as the README is published with the NuGet package.
+**Note**: README.md changes DO require version bumps as README files are published with NuGet packages.
 
 ### README Maintenance
 
@@ -77,6 +79,60 @@ The project is .NET 9, and uses Microsoft's System.CommandLine library for build
   - `pbtk openai corpospeak --source "API performance is great" --audience "csuite"`
   - `pbtk openai corpospeak --source "New feature deployed" --audience "engineering" --user-messages "Hey team" "Let's ship this"`
 
+## RAG Project (Pixelbadger.Toolkit.Rag)
+
+The RAG functionality has been extracted into a separate project: `Pixelbadger.Toolkit.Rag`. This is a standalone CLI tool with its own NuGet package.
+
+### RAG Development Commands
+
+- **Build**: `dotnet build Pixelbadger.Toolkit.Rag/Pixelbadger.Toolkit.Rag.csproj`
+- **Test**: `dotnet test Pixelbadger.Toolkit.Rag.Tests/`
+- **Package**: `dotnet pack Pixelbadger.Toolkit.Rag/Pixelbadger.Toolkit.Rag.csproj`
+- **Publish to NuGet**: `dotnet nuget push bin/Release/Pixelbadger.Toolkit.Rag.*.nupkg --source https://api.nuget.org/v3/index.json --api-key $NUGET_API_KEY`
+- **Install as global tool**: `dotnet tool install --global --add-source ./bin/Release Pixelbadger.Toolkit.Rag`
+- **Run (from source)**: `dotnet run --project Pixelbadger.Toolkit.Rag -- [command] [options]`
+- **Run (global tool)**: `pbrag [command] [options]`
+- **Run with examples**:
+  - `pbrag ingest --index-path ./search-index --content-path document.txt`
+  - `pbrag query --index-path ./search-index --query "machine learning" --max-results 5`
+  - `pbrag serve --index-path ./search-index`
+
+### RAG Architecture
+
+The RAG project follows a flattened command architecture (no topic hierarchy):
+
+- **Program.cs**: Entry point that registers all commands with the root command
+- **Commands/**: Contains command definitions (`IngestCommand`, `QueryCommand`, `ServeCommand`)
+- **Components/**: Contains core business logic:
+  - `SearchIndexer`: BM25 indexing and querying using Lucene.NET
+  - `McpRagServer`: MCP server for AI assistant integration
+  - `ITextChunker`: Interface for content chunking strategies
+  - `MarkdownChunker`: Header-based chunking for markdown files
+  - `ParagraphChunker`: Paragraph-based chunking for text files
+
+### RAG Commands
+
+Available commands:
+- **ingest**: Ingest content files into Lucene.NET search index with intelligent chunking
+- **query**: Perform BM25 similarity search against an index
+- **serve**: Host an MCP server for AI assistant integration
+
+### RAG Dependencies
+
+- Lucene.Net 4.8.0-beta00016 (core search functionality)
+- Lucene.Net.Analysis.Common (text analysis)
+- Lucene.Net.QueryParser (query parsing)
+- ModelContextProtocol 0.3.0-preview.4 (MCP server)
+- Microsoft.Extensions.Hosting (for MCP server hosting)
+- System.CommandLine (CLI framework)
+
+### RAG Testing
+
+Tests are located in `Pixelbadger.Toolkit.Rag.Tests/` and follow the same testing standards as the main project:
+- **Test Classes**: `SearchIndexerTests`, `MarkdownChunkerTests`, `ParagraphChunkerTests`, `McpRagServerConsistencyTests`
+- **Framework**: xUnit with FluentAssertions and Moq
+- **Test Assets**: Located in `test-assets/` folder (gitignored)
+
 ### Testing Requirements
 
 **CRITICAL**: All new functionality must include comprehensive unit tests following these requirements:
@@ -91,7 +147,9 @@ The project is .NET 9, and uses Microsoft's System.CommandLine library for build
 - **Framework**: xUnit for all unit and integration tests
 - **Assertions**: FluentAssertions for improved readability and better error messages
 - **Mocking**: Moq for dependency mocking, especially for external service dependencies
-- **Test Project**: `Pixelbadger.Toolkit.Tests` - all tests must be in this project
+- **Test Projects**:
+  - `Pixelbadger.Toolkit.Tests` - tests for main toolkit
+  - `Pixelbadger.Toolkit.Rag.Tests` - tests for RAG toolkit
 
 #### Test Organization and Naming
 - **Test Classes**: Named `{ComponentName}Tests.cs` (e.g., `ChatComponentTests.cs`)
