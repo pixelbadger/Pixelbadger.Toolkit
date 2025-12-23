@@ -4,21 +4,8 @@ using Xunit;
 
 namespace Pixelbadger.Toolkit.Rag.Tests;
 
-public class SemanticChunkerTests : IDisposable
+public class SemanticChunkerTests
 {
-    private readonly string _testDirectory;
-
-    public SemanticChunkerTests()
-    {
-        _testDirectory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-        Directory.CreateDirectory(_testDirectory);
-    }
-
-    public void Dispose()
-    {
-        if (Directory.Exists(_testDirectory))
-            Directory.Delete(_testDirectory, true);
-    }
 
     [Fact]
     public async Task ChunkBySemanticSimilarity_ShouldReturnEmptyList_WhenContentIsEmpty()

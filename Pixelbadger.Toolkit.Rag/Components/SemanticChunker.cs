@@ -49,6 +49,7 @@ public static class SemanticChunker
 
         // Step 2: Generate embeddings with buffer context
         // Create client and clear API key from memory for security
+        // Note: EmbeddingClient does not implement IDisposable, so no disposal needed
         var client = new EmbeddingClient(DefaultModel, apiKey);
         apiKey = null; // Clear API key to prevent exposure in stack traces
 
@@ -70,7 +71,12 @@ public static class SemanticChunker
     private static List<string> SplitIntoSentences(string content)
     {
         // Split on sentence-ending punctuation followed by whitespace
-        // This is a simple implementation; could be enhanced with more sophisticated NLP
+        // LIMITATIONS: This simple regex-based approach may struggle with:
+        // - Abbreviations (Dr. Smith, Ph.D., etc.)
+        // - Decimal numbers (3.14159)
+        // - URLs and email addresses
+        // - Quoted sentences
+        // For production use with complex text, consider a proper NLP library like NLTk or spaCy
         var sentencePattern = @"(?<=[.!?])\s+";
         var sentences = System.Text.RegularExpressions.Regex
             .Split(content, sentencePattern)
@@ -188,6 +194,16 @@ public static class SemanticChunker
             if (distances[i] >= threshold)
             {
                 breakpoints.Add(i + 1); // Breakpoint is after sentence i
+            }
+        }
+
+        // Edge case safeguard: If no breakpoints found (uniform text), create breakpoints every 50 sentences
+        // to prevent unbounded chunk sizes
+        if (breakpoints.Count == 0 && distances.Count > 50)
+        {
+            for (int i = 50; i < distances.Count; i += 50)
+            {
+                breakpoints.Add(i);
             }
         }
 
