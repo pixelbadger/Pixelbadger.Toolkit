@@ -1,5 +1,3 @@
-using OpenAI.Embeddings;
-
 namespace Pixelbadger.Toolkit.Rag.Components;
 
 public class SemanticChunk
@@ -10,25 +8,17 @@ public class SemanticChunk
 
 public static class SemanticChunker
 {
-    private const string DefaultModel = "text-embedding-3-large";
     private const double DefaultPercentileThreshold = 0.95;
 
     public static async Task<List<SemanticChunk>> ChunkBySemanticSimilarityAsync(
         string content,
-        string? apiKey = null,
+        IEmbeddingService embeddingService,
         double percentileThreshold = DefaultPercentileThreshold,
         int bufferSize = 1)
     {
         if (string.IsNullOrWhiteSpace(content))
         {
             return new List<SemanticChunk>();
-        }
-
-        // Get API key from environment if not provided
-        apiKey ??= Environment.GetEnvironmentVariable("OPENAI_API_KEY");
-        if (string.IsNullOrEmpty(apiKey))
-        {
-            throw new InvalidOperationException("OpenAI API key must be provided or set in OPENAI_API_KEY environment variable");
         }
 
         // Step 1: Split into sentences
@@ -48,13 +38,8 @@ public static class SemanticChunker
         }
 
         // Step 2: Generate embeddings with buffer context
-        // Create client and clear API key from memory for security
-        // Note: EmbeddingClient does not implement IDisposable, so no disposal needed
-        var client = new EmbeddingClient(DefaultModel, apiKey);
-        apiKey = null; // Clear API key to prevent exposure in stack traces
-
         var sentencesWithContext = GenerateSentencesWithContext(sentences, bufferSize);
-        var embeddings = await GenerateEmbeddingsBatchedAsync(client, sentencesWithContext);
+        var embeddings = await embeddingService.GenerateEmbeddingsAsync(sentencesWithContext);
 
         // Step 3: Calculate distances between consecutive embeddings
         var distances = CalculateCosineDistances(embeddings);
@@ -106,30 +91,6 @@ public static class SemanticChunker
         }
 
         return sentencesWithContext;
-    }
-
-    private static async Task<List<float[]>> GenerateEmbeddingsBatchedAsync(
-        EmbeddingClient client,
-        List<string> texts)
-    {
-        const int batchSize = 100; // Process 100 sentences per batch for optimal performance
-        var allEmbeddings = new List<float[]>();
-
-        // Process in batches to avoid rate limits and improve performance
-        for (int i = 0; i < texts.Count; i += batchSize)
-        {
-            var batch = texts.Skip(i).Take(batchSize).ToList();
-
-            // Generate embeddings for entire batch at once
-            var response = await client.GenerateEmbeddingsAsync(batch);
-
-            foreach (var embedding in response.Value)
-            {
-                allEmbeddings.Add(embedding.ToFloats().ToArray());
-            }
-        }
-
-        return allEmbeddings;
     }
 
     private static List<double> CalculateCosineDistances(List<float[]> embeddings)

@@ -73,13 +73,13 @@ public class ParagraphTextChunker : ITextChunker
 
 public class SemanticTextChunker : ITextChunker
 {
-    private readonly string? _apiKey;
+    private readonly IEmbeddingService _embeddingService;
     private readonly double _percentileThreshold;
     private readonly int _bufferSize;
 
     public SemanticTextChunker(string? apiKey = null, double percentileThreshold = 0.95, int bufferSize = 1)
     {
-        _apiKey = apiKey;
+        _embeddingService = new OpenAIEmbeddingService(apiKey);
         _percentileThreshold = percentileThreshold;
         _bufferSize = bufferSize;
     }
@@ -88,7 +88,7 @@ public class SemanticTextChunker : ITextChunker
     {
         var chunks = await SemanticChunker.ChunkBySemanticSimilarityAsync(
             content,
-            _apiKey,
+            _embeddingService,
             _percentileThreshold,
             _bufferSize
         );

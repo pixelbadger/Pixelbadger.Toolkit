@@ -12,9 +12,10 @@ public class SemanticChunkerTests
     {
         // Arrange
         var content = "";
+        var mockService = new MockEmbeddingService();
 
         // Act
-        var chunks = await SemanticChunker.ChunkBySemanticSimilarityAsync(content, apiKey: "test-key");
+        var chunks = await SemanticChunker.ChunkBySemanticSimilarityAsync(content, mockService);
 
         // Assert
         chunks.Should().BeEmpty();
@@ -25,31 +26,31 @@ public class SemanticChunkerTests
     {
         // Arrange
         var content = "   \n\n\t  ";
+        var mockService = new MockEmbeddingService();
 
         // Act
-        var chunks = await SemanticChunker.ChunkBySemanticSimilarityAsync(content, apiKey: "test-key");
+        var chunks = await SemanticChunker.ChunkBySemanticSimilarityAsync(content, mockService);
 
         // Assert
         chunks.Should().BeEmpty();
     }
 
     [Fact]
-    public async Task ChunkBySemanticSimilarity_ShouldThrowException_WhenApiKeyNotProvided()
+    public void OpenAIEmbeddingService_ShouldThrowException_WhenApiKeyNotProvided()
     {
-        // Arrange
-        var content = "This is a test sentence.";
-
-        // Clear environment variable if set
+        // Arrange - Clear environment variable if set
         var originalKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
         Environment.SetEnvironmentVariable("OPENAI_API_KEY", null);
 
         try
         {
             // Act & Assert
-            await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            var exception = Assert.Throws<InvalidOperationException>(() =>
             {
-                await SemanticChunker.ChunkBySemanticSimilarityAsync(content);
+                var service = new OpenAIEmbeddingService();
             });
+
+            exception.Message.Should().Contain("OpenAI API key must be provided");
         }
         finally
         {
@@ -63,18 +64,10 @@ public class SemanticChunkerTests
     {
         // Arrange
         var content = "This is a single sentence.";
-
-        // Note: This test will fail without a real API key, so we skip it in CI
-        // In a real scenario, you'd mock the EmbeddingClient
-        var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
-        if (string.IsNullOrEmpty(apiKey))
-        {
-            // Skip test if no API key available
-            return;
-        }
+        var mockService = new MockEmbeddingService();
 
         // Act
-        var chunks = await SemanticChunker.ChunkBySemanticSimilarityAsync(content, apiKey);
+        var chunks = await SemanticChunker.ChunkBySemanticSimilarityAsync(content, mockService);
 
         // Assert
         chunks.Should().HaveCount(1);
@@ -111,15 +104,34 @@ public class SemanticChunkerTests
     [InlineData("First sentence. Second sentence. Third sentence.", 3)]
     [InlineData("Hello! How are you? I am fine.", 3)]
     [InlineData("Question one? Question two!", 2)]
-    public void SplitIntoSentences_ShouldSplitCorrectly(string content, int expectedCount)
+    public async Task ChunkBySemanticSimilarity_ShouldCreateMultipleChunks_WhenContentHasMultipleSentences(string content, int expectedSentenceCount)
     {
-        // This tests the internal sentence splitting logic
-        // We need to expose this for testing or test it indirectly
+        // Arrange
+        var mockService = new MockEmbeddingService();
 
-        // For now, we'll test it indirectly through the main method
-        // In a production scenario, you might want to make SplitIntoSentences internal/public for testing
+        // Act
+        var chunks = await SemanticChunker.ChunkBySemanticSimilarityAsync(content, mockService);
 
-        // This is a placeholder - actual testing would require API access or mocking
-        expectedCount.Should().BeGreaterThan(0);
+        // Assert
+        chunks.Should().NotBeEmpty();
+        chunks.Should().HaveCountGreaterThan(0);
+
+        // Verify all chunks have content
+        foreach (var chunk in chunks)
+        {
+            chunk.Content.Should().NotBeNullOrWhiteSpace();
+            chunk.ChunkNumber.Should().BeGreaterThan(0);
+        }
+
+        // Verify chunk numbers are sequential
+        for (int i = 0; i < chunks.Count; i++)
+        {
+            chunks[i].ChunkNumber.Should().Be(i + 1);
+        }
+
+        // Verify total content is preserved (all sentences included)
+        var totalContent = string.Join(" ", chunks.Select(c => c.Content));
+        var sentenceCount = totalContent.Split(new[] { '.', '!', '?' }, StringSplitOptions.RemoveEmptyEntries).Length;
+        sentenceCount.Should().Be(expectedSentenceCount);
     }
 }
