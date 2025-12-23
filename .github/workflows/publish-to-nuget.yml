@@ -25,9 +25,11 @@ jobs:
           main-code:
             - 'Pixelbadger.Toolkit/**'
             - '!Pixelbadger.Toolkit.Tests/**'
+            - '!.github/**'
           rag-code:
             - 'Pixelbadger.Toolkit.Rag/**'
             - '!Pixelbadger.Toolkit.Rag.Tests/**'
+            - '!.github/**'
 
   build-and-test:
     runs-on: ubuntu-latest

@@ -24,15 +24,19 @@ jobs:
           main-code:
             - 'Pixelbadger.Toolkit/**'
             - '!Pixelbadger.Toolkit.Tests/**'
+            - '!.github/**'
           main-any:
             - 'Pixelbadger.Toolkit/**'
             - 'Pixelbadger.Toolkit.Tests/**'
+            - '!.github/**'
           rag-code:
             - 'Pixelbadger.Toolkit.Rag/**'
             - '!Pixelbadger.Toolkit.Rag.Tests/**'
+            - '!.github/**'
           rag-any:
             - 'Pixelbadger.Toolkit.Rag/**'
             - 'Pixelbadger.Toolkit.Rag.Tests/**'
+            - '!.github/**'
 
   check-version:
     runs-on: ubuntu-latest
