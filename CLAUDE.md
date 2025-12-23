@@ -67,8 +67,6 @@ The project is .NET 9, and uses Microsoft's System.CommandLine library for build
 - **Run with examples**:
   - `pbtk strings reverse --in-file hello.txt --out-file hello-reversed.txt`
   - `pbtk strings levenshtein-distance --string1 "hello" --string2 "world"`
-  - `pbtk search ingest --index-path ./index --content-path document.txt`
-  - `pbtk search query --index-path ./index --query "hello world"`
   - `pbtk interpreters brainfuck --file hello.bf`
   - `pbtk interpreters ook --file hello.ook`
   - `pbtk interpreters bf-to-ook --source hello.bf --output hello.ook`
@@ -245,8 +243,7 @@ Each topic command follows the pattern:
 Topic commands are registered in Program.cs by calling their static `Create()` methods and adding them to the root command.
 
 Available topics and actions:
-- **strings**: reverse, levenshtein-distance
-- **search**: ingest, query
+- **strings**: reverse, levenshtein-distance, abjadify
 - **interpreters**: brainfuck, ook, bf-to-ook
 - **images**: steganography
 - **web**: serve-html
@@ -256,7 +253,6 @@ Available topics and actions:
 
 - Microsoft.AspNetCore.App (framework reference)
 - Microsoft.Extensions.Hosting
-- Lucene.Net (for search indexing)
 - SixLabors.ImageSharp (for steganography)
 - System.CommandLine (beta)
 - OpenAI (for LLM integration)

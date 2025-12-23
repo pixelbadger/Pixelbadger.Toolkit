@@ -1,7 +1,7 @@
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace Pixelbadger.Toolkit.Components;
+namespace Pixelbadger.Toolkit.Rag.Components;
 
 public class MarkdownChunk
 {
@@ -25,7 +25,7 @@ public static class MarkdownChunker
 
         var lines = content.Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.None);
         var chunks = new List<MarkdownChunk>();
-        
+
         var currentChunk = new StringBuilder();
         var currentHeaderText = string.Empty;
         var currentHeaderLevel = 0;
@@ -36,7 +36,7 @@ public static class MarkdownChunker
         {
             var line = lines[i];
             var headerMatch = HeaderRegex.Match(line);
-            
+
             if (headerMatch.Success)
             {
                 // If we have content in the current chunk, save it
@@ -68,7 +68,7 @@ public static class MarkdownChunker
                 // Add non-header line to current chunk
                 currentChunk.AppendLine(line);
             }
-            
+
             lineNumber++;
         }
 
@@ -94,7 +94,7 @@ public static class MarkdownChunker
         {
             var preHeaderLines = lines.Take(chunks[0].StartLine - 1);
             var preHeaderContent = string.Join("\n", preHeaderLines).Trim();
-            
+
             if (!string.IsNullOrWhiteSpace(preHeaderContent))
             {
                 chunks.Insert(0, new MarkdownChunk

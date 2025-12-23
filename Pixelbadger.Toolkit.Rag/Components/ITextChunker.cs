@@ -1,4 +1,4 @@
-namespace Pixelbadger.Toolkit.Components;
+namespace Pixelbadger.Toolkit.Rag.Components;
 
 public interface IChunk
 {
