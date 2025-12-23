@@ -21,8 +21,7 @@ jobs:
         filters: |
           main-project:
             - 'Pixelbadger.Toolkit/**'
-            - '!Pixelbadger.Toolkit.Rag/**'
-            - '!Pixelbadger.Toolkit.Rag.Tests/**'
+            - 'Pixelbadger.Toolkit.Tests/**'
           rag-project:
             - 'Pixelbadger.Toolkit.Rag/**'
             - 'Pixelbadger.Toolkit.Rag.Tests/**'
