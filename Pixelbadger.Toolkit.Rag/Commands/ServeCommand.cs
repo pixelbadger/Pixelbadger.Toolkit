@@ -9,26 +9,40 @@ public static class ServeCommand
     {
         var command = new Command("serve", "Host an MCP server that performs BM25 queries against a Lucene.NET index");
 
-        var indexPathOption = new Option<string>(
+        var indexPathOption = new Option<string?>(
             aliases: ["--index-path"],
-            description: "Path to the Lucene.NET index directory")
+            description: "Path to the Lucene.NET index directory (uses config default if not specified)")
         {
-            IsRequired = true
+            IsRequired = false
         };
 
         command.AddOption(indexPathOption);
 
-        command.SetHandler(async (string indexPath) =>
+        command.SetHandler(async (string? indexPath) =>
         {
             try
             {
-                if (!Directory.Exists(indexPath))
+                var configManager = new ConfigurationManager();
+                var config = configManager.LoadConfig();
+
+                // Use provided value or fall back to config
+                var effectiveIndexPath = indexPath ?? config.DefaultIndexPath;
+
+                if (string.IsNullOrWhiteSpace(effectiveIndexPath))
                 {
-                    Console.WriteLine($"Error: Index directory '{indexPath}' not found.");
+                    Console.WriteLine("Error: --index-path is required (or set a default with 'pbrag config set index-path <path>')");
                     Environment.Exit(1);
+                    return;
                 }
 
-                var server = new McpRagServer(indexPath);
+                if (!Directory.Exists(effectiveIndexPath))
+                {
+                    Console.WriteLine($"Error: Index directory '{effectiveIndexPath}' not found.");
+                    Environment.Exit(1);
+                    return;
+                }
+
+                var server = new McpRagServer(effectiveIndexPath);
                 await server.RunAsync();
             }
             catch (Exception ex)

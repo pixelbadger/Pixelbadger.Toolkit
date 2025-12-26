@@ -6,6 +6,12 @@ A CLI toolkit for RAG (Retrieval-Augmented Generation) workflows, providing BM25
 
 - [Installation](#installation)
 - [Usage](#usage)
+- [Configuration](#configuration)
+  - [config set](#config-set)
+  - [config get](#config-get)
+  - [config list](#config-list)
+  - [config unset](#config-unset)
+  - [config path](#config-path)
 - [Available Commands](#available-commands)
   - [ingest](#ingest)
   - [query](#query)
@@ -55,6 +61,133 @@ If building from source, use:
 dotnet run -- [command] [options]
 ```
 
+## Configuration
+
+The `pbrag` tool supports persistent configuration to reduce repetitive typing. Configuration values are stored in a JSON file in your OS-specific application data directory.
+
+**Configuration file location:**
+- **Linux/macOS:** `~/.config/pbrag/config.json`
+- **Windows:** `%APPDATA%\pbrag\config.json`
+
+### config set
+
+Set a configuration value that will be used as a default for future commands.
+
+**Usage:**
+```bash
+pbrag config set <key> <value>
+```
+
+**Available keys:**
+- `index-path`: Default index directory path
+- `max-results`: Default maximum number of query results
+- `chunking-strategy`: Default chunking strategy (`semantic`, `markdown`, or `paragraph`)
+
+**Examples:**
+```bash
+# Set default index path
+pbrag config set index-path ./my-search-index
+
+# Set default max results
+pbrag config set max-results 20
+
+# Set default chunking strategy
+pbrag config set chunking-strategy markdown
+```
+
+### config get
+
+Get the current value of a configuration key.
+
+**Usage:**
+```bash
+pbrag config get <key>
+```
+
+**Examples:**
+```bash
+# Get current default index path
+pbrag config get index-path
+
+# Get current default max results
+pbrag config get max-results
+```
+
+### config list
+
+List all configuration values.
+
+**Usage:**
+```bash
+pbrag config list
+```
+
+**Example output:**
+```
+Configuration:
+  index-path = ./my-search-index
+  max-results = 20
+  chunking-strategy = markdown
+```
+
+### config unset
+
+Remove a configuration value (reset to no default).
+
+**Usage:**
+```bash
+pbrag config unset <key>
+```
+
+**Examples:**
+```bash
+# Remove default index path
+pbrag config unset index-path
+
+# Remove default chunking strategy
+pbrag config unset chunking-strategy
+```
+
+### config path
+
+Show the path to the configuration file.
+
+**Usage:**
+```bash
+pbrag config path
+```
+
+**Example:**
+```bash
+pbrag config path
+# Output: /home/user/.config/pbrag/config.json
+```
+
+### Using Configuration with Commands
+
+Once configuration values are set, you can omit those options from commands:
+
+**Before configuration:**
+```bash
+pbrag ingest --index-path ./search-index --content-path doc1.md
+pbrag query --index-path ./search-index --query "search term" --max-results 10
+pbrag serve --index-path ./search-index
+```
+
+**After setting configuration:**
+```bash
+# Set once
+pbrag config set index-path ./search-index
+pbrag config set max-results 10
+
+# Then use without repetition
+pbrag ingest --content-path doc1.md
+pbrag query --query "search term"
+pbrag serve
+```
+
+**Note:** Command-line options always override configuration defaults when both are provided.
+
 ## Available Commands
 
 ### ingest
@@ -67,9 +200,9 @@ pbrag ingest --index-path <index-directory> --content-path <content-file>
 ```
 
 **Options:**
-- `--index-path`: Path to the Lucene.NET index directory (required)
+- `--index-path`: Path to the Lucene.NET index directory (optional if set in config)
 - `--content-path`: Path to the content file to ingest (required)
-- `--chunking-strategy`: Chunking strategy to use: `semantic`, `markdown`, or `paragraph` (optional, default: auto-detect)
+- `--chunking-strategy`: Chunking strategy to use: `semantic`, `markdown`, or `paragraph` (optional, uses config default or auto-detect)
 
 **Examples:**
 ```bash
@@ -107,9 +240,9 @@ pbrag query --index-path <index-directory> --query <search-query> [--max-results
 ```
 
 **Options:**
-- `--index-path`: Path to the Lucene.NET index directory (required)
+- `--index-path`: Path to the Lucene.NET index directory (optional if set in config)
 - `--query`: Search query text (required)
-- `--max-results`: Maximum number of results to return (optional, default: 10)
+- `--max-results`: Maximum number of results to return (optional, uses config default or 10)
 - `--source-ids`: Optional list of source IDs to constrain search results (optional)
 
 **Examples:**
@@ -154,7 +287,7 @@ pbrag serve --index-path <index-directory>
 ```
 
 **Options:**
-- `--index-path`: Path to the Lucene.NET index directory (required)
+- `--index-path`: Path to the Lucene.NET index directory (optional if set in config)
 
 **Examples:**
 ```bash

@@ -9,11 +9,11 @@ public static class QueryCommand
     {
         var command = new Command("query", "Perform BM25 similarity search against a Lucene.NET index");
 
-        var indexPathOption = new Option<string>(
+        var indexPathOption = new Option<string?>(
             aliases: ["--index-path"],
-            description: "Path to the Lucene.NET index directory")
+            description: "Path to the Lucene.NET index directory (uses config default if not specified)")
         {
-            IsRequired = true
+            IsRequired = false
         };
 
         var queryOption = new Option<string>(
@@ -23,13 +23,12 @@ public static class QueryCommand
             IsRequired = true
         };
 
-        var maxResultsOption = new Option<int>(
+        var maxResultsOption = new Option<int?>(
             aliases: ["--max-results"],
-            description: "Maximum number of results to return")
+            description: "Maximum number of results to return (uses config default or 10 if not specified)")
         {
             IsRequired = false
         };
-        maxResultsOption.SetDefaultValue(10);
 
         var sourceIdsOption = new Option<string[]>(
             aliases: ["--source-ids"],
@@ -43,12 +42,26 @@ public static class QueryCommand
         command.AddOption(maxResultsOption);
         command.AddOption(sourceIdsOption);
 
-        command.SetHandler(async (string indexPath, string query, int maxResults, string[] sourceIds) =>
+        command.SetHandler(async (string? indexPath, string query, int? maxResults, string[] sourceIds) =>
         {
             try
             {
+                var configManager = new ConfigurationManager();
+                var config = configManager.LoadConfig();
+
+                // Use provided value or fall back to config or hardcoded default
+                var effectiveIndexPath = indexPath ?? config.DefaultIndexPath;
+                var effectiveMaxResults = maxResults ?? config.DefaultMaxResults ?? 10;
+
+                if (string.IsNullOrWhiteSpace(effectiveIndexPath))
+                {
+                    Console.WriteLine("Error: --index-path is required (or set a default with 'pbrag config set index-path <path>')");
+                    Environment.Exit(1);
+                    return;
+                }
+
                 var indexer = new SearchIndexer();
-                var results = await indexer.QueryAsync(indexPath, query, maxResults, sourceIds);
+                var results = await indexer.QueryAsync(effectiveIndexPath, query, effectiveMaxResults, sourceIds);
 
                 if (results.Count == 0)
                 {
