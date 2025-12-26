@@ -103,14 +103,14 @@ Perform BM25 similarity search against a Lucene.NET index to find relevant conte
 
 **Usage:**
 ```bash
-pbrag query --index-path <index-directory> --query <search-query> [--max-results <number>] [--sourceIds <id1> <id2> ...]
+pbrag query --index-path <index-directory> --query <search-query> [--max-results <number>] [--source-ids <id1> <id2> ...]
 ```
 
 **Options:**
 - `--index-path`: Path to the Lucene.NET index directory (required)
 - `--query`: Search query text (required)
 - `--max-results`: Maximum number of results to return (optional, default: 10)
-- `--sourceIds`: Optional list of source IDs to constrain search results (optional)
+- `--source-ids`: Optional list of source IDs to constrain search results (optional)
 
 **Examples:**
 ```bash
@@ -121,7 +121,7 @@ pbrag query --index-path ./search-index --query "machine learning algorithms"
 pbrag query --index-path ./search-index --query "neural networks" --max-results 5
 
 # Search within specific source documents
-pbrag query --index-path ./search-index --query "data processing" --sourceIds doc1.txt doc2.md
+pbrag query --index-path ./search-index --query "data processing" --source-ids doc1.txt doc2.md
 
 # Complex multi-word query
 pbrag query --index-path ./search-index --query "how to implement dependency injection in C#"

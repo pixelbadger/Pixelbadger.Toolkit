@@ -32,7 +32,7 @@ public static class QueryCommand
         maxResultsOption.SetDefaultValue(10);
 
         var sourceIdsOption = new Option<string[]>(
-            aliases: ["--sourceIds"],
+            aliases: ["--source-ids"],
             description: "Optional list of source IDs to constrain search results")
         {
             IsRequired = false

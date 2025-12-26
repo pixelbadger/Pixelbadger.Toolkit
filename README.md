@@ -12,6 +12,7 @@ A CLI toolkit exposing varied functionality organized by topic, including string
   - [strings](#strings)
     - [reverse](#reverse)
     - [levenshtein-distance](#levenshtein-distance)
+    - [abjadify](#abjadify)
   - [interpreters](#interpreters)
     - [brainfuck](#brainfuck)
     - [ook](#ook)
@@ -106,6 +107,31 @@ pbtk strings levenshtein-distance --string1 "hello" --string2 "world"
 # Compare contents of two files
 pbtk strings levenshtein-distance --string1 file1.txt --string2 file2.txt
 ```
+
+#### abjadify
+Removes vowels from text while preserving single-letter vowels (a, i, A, I), inspired by abjad writing systems.
+
+**Usage:**
+```bash
+pbtk strings abjadify --in-file <input-file> --out-file <output-file>
+```
+
+**Examples:**
+```bash
+# Remove vowels from a text file
+pbtk strings abjadify --in-file document.txt --out-file document-abjadified.txt
+
+# Create a vowel-less version of your content
+pbtk strings abjadify --in-file message.txt --out-file message-abjad.txt
+```
+
+**Details:**
+- Removes vowels (a, e, i, o, u) from words
+- Preserves single-letter vowels "a", "A", "i", and "I" (articles and pronouns)
+- Maintains word boundaries, punctuation, and whitespace
+- Case-insensitive vowel detection
+- Inspired by abjad writing systems (Arabic, Hebrew) which traditionally omit short vowels
+- Useful for text compression, puzzles, or linguistic experiments
 
 ### interpreters
 Esoteric programming language interpreters.
