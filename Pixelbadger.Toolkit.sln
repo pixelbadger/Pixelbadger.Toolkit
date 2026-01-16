@@ -1,4 +1,4 @@
-
+﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.5.2.0
@@ -6,10 +6,6 @@ MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Pixelbadger.Toolkit", "Pixelbadger.Toolkit\Pixelbadger.Toolkit.csproj", "{33A6E20B-AE38-76CF-E2EE-B699BAE7F3AD}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Pixelbadger.Toolkit.Tests", "Pixelbadger.Toolkit.Tests\Pixelbadger.Toolkit.Tests.csproj", "{33230B5F-DF98-4B89-92BD-622D17B5871D}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Pixelbadger.Toolkit.Rag", "Pixelbadger.Toolkit.Rag\Pixelbadger.Toolkit.Rag.csproj", "{F266CCCB-4A1A-40AB-94D0-ABB4C4324B5D}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Pixelbadger.Toolkit.Rag.Tests", "Pixelbadger.Toolkit.Rag.Tests\Pixelbadger.Toolkit.Rag.Tests.csproj", "{961255C5-8C0F-4513-BFA0-47DFE1837FD9}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -45,30 +41,6 @@ Global
 		{33230B5F-DF98-4B89-92BD-622D17B5871D}.Release|x64.Build.0 = Release|Any CPU
 		{33230B5F-DF98-4B89-92BD-622D17B5871D}.Release|x86.ActiveCfg = Release|Any CPU
 		{33230B5F-DF98-4B89-92BD-622D17B5871D}.Release|x86.Build.0 = Release|Any CPU
-		{F266CCCB-4A1A-40AB-94D0-ABB4C4324B5D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{F266CCCB-4A1A-40AB-94D0-ABB4C4324B5D}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{F266CCCB-4A1A-40AB-94D0-ABB4C4324B5D}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{F266CCCB-4A1A-40AB-94D0-ABB4C4324B5D}.Debug|x64.Build.0 = Debug|Any CPU
-		{F266CCCB-4A1A-40AB-94D0-ABB4C4324B5D}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{F266CCCB-4A1A-40AB-94D0-ABB4C4324B5D}.Debug|x86.Build.0 = Debug|Any CPU
-		{F266CCCB-4A1A-40AB-94D0-ABB4C4324B5D}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{F266CCCB-4A1A-40AB-94D0-ABB4C4324B5D}.Release|Any CPU.Build.0 = Release|Any CPU
-		{F266CCCB-4A1A-40AB-94D0-ABB4C4324B5D}.Release|x64.ActiveCfg = Release|Any CPU
-		{F266CCCB-4A1A-40AB-94D0-ABB4C4324B5D}.Release|x64.Build.0 = Release|Any CPU
-		{F266CCCB-4A1A-40AB-94D0-ABB4C4324B5D}.Release|x86.ActiveCfg = Release|Any CPU
-		{F266CCCB-4A1A-40AB-94D0-ABB4C4324B5D}.Release|x86.Build.0 = Release|Any CPU
-		{961255C5-8C0F-4513-BFA0-47DFE1837FD9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{961255C5-8C0F-4513-BFA0-47DFE1837FD9}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{961255C5-8C0F-4513-BFA0-47DFE1837FD9}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{961255C5-8C0F-4513-BFA0-47DFE1837FD9}.Debug|x64.Build.0 = Debug|Any CPU
-		{961255C5-8C0F-4513-BFA0-47DFE1837FD9}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{961255C5-8C0F-4513-BFA0-47DFE1837FD9}.Debug|x86.Build.0 = Debug|Any CPU
-		{961255C5-8C0F-4513-BFA0-47DFE1837FD9}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{961255C5-8C0F-4513-BFA0-47DFE1837FD9}.Release|Any CPU.Build.0 = Release|Any CPU
-		{961255C5-8C0F-4513-BFA0-47DFE1837FD9}.Release|x64.ActiveCfg = Release|Any CPU
-		{961255C5-8C0F-4513-BFA0-47DFE1837FD9}.Release|x64.Build.0 = Release|Any CPU
-		{961255C5-8C0F-4513-BFA0-47DFE1837FD9}.Release|x86.ActiveCfg = Release|Any CPU
-		{961255C5-8C0F-4513-BFA0-47DFE1837FD9}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

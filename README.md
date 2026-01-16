@@ -2,7 +2,7 @@
 
 A CLI toolkit exposing varied functionality organized by topic, including string manipulation, distance calculations, esoteric programming language interpreters, image steganography, web serving, and OpenAI integration.
 
-> **Note**: Search and MCP RAG functionality has been extracted to the separate [Pixelbadger.Toolkit.Rag](https://www.nuget.org/packages/Pixelbadger.Toolkit.Rag) package (`pbrag` CLI tool).
+> **Note**: Search and MCP RAG functionality has been extracted to the separate [Pixelbadger.Toolkit.Rag](https://github.com/pixelbadger/Pixelbadger.Toolkit.Rag) repository (`pbrag` CLI tool).
 
 ## Table of Contents
 
