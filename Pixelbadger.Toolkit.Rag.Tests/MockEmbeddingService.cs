@@ -1,27 +1,39 @@
-using Pixelbadger.Toolkit.Rag.Components;
+using Microsoft.Extensions.AI;
 
 namespace Pixelbadger.Toolkit.Rag.Tests;
 
 /// <summary>
-/// Mock embedding service for testing that generates deterministic embeddings based on text content
+/// Mock embedding generator for testing that generates deterministic embeddings based on text content
 /// </summary>
-public class MockEmbeddingService : IEmbeddingService
+public class MockEmbeddingGenerator : IEmbeddingGenerator<string, Embedding<float>>
 {
-    public Task<List<float[]>> GenerateEmbeddingsAsync(List<string> texts)
-    {
-        var embeddings = new List<float[]>();
+    public EmbeddingGeneratorMetadata Metadata => new("mock-embedding-model");
 
-        foreach (var text in texts)
+    public async Task<GeneratedEmbeddings<Embedding<float>>> GenerateAsync(
+        IEnumerable<string> values,
+        EmbeddingGenerationOptions? options = null,
+        CancellationToken cancellationToken = default)
+    {
+        var embeddings = new List<Embedding<float>>();
+
+        foreach (var text in values)
         {
             // Generate a deterministic embedding based on text content
-            // Use simple heuristics to create semantic similarity:
-            // - Similar word counts produce similar embeddings
-            // - Similar starting characters produce similar embeddings
             var embedding = GenerateDeterministicEmbedding(text);
-            embeddings.Add(embedding);
+            embeddings.Add(new Embedding<float>(embedding));
         }
 
-        return Task.FromResult(embeddings);
+        return await Task.FromResult(new GeneratedEmbeddings<Embedding<float>>(embeddings));
+    }
+
+    public object? GetService(Type serviceType, object? serviceKey = null)
+    {
+        return serviceType.IsInstanceOfType(this) ? this : null;
+    }
+
+    public void Dispose()
+    {
+        // No resources to dispose
     }
 
     private static float[] GenerateDeterministicEmbedding(string text)
