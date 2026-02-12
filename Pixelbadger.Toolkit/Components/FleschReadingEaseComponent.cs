@@ -9,6 +9,11 @@ public class FleschReadingEaseComponent
 
     public async Task<FleschReadingEaseResult> AnalyzeFileAsync(string inputFilePath)
     {
+        if (string.IsNullOrWhiteSpace(inputFilePath))
+        {
+            throw new ArgumentException("Input file path cannot be null or empty.", nameof(inputFilePath));
+        }
+
         if (!File.Exists(inputFilePath))
         {
             throw new FileNotFoundException($"Input file '{inputFilePath}' does not exist.");
@@ -42,16 +47,18 @@ public class FleschReadingEaseComponent
             syllableCount += CountSyllables(word.Value);
         }
 
-        var score = 206.835
+        var rawScore = 206.835
             - (1.015 * ((double)wordCount / sentenceCount))
             - (84.6 * ((double)syllableCount / wordCount));
 
+        var clampedScore = Math.Clamp(rawScore, 0d, 100d);
+
         return new FleschReadingEaseResult(
-            Math.Round(score, 2),
+            Math.Round(clampedScore, 2),
             sentenceCount,
             wordCount,
             syllableCount,
-            GetReadabilityBand(score));
+            GetReadabilityBand(clampedScore));
     }
 
     private static int CountSyllables(string word)

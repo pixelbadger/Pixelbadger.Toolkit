@@ -34,8 +34,18 @@ public class FleschReadingEaseComponentTests : IDisposable
         result.Sentences.Should().Be(1);
         result.Words.Should().Be(6);
         result.Syllables.Should().Be(6);
-        result.Score.Should().Be(116.15);
+        result.Score.Should().Be(100);
         result.ReadabilityBand.Should().Be("Very easy");
+    }
+
+    [Fact]
+    public void AnalyzeText_ShouldClampScoreToRangeZeroToOneHundred_WhenInputProducesExtremeValues()
+    {
+        var easyResult = _component.AnalyzeText("The cat sat on the mat.");
+        var difficultResult = _component.AnalyzeText("Antidisestablishmentarianism institutionalizes counterrevolutionary epistemological frameworks.");
+
+        easyResult.Score.Should().Be(100);
+        difficultResult.Score.Should().Be(0);
     }
 
     [Fact]
@@ -47,6 +57,18 @@ public class FleschReadingEaseComponentTests : IDisposable
 
         await act.Should().ThrowAsync<FileNotFoundException>()
             .WithMessage($"Input file '{inputFile}' does not exist.");
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task AnalyzeFileAsync_ShouldThrowArgumentException_WhenInputFilePathIsNullOrEmpty(string? inputFilePath)
+    {
+        var act = async () => await _component.AnalyzeFileAsync(inputFilePath!);
+
+        await act.Should().ThrowAsync<ArgumentException>()
+            .WithMessage("Input file path cannot be null or empty.*");
     }
 
     [Fact]
