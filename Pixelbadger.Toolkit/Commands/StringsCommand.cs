@@ -12,6 +12,7 @@ public static class StringsCommand
         command.AddCommand(CreateReverseCommand());
         command.AddCommand(CreateLevenshteinDistanceCommand());
         command.AddCommand(CreateAbjadifyCommand());
+        command.AddCommand(CreateFleschReadingEaseCommand());
 
         return command;
     }
@@ -132,6 +133,42 @@ public static class StringsCommand
                 Environment.Exit(1);
             }
         }, inFileOption, outFileOption);
+
+        return command;
+    }
+
+    private static Command CreateFleschReadingEaseCommand()
+    {
+        var command = new Command("flesch-reading-ease", "Analyzes plain text readability using the Flesch Reading Ease score");
+
+        var inFileOption = new Option<string>(
+            aliases: ["--in-file"],
+            description: "Input plain-text file path")
+        {
+            IsRequired = true
+        };
+
+        command.AddOption(inFileOption);
+
+        command.SetHandler(async (string inFile) =>
+        {
+            try
+            {
+                var component = new FleschReadingEaseComponent();
+                var result = await component.AnalyzeFileAsync(inFile);
+
+                Console.WriteLine($"Flesch Reading Ease: {result.Score:F2}");
+                Console.WriteLine($"Readability: {result.ReadabilityBand}");
+                Console.WriteLine($"Sentences: {result.Sentences}");
+                Console.WriteLine($"Words: {result.Words}");
+                Console.WriteLine($"Syllables: {result.Syllables}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error: {ex.Message}");
+                Environment.Exit(1);
+            }
+        }, inFileOption);
 
         return command;
     }
