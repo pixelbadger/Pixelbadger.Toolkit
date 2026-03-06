@@ -8,5 +8,6 @@ rootCommand.AddCommand(InterpretersCommand.Create());
 rootCommand.AddCommand(ImagesCommand.Create());
 rootCommand.AddCommand(WebCommand.Create());
 rootCommand.AddCommand(OpenAiCommand.Create());
+rootCommand.AddCommand(OAuthCommand.Create());
 
 return await rootCommand.InvokeAsync(args);
