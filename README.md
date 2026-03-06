@@ -12,6 +12,7 @@ A CLI toolkit exposing varied functionality organized by topic, including string
   - [strings](#strings)
     - [reverse](#reverse)
     - [levenshtein-distance](#levenshtein-distance)
+    - [flesch-reading-ease](#flesch-reading-ease)
   - [interpreters](#interpreters)
     - [brainfuck](#brainfuck)
     - [ook](#ook)
@@ -106,6 +107,29 @@ pbtk strings levenshtein-distance --string1 "hello" --string2 "world"
 # Compare contents of two files
 pbtk strings levenshtein-distance --string1 file1.txt --string2 file2.txt
 ```
+
+#### flesch-reading-ease
+Analyzes a plain-text file and reports its Flesch Reading Ease score.
+
+**Usage:**
+```bash
+pbtk strings flesch-reading-ease --in-file <input-file>
+```
+
+**Options:**
+- `--in-file`: Path to the plain-text input file (required)
+
+**Example:**
+```bash
+pbtk strings flesch-reading-ease --in-file article.txt
+```
+
+**Output includes:**
+- Flesch Reading Ease score
+- Readability band (Very easy, Easy, Standard, etc.)
+- Sentence count
+- Word count
+- Syllable count
 
 ### interpreters
 Esoteric programming language interpreters.
