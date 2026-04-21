@@ -9,5 +9,6 @@ rootCommand.AddCommand(ImagesCommand.Create());
 rootCommand.AddCommand(WebCommand.Create());
 rootCommand.AddCommand(OpenAiCommand.Create());
 rootCommand.AddCommand(OAuthCommand.Create());
+rootCommand.AddCommand(CryptoCommand.Create());
 
 return await rootCommand.InvokeAsync(args);
