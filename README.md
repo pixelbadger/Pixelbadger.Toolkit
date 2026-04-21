@@ -36,6 +36,7 @@ A CLI toolkit exposing varied functionality organized by topic, including string
 - [Technical Details](#technical-details)
   - [Steganography Implementation](#steganography-implementation)
   - [Supported Languages](#supported-languages)
+  - [Homomorphic Encryption Implementation](#homomorphic-encryption-implementation)
 
 ## Installation
 
@@ -423,22 +424,23 @@ pbtk openai corpospeak --source "Database migration finished" --audience "operat
 ### crypto
 Homomorphic encryption utilities using the Paillier cryptosystem. Encrypted numbers can be added together without ever decrypting them — the result decrypts to the correct sum.
 
-> **Security note**: The key file produced by `generate-key` contains both the public components (`N`) and the private components (`Lambda`, `Mu`). Keep this file secret. If you need a third party to encrypt values for you, share only the `N` value from the key file, not the file itself.
+> **Security note**: `generate-key` produces two separate files: a **public key** file (contains only `N`) which is safe to distribute to anyone who needs to encrypt values for you, and a **private key** file (contains `N`, `Lambda`, `Mu`) which must be kept secret and is required only for decryption.
 
 #### generate-key
-Generates a Paillier key pair and writes it to a JSON file.
+Generates a Paillier key pair and writes separate public and private key files.
 
 **Usage:**
 ```bash
-pbtk crypto generate-key --key-file <key-file>
+pbtk crypto generate-key --public-key-file <public-key-file> --private-key-file <private-key-file>
 ```
 
 **Options:**
-- `--key-file`: Path to write the generated key pair JSON file (required)
+- `--public-key-file`: Path to write the public key JSON file (required)
+- `--private-key-file`: Path to write the private key JSON file (required)
 
 **Example:**
 ```bash
-pbtk crypto generate-key --key-file my.key
+pbtk crypto generate-key --public-key-file my.pub --private-key-file my.key
 ```
 
 #### encrypt
@@ -446,17 +448,17 @@ Encrypts a non-negative integer using the Paillier public key. Paillier encrypti
 
 **Usage:**
 ```bash
-pbtk crypto encrypt --number <number> --key-file <key-file> --out-file <output-file>
+pbtk crypto encrypt --number <number> --public-key-file <public-key-file> --out-file <output-file>
 ```
 
 **Options:**
 - `--number`: The non-negative integer to encrypt (required)
-- `--key-file`: Path to the key pair JSON file (required)
+- `--public-key-file`: Path to the public key JSON file (required)
 - `--out-file`: Path to write the encrypted number JSON file (required)
 
 **Example:**
 ```bash
-pbtk crypto encrypt --number 37 --key-file my.key --out-file a.enc
+pbtk crypto encrypt --number 37 --public-key-file my.pub --out-file a.enc
 ```
 
 #### decrypt
@@ -464,16 +466,16 @@ Decrypts an encrypted number using the Paillier private key and prints the plain
 
 **Usage:**
 ```bash
-pbtk crypto decrypt --in-file <encrypted-file> --key-file <key-file>
+pbtk crypto decrypt --in-file <encrypted-file> --private-key-file <private-key-file>
 ```
 
 **Options:**
 - `--in-file`: Path to the encrypted number JSON file (required)
-- `--key-file`: Path to the key pair JSON file (required)
+- `--private-key-file`: Path to the private key JSON file (required)
 
 **Example:**
 ```bash
-pbtk crypto decrypt --in-file a.enc --key-file my.key
+pbtk crypto decrypt --in-file a.enc --private-key-file my.key
 ```
 
 #### add
@@ -492,11 +494,11 @@ pbtk crypto add --in-file1 <first-encrypted-file> --in-file2 <second-encrypted-f
 **Example:**
 ```bash
 # Encrypt 37 and 5, add without decrypting, then reveal the sum
-pbtk crypto generate-key --key-file my.key
-pbtk crypto encrypt --number 37 --key-file my.key --out-file a.enc
-pbtk crypto encrypt --number 5  --key-file my.key --out-file b.enc
+pbtk crypto generate-key --public-key-file my.pub --private-key-file my.key
+pbtk crypto encrypt --number 37 --public-key-file my.pub --out-file a.enc
+pbtk crypto encrypt --number 5  --public-key-file my.pub --out-file b.enc
 pbtk crypto add --in-file1 a.enc --in-file2 b.enc --out-file sum.enc
-pbtk crypto decrypt --in-file sum.enc --key-file my.key
+pbtk crypto decrypt --in-file sum.enc --private-key-file my.key
 # Output: 42
 ```
 
@@ -530,3 +532,13 @@ The steganography feature uses LSB (Least Significant Bit) encoding to hide mess
 
 ### Homomorphic Encryption Implementation
 The `crypto` topic uses the simplified Paillier cryptosystem, a partially homomorphic encryption scheme supporting additive operations on ciphertexts. Key generation uses Miller-Rabin primality testing (20 witnesses) via `System.Security.Cryptography.RandomNumberGenerator`. All big-integer arithmetic is performed using `System.Numerics.BigInteger` — no third-party cryptography library is required. The default key size is 512 bits; ciphertexts live in Z_{n²} and are therefore approximately 1024 bits in length. The scheme is partially homomorphic: addition of plaintexts corresponds to multiplication of their ciphertexts modulo n².
+
+#### Performance
+Homomorphic addition (`add` command) operates on ~1024-bit `BigInteger` values (multiply + modular reduction over n²). Benchmarked on .NET 9 ARM64 against plain `long` addition:
+
+| Operation | Mean | Allocated |
+|---|---|---|
+| Regular `long` addition | ~0.2 ns | 0 B |
+| Homomorphic add (in-memory BigInteger) | ~2,777 ns | 432 B |
+
+The homomorphic operation is roughly **14,000× slower** than native integer addition and allocates ~432 bytes per call due to intermediate `BigInteger` heap objects. This is the irreducible cost of arbitrary-precision modular arithmetic on 512-bit keys — not parsing overhead.

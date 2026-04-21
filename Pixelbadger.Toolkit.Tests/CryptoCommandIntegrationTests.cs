@@ -20,28 +20,35 @@ public class CryptoCommandIntegrationTests : IDisposable
     }
 
     [Fact]
-    public async Task GenerateKey_ShouldCreateKeyFile_WhenKeyFileOptionProvided()
+    public async Task GenerateKey_ShouldCreatePublicAndPrivateKeyFiles_WhenBothOptionsProvided()
     {
-        var keyFile = Path.Combine(_testDirectory, "test.key");
+        var publicKeyFile = Path.Combine(_testDirectory, "test.pub");
+        var privateKeyFile = Path.Combine(_testDirectory, "test.key");
 
         var (exitCode, stdout, _) = await RunToolkitCommandAsync(
-            "crypto", "generate-key", "--key-file", keyFile);
+            "crypto", "generate-key",
+            "--public-key-file", publicKeyFile,
+            "--private-key-file", privateKeyFile);
 
         exitCode.Should().Be(0);
-        stdout.Should().Contain("Key pair written to");
-        File.Exists(keyFile).Should().BeTrue();
+        stdout.Should().Contain("Public key written to");
+        stdout.Should().Contain("Private key written to");
+        File.Exists(publicKeyFile).Should().BeTrue();
+        File.Exists(privateKeyFile).Should().BeTrue();
     }
 
     [Fact]
     public async Task Encrypt_ShouldCreateEncryptedFile_WhenValidOptionsProvided()
     {
-        var keyFile = Path.Combine(_testDirectory, "test.key");
+        var publicKeyFile = Path.Combine(_testDirectory, "test.pub");
+        var privateKeyFile = Path.Combine(_testDirectory, "test.key");
         var encFile = Path.Combine(_testDirectory, "number.enc");
 
-        await RunToolkitCommandAsync("crypto", "generate-key", "--key-file", keyFile);
+        await RunToolkitCommandAsync("crypto", "generate-key",
+            "--public-key-file", publicKeyFile, "--private-key-file", privateKeyFile);
 
         var (exitCode, stdout, _) = await RunToolkitCommandAsync(
-            "crypto", "encrypt", "--number", "42", "--key-file", keyFile, "--out-file", encFile);
+            "crypto", "encrypt", "--number", "42", "--public-key-file", publicKeyFile, "--out-file", encFile);
 
         exitCode.Should().Be(0);
         stdout.Should().Contain("Encrypted number written to");
@@ -51,14 +58,17 @@ public class CryptoCommandIntegrationTests : IDisposable
     [Fact]
     public async Task Decrypt_ShouldReturnOriginalPlaintext_WhenDecryptingEncryptedNumber()
     {
-        var keyFile = Path.Combine(_testDirectory, "test.key");
+        var publicKeyFile = Path.Combine(_testDirectory, "test.pub");
+        var privateKeyFile = Path.Combine(_testDirectory, "test.key");
         var encFile = Path.Combine(_testDirectory, "number.enc");
 
-        await RunToolkitCommandAsync("crypto", "generate-key", "--key-file", keyFile);
-        await RunToolkitCommandAsync("crypto", "encrypt", "--number", "99", "--key-file", keyFile, "--out-file", encFile);
+        await RunToolkitCommandAsync("crypto", "generate-key",
+            "--public-key-file", publicKeyFile, "--private-key-file", privateKeyFile);
+        await RunToolkitCommandAsync("crypto", "encrypt",
+            "--number", "99", "--public-key-file", publicKeyFile, "--out-file", encFile);
 
         var (exitCode, stdout, _) = await RunToolkitCommandAsync(
-            "crypto", "decrypt", "--in-file", encFile, "--key-file", keyFile);
+            "crypto", "decrypt", "--in-file", encFile, "--private-key-file", privateKeyFile);
 
         exitCode.Should().Be(0);
         stdout.Trim().Should().Be("99");
@@ -67,56 +77,76 @@ public class CryptoCommandIntegrationTests : IDisposable
     [Fact]
     public async Task Add_ShouldProduceEncryptedSumThatDecryptsToCorrectValue()
     {
-        var keyFile = Path.Combine(_testDirectory, "test.key");
+        var publicKeyFile = Path.Combine(_testDirectory, "test.pub");
+        var privateKeyFile = Path.Combine(_testDirectory, "test.key");
         var encFile1 = Path.Combine(_testDirectory, "a.enc");
         var encFile2 = Path.Combine(_testDirectory, "b.enc");
         var sumFile = Path.Combine(_testDirectory, "sum.enc");
 
-        await RunToolkitCommandAsync("crypto", "generate-key", "--key-file", keyFile);
-        await RunToolkitCommandAsync("crypto", "encrypt", "--number", "37", "--key-file", keyFile, "--out-file", encFile1);
-        await RunToolkitCommandAsync("crypto", "encrypt", "--number", "5", "--key-file", keyFile, "--out-file", encFile2);
-        await RunToolkitCommandAsync("crypto", "add", "--in-file1", encFile1, "--in-file2", encFile2, "--out-file", sumFile);
+        await RunToolkitCommandAsync("crypto", "generate-key",
+            "--public-key-file", publicKeyFile, "--private-key-file", privateKeyFile);
+        await RunToolkitCommandAsync("crypto", "encrypt",
+            "--number", "37", "--public-key-file", publicKeyFile, "--out-file", encFile1);
+        await RunToolkitCommandAsync("crypto", "encrypt",
+            "--number", "5", "--public-key-file", publicKeyFile, "--out-file", encFile2);
+        await RunToolkitCommandAsync("crypto", "add",
+            "--in-file1", encFile1, "--in-file2", encFile2, "--out-file", sumFile);
 
         var (exitCode, stdout, _) = await RunToolkitCommandAsync(
-            "crypto", "decrypt", "--in-file", sumFile, "--key-file", keyFile);
+            "crypto", "decrypt", "--in-file", sumFile, "--private-key-file", privateKeyFile);
 
         exitCode.Should().Be(0);
         stdout.Trim().Should().Be("42");
     }
 
     [Fact]
-    public async Task GenerateKey_ShouldReturnFailure_WhenKeyFileOptionIsMissing()
+    public async Task GenerateKey_ShouldReturnFailure_WhenPublicKeyFileOptionIsMissing()
     {
-        var (exitCode, stdout, stderr) = await RunToolkitCommandAsync("crypto", "generate-key");
+        var privateKeyFile = Path.Combine(_testDirectory, "test.key");
+
+        var (exitCode, stdout, stderr) = await RunToolkitCommandAsync(
+            "crypto", "generate-key", "--private-key-file", privateKeyFile);
 
         exitCode.Should().NotBe(0);
-        (stdout + stderr).Should().Contain("--key-file");
+        (stdout + stderr).Should().Contain("--public-key-file");
     }
 
     [Fact]
-    public async Task Encrypt_ShouldReturnFailure_WhenKeyFileDoesNotExist()
+    public async Task GenerateKey_ShouldReturnFailure_WhenPrivateKeyFileOptionIsMissing()
     {
-        var missingKeyFile = Path.Combine(_testDirectory, "missing.key");
+        var publicKeyFile = Path.Combine(_testDirectory, "test.pub");
+
+        var (exitCode, stdout, stderr) = await RunToolkitCommandAsync(
+            "crypto", "generate-key", "--public-key-file", publicKeyFile);
+
+        exitCode.Should().NotBe(0);
+        (stdout + stderr).Should().Contain("--private-key-file");
+    }
+
+    [Fact]
+    public async Task Encrypt_ShouldReturnFailure_WhenPublicKeyFileDoesNotExist()
+    {
+        var missingPublicKeyFile = Path.Combine(_testDirectory, "missing.pub");
         var encFile = Path.Combine(_testDirectory, "number.enc");
 
         var (exitCode, stdout, _) = await RunToolkitCommandAsync(
-            "crypto", "encrypt", "--number", "42", "--key-file", missingKeyFile, "--out-file", encFile);
+            "crypto", "encrypt", "--number", "42", "--public-key-file", missingPublicKeyFile, "--out-file", encFile);
 
         exitCode.Should().Be(1);
         stdout.Should().Contain("Error:");
     }
 
     [Fact]
-    public async Task Decrypt_ShouldReturnFailure_WhenKeyFileContainsMalformedJson()
+    public async Task Decrypt_ShouldReturnFailure_WhenPrivateKeyFileContainsMalformedJson()
     {
-        var keyFile = Path.Combine(_testDirectory, "bad.key");
+        var privateKeyFile = Path.Combine(_testDirectory, "bad.key");
         var encFile = Path.Combine(_testDirectory, "number.enc");
 
-        await File.WriteAllTextAsync(keyFile, "{ not valid json }");
+        await File.WriteAllTextAsync(privateKeyFile, "{ not valid json }");
         await File.WriteAllTextAsync(encFile, "{ \"Ciphertext\": \"12345\", \"N\": \"99999\" }");
 
         var (exitCode, stdout, _) = await RunToolkitCommandAsync(
-            "crypto", "decrypt", "--in-file", encFile, "--key-file", keyFile);
+            "crypto", "decrypt", "--in-file", encFile, "--private-key-file", privateKeyFile);
 
         exitCode.Should().Be(1);
         stdout.Should().Contain("Error:");
@@ -125,13 +155,16 @@ public class CryptoCommandIntegrationTests : IDisposable
     [Fact]
     public async Task Add_ShouldReturnFailure_WhenFirstInputFileDoesNotExist()
     {
-        var keyFile = Path.Combine(_testDirectory, "test.key");
+        var publicKeyFile = Path.Combine(_testDirectory, "test.pub");
+        var privateKeyFile = Path.Combine(_testDirectory, "test.key");
         var missingFile = Path.Combine(_testDirectory, "missing.enc");
         var encFile = Path.Combine(_testDirectory, "number.enc");
         var sumFile = Path.Combine(_testDirectory, "sum.enc");
 
-        await RunToolkitCommandAsync("crypto", "generate-key", "--key-file", keyFile);
-        await RunToolkitCommandAsync("crypto", "encrypt", "--number", "5", "--key-file", keyFile, "--out-file", encFile);
+        await RunToolkitCommandAsync("crypto", "generate-key",
+            "--public-key-file", publicKeyFile, "--private-key-file", privateKeyFile);
+        await RunToolkitCommandAsync("crypto", "encrypt",
+            "--number", "5", "--public-key-file", publicKeyFile, "--out-file", encFile);
 
         var (exitCode, stdout, _) = await RunToolkitCommandAsync(
             "crypto", "add", "--in-file1", missingFile, "--in-file2", encFile, "--out-file", sumFile);

@@ -28,12 +28,12 @@ public class HomomorphicEncryptionComponent
         };
     }
 
-    public EncryptedNumber Encrypt(long plaintext, PaillierKeyPair key)
+    public EncryptedNumber Encrypt(long plaintext, PaillierPublicKey publicKey)
     {
         if (plaintext < 0)
             throw new ArgumentException("Plaintext must be non-negative.", nameof(plaintext));
 
-        var n = BigInteger.Parse(key.N);
+        var n = BigInteger.Parse(publicKey.N);
         var m = new BigInteger(plaintext);
 
         if (m >= n)
@@ -54,7 +54,7 @@ public class HomomorphicEncryptionComponent
         return new EncryptedNumber
         {
             Ciphertext = ciphertext.ToString(),
-            N = key.N
+            N = publicKey.N
         };
     }
 

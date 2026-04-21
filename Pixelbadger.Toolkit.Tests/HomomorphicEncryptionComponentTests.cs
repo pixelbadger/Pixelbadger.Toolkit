@@ -40,8 +40,9 @@ public class HomomorphicEncryptionComponentTests
     public void Encrypt_ShouldReturnCiphertextDifferentFromPlaintext()
     {
         var key = _component.GenerateKey(TestKeyBitLength);
+        var publicKey = new PaillierPublicKey { N = key.N };
 
-        var encrypted = _component.Encrypt(42L, key);
+        var encrypted = _component.Encrypt(42L, publicKey);
 
         BigInteger.TryParse(encrypted.Ciphertext, out var ciphertext).Should().BeTrue();
         ciphertext.Should().NotBe(new BigInteger(42));
@@ -52,9 +53,10 @@ public class HomomorphicEncryptionComponentTests
     public void Encrypt_ShouldProduceProbabilisticCiphertext_SamePlaintextYieldsDifferentCiphertexts()
     {
         var key = _component.GenerateKey(TestKeyBitLength);
+        var publicKey = new PaillierPublicKey { N = key.N };
 
-        var encrypted1 = _component.Encrypt(7L, key);
-        var encrypted2 = _component.Encrypt(7L, key);
+        var encrypted1 = _component.Encrypt(7L, publicKey);
+        var encrypted2 = _component.Encrypt(7L, publicKey);
 
         // Paillier is semantically secure: same plaintext encrypts to different ciphertexts
         encrypted1.Ciphertext.Should().NotBe(encrypted2.Ciphertext);
@@ -64,8 +66,9 @@ public class HomomorphicEncryptionComponentTests
     public void Decrypt_ShouldReturnOriginalPlaintext_WhenDecryptingEncryptedNumber()
     {
         var key = _component.GenerateKey(TestKeyBitLength);
+        var publicKey = new PaillierPublicKey { N = key.N };
 
-        var encrypted = _component.Encrypt(42L, key);
+        var encrypted = _component.Encrypt(42L, publicKey);
         var decrypted = _component.Decrypt(encrypted, key);
 
         decrypted.Should().Be(new BigInteger(42));
@@ -79,8 +82,9 @@ public class HomomorphicEncryptionComponentTests
     public void Decrypt_ShouldReturnCorrectValue_ForVariousPlaintextValues(long plaintext)
     {
         var key = _component.GenerateKey(TestKeyBitLength);
+        var publicKey = new PaillierPublicKey { N = key.N };
 
-        var encrypted = _component.Encrypt(plaintext, key);
+        var encrypted = _component.Encrypt(plaintext, publicKey);
         var decrypted = _component.Decrypt(encrypted, key);
 
         decrypted.Should().Be(new BigInteger(plaintext));
@@ -90,9 +94,10 @@ public class HomomorphicEncryptionComponentTests
     public void AddEncrypted_ShouldDecryptToSumOfOriginalValues()
     {
         var key = _component.GenerateKey(TestKeyBitLength);
+        var publicKey = new PaillierPublicKey { N = key.N };
 
-        var encryptedA = _component.Encrypt(15L, key);
-        var encryptedB = _component.Encrypt(27L, key);
+        var encryptedA = _component.Encrypt(15L, publicKey);
+        var encryptedB = _component.Encrypt(27L, publicKey);
         var encryptedSum = _component.AddEncrypted(encryptedA, encryptedB);
         var decryptedSum = _component.Decrypt(encryptedSum, key);
 
@@ -103,9 +108,10 @@ public class HomomorphicEncryptionComponentTests
     public void AddEncrypted_ShouldDecryptToCorrectSum_WhenAddingZero()
     {
         var key = _component.GenerateKey(TestKeyBitLength);
+        var publicKey = new PaillierPublicKey { N = key.N };
 
-        var encryptedA = _component.Encrypt(99L, key);
-        var encryptedZero = _component.Encrypt(0L, key);
+        var encryptedA = _component.Encrypt(99L, publicKey);
+        var encryptedZero = _component.Encrypt(0L, publicKey);
         var encryptedSum = _component.AddEncrypted(encryptedA, encryptedZero);
         var decryptedSum = _component.Decrypt(encryptedSum, key);
 
@@ -116,9 +122,10 @@ public class HomomorphicEncryptionComponentTests
     public void AddEncrypted_ShouldReturnEncryptedNumberWithSameN_AsInputs()
     {
         var key = _component.GenerateKey(TestKeyBitLength);
+        var publicKey = new PaillierPublicKey { N = key.N };
 
-        var encryptedA = _component.Encrypt(5L, key);
-        var encryptedB = _component.Encrypt(3L, key);
+        var encryptedA = _component.Encrypt(5L, publicKey);
+        var encryptedB = _component.Encrypt(3L, publicKey);
         var encryptedSum = _component.AddEncrypted(encryptedA, encryptedB);
 
         encryptedSum.N.Should().Be(key.N);
@@ -128,8 +135,9 @@ public class HomomorphicEncryptionComponentTests
     public void Encrypt_ShouldThrowArgumentException_WhenPlaintextIsNegative()
     {
         var key = _component.GenerateKey(TestKeyBitLength);
+        var publicKey = new PaillierPublicKey { N = key.N };
 
-        var act = () => _component.Encrypt(-1L, key);
+        var act = () => _component.Encrypt(-1L, publicKey);
 
         act.Should().Throw<ArgumentException>()
             .WithMessage("*non-negative*");
@@ -141,8 +149,8 @@ public class HomomorphicEncryptionComponentTests
         var key1 = _component.GenerateKey(TestKeyBitLength);
         var key2 = _component.GenerateKey(TestKeyBitLength);
 
-        var encrypted1 = _component.Encrypt(5L, key1);
-        var encrypted2 = _component.Encrypt(3L, key2);
+        var encrypted1 = _component.Encrypt(5L, new PaillierPublicKey { N = key1.N });
+        var encrypted2 = _component.Encrypt(3L, new PaillierPublicKey { N = key2.N });
 
         var act = () => _component.AddEncrypted(encrypted1, encrypted2);
 
