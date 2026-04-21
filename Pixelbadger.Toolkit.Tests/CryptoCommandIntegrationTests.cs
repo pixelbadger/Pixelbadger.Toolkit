@@ -100,6 +100,21 @@ public class CryptoCommandIntegrationTests : IDisposable
     }
 
     [Fact]
+    public async Task GenerateKey_ShouldWriteOnlyNToPublicKeyFile_AndNotExposePrivateKeyMaterial()
+    {
+        var publicKeyFile = Path.Combine(_testDirectory, "test.pub");
+        var privateKeyFile = Path.Combine(_testDirectory, "test.key");
+
+        await RunToolkitCommandAsync("crypto", "generate-key",
+            "--public-key-file", publicKeyFile, "--private-key-file", privateKeyFile);
+
+        var publicJson = await File.ReadAllTextAsync(publicKeyFile);
+        publicJson.Should().Contain("\"N\"");
+        publicJson.Should().NotContain("\"Lambda\"");
+        publicJson.Should().NotContain("\"Mu\"");
+    }
+
+    [Fact]
     public async Task GenerateKey_ShouldReturnFailure_WhenPublicKeyFileOptionIsMissing()
     {
         var privateKeyFile = Path.Combine(_testDirectory, "test.key");
