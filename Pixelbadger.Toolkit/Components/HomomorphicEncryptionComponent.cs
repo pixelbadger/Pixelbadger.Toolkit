@@ -94,17 +94,20 @@ public class HomomorphicEncryptionComponent
 
     private static BigInteger ModInverse(BigInteger a, BigInteger m)
     {
-        var (gcd, x, _) = ExtendedGcd(((a % m) + m) % m, m);
-        if (gcd != 1)
-            throw new InvalidOperationException("Modular inverse does not exist.");
-        return (x % m + m) % m;
-    }
+        BigInteger oldR = ((a % m) + m) % m, r = m;
+        BigInteger oldS = BigInteger.One, s = BigInteger.Zero;
 
-    private static (BigInteger Gcd, BigInteger X, BigInteger Y) ExtendedGcd(BigInteger a, BigInteger b)
-    {
-        if (a == 0) return (b, BigInteger.Zero, BigInteger.One);
-        var (g, x, y) = ExtendedGcd(b % a, a);
-        return (g, y - b / a * x, x);
+        while (r != 0)
+        {
+            var q = oldR / r;
+            (oldR, r) = (r, oldR - q * r);
+            (oldS, s) = (s, oldS - q * s);
+        }
+
+        if (oldR != 1)
+            throw new InvalidOperationException("Modular inverse does not exist.");
+
+        return (oldS % m + m) % m;
     }
 
     private static BigInteger GeneratePrime(int bitLength, RandomNumberGenerator rng)
