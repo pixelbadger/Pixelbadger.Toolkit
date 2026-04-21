@@ -1,6 +1,6 @@
 # Pixelbadger.Toolkit
 
-A CLI toolkit exposing varied functionality organized by topic, including string manipulation, distance calculations, esoteric programming language interpreters, image steganography, web serving, and OpenAI integration.
+A CLI toolkit exposing varied functionality organized by topic, including string manipulation, distance calculations, esoteric programming language interpreters, image steganography, web serving, OpenAI integration, and homomorphic encryption.
 
 > **Note**: Search and MCP RAG functionality has been extracted to the separate [Pixelbadger.Toolkit.Rag](https://github.com/pixelbadger/Pixelbadger.Toolkit.Rag) repository (`pbrag` CLI tool).
 
@@ -26,6 +26,11 @@ A CLI toolkit exposing varied functionality organized by topic, including string
     - [translate](#translate)
     - [ocaaar](#ocaaar)
     - [corpospeak](#corpospeak)
+  - [crypto](#crypto)
+    - [generate-key](#generate-key)
+    - [encrypt](#encrypt)
+    - [decrypt](#decrypt)
+    - [add](#add)
 - [Help](#help)
 - [Requirements](#requirements)
 - [Technical Details](#technical-details)
@@ -415,6 +420,86 @@ pbtk openai corpospeak --source "Database migration finished" --audience "operat
 - **hr**: People impact and organizational dynamics
 - **customer-success**: Customer experience and support focus
 
+### crypto
+Homomorphic encryption utilities using the Paillier cryptosystem. Encrypted numbers can be added together without ever decrypting them — the result decrypts to the correct sum.
+
+> **Security note**: The key file produced by `generate-key` contains both the public components (`N`) and the private components (`Lambda`, `Mu`). Keep this file secret. If you need a third party to encrypt values for you, share only the `N` value from the key file, not the file itself.
+
+#### generate-key
+Generates a Paillier key pair and writes it to a JSON file.
+
+**Usage:**
+```bash
+pbtk crypto generate-key --key-file <key-file>
+```
+
+**Options:**
+- `--key-file`: Path to write the generated key pair JSON file (required)
+
+**Example:**
+```bash
+pbtk crypto generate-key --key-file my.key
+```
+
+#### encrypt
+Encrypts a non-negative integer using the Paillier public key. Paillier encryption is probabilistic — encrypting the same number twice produces different ciphertexts, both of which decrypt to the same value.
+
+**Usage:**
+```bash
+pbtk crypto encrypt --number <number> --key-file <key-file> --out-file <output-file>
+```
+
+**Options:**
+- `--number`: The non-negative integer to encrypt (required)
+- `--key-file`: Path to the key pair JSON file (required)
+- `--out-file`: Path to write the encrypted number JSON file (required)
+
+**Example:**
+```bash
+pbtk crypto encrypt --number 37 --key-file my.key --out-file a.enc
+```
+
+#### decrypt
+Decrypts an encrypted number using the Paillier private key and prints the plaintext.
+
+**Usage:**
+```bash
+pbtk crypto decrypt --in-file <encrypted-file> --key-file <key-file>
+```
+
+**Options:**
+- `--in-file`: Path to the encrypted number JSON file (required)
+- `--key-file`: Path to the key pair JSON file (required)
+
+**Example:**
+```bash
+pbtk crypto decrypt --in-file a.enc --key-file my.key
+```
+
+#### add
+Homomorphically adds two encrypted numbers without decrypting them. The resulting file can be decrypted to yield the sum of the two original plaintexts.
+
+**Usage:**
+```bash
+pbtk crypto add --in-file1 <first-encrypted-file> --in-file2 <second-encrypted-file> --out-file <output-file>
+```
+
+**Options:**
+- `--in-file1`: Path to the first encrypted number JSON file (required)
+- `--in-file2`: Path to the second encrypted number JSON file (required)
+- `--out-file`: Path to write the encrypted sum JSON file (required)
+
+**Example:**
+```bash
+# Encrypt 37 and 5, add without decrypting, then reveal the sum
+pbtk crypto generate-key --key-file my.key
+pbtk crypto encrypt --number 37 --key-file my.key --out-file a.enc
+pbtk crypto encrypt --number 5  --key-file my.key --out-file b.enc
+pbtk crypto add --in-file1 a.enc --in-file2 b.enc --out-file sum.enc
+pbtk crypto decrypt --in-file sum.enc --key-file my.key
+# Output: 42
+```
+
 ## Help
 
 Get help for any command by adding `--help`:
@@ -442,3 +527,6 @@ The steganography feature uses LSB (Least Significant Bit) encoding to hide mess
 ### Supported Languages
 - **Brainfuck**: A minimalist esoteric programming language with 8 commands
 - **Ook**: A Brainfuck derivative using "Ook." and "Ook?" syntax inspired by Terry Pratchett's Discworld orangutans
+
+### Homomorphic Encryption Implementation
+The `crypto` topic uses the simplified Paillier cryptosystem, a partially homomorphic encryption scheme supporting additive operations on ciphertexts. Key generation uses Miller-Rabin primality testing (20 witnesses) via `System.Security.Cryptography.RandomNumberGenerator`. All big-integer arithmetic is performed using `System.Numerics.BigInteger` — no third-party cryptography library is required. The default key size is 512 bits; ciphertexts live in Z_{n²} and are therefore approximately 1024 bits in length. The scheme is partially homomorphic: addition of plaintexts corresponds to multiplication of their ciphertexts modulo n².

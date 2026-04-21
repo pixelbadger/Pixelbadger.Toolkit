@@ -10,10 +10,10 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>pbtk</ToolCommandName>
     <PackageId>Pixelbadger.Toolkit</PackageId>
-    <Version>3.2.0</Version>
+    <Version>3.3.0</Version>
     <Authors>Pixelbadger</Authors>
-    <Description>A CLI toolkit exposing varied functionality organized by topic, including string manipulation, distance calculations, esoteric programming language interpreters, image steganography, web serving, and OpenAI integration.</Description>
-    <PackageTags>cli;toolkit;strings;interpreters;steganography;openai</PackageTags>
+    <Description>A CLI toolkit exposing varied functionality organized by topic, including string manipulation, distance calculations, esoteric programming language interpreters, image steganography, web serving, OpenAI integration, and homomorphic encryption.</Description>
+    <PackageTags>cli;toolkit;strings;interpreters;steganography;openai;crypto;homomorphic-encryption</PackageTags>
     <RepositoryUrl>https://github.com/pixelbadger/Pixelbadger.Toolkit</RepositoryUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
