@@ -23,33 +23,45 @@ public static class CryptoCommand
 
     private static Command CreateGenerateKeyCommand()
     {
-        var command = new Command("generate-key", "Generate a Paillier key pair and save it to a file");
+        var command = new Command("generate-key", "Generate a Paillier key pair and save public and private key files");
 
-        var keyFileOption = new Option<string>(
-            aliases: ["--key-file"],
-            description: "Path to write the generated key pair JSON file")
+        var publicKeyFileOption = new Option<string>(
+            aliases: ["--public-key-file"],
+            description: "Path to write the public key JSON file (contains N; safe to share)")
         {
             IsRequired = true
         };
 
-        command.AddOption(keyFileOption);
+        var privateKeyFileOption = new Option<string>(
+            aliases: ["--private-key-file"],
+            description: "Path to write the private key JSON file (contains N, Lambda, Mu; keep secret)")
+        {
+            IsRequired = true
+        };
 
-        command.SetHandler(async (string keyFile) =>
+        command.AddOption(publicKeyFileOption);
+        command.AddOption(privateKeyFileOption);
+
+        command.SetHandler(async (string publicKeyFile, string privateKeyFile) =>
         {
             try
             {
                 var component = new HomomorphicEncryptionComponent();
                 var keyPair = component.GenerateKey();
-                var json = JsonSerializer.Serialize(keyPair, JsonOptions);
-                await File.WriteAllTextAsync(keyFile, json);
-                Console.WriteLine($"Key pair written to '{keyFile}'");
+                var publicKey = new PaillierPublicKey { N = keyPair.N };
+
+                await File.WriteAllTextAsync(publicKeyFile, JsonSerializer.Serialize(publicKey, JsonOptions));
+                await File.WriteAllTextAsync(privateKeyFile, JsonSerializer.Serialize(keyPair, JsonOptions));
+
+                Console.WriteLine($"Public key written to '{publicKeyFile}'");
+                Console.WriteLine($"Private key written to '{privateKeyFile}'");
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error: {ex.Message}");
                 Environment.Exit(1);
             }
-        }, keyFileOption);
+        }, publicKeyFileOption, privateKeyFileOption);
 
         return command;
     }
@@ -65,9 +77,9 @@ public static class CryptoCommand
             IsRequired = true
         };
 
-        var keyFileOption = new Option<string>(
-            aliases: ["--key-file"],
-            description: "Path to the key pair JSON file")
+        var publicKeyFileOption = new Option<string>(
+            aliases: ["--public-key-file"],
+            description: "Path to the public key JSON file")
         {
             IsRequired = true
         };
@@ -80,19 +92,19 @@ public static class CryptoCommand
         };
 
         command.AddOption(numberOption);
-        command.AddOption(keyFileOption);
+        command.AddOption(publicKeyFileOption);
         command.AddOption(outFileOption);
 
-        command.SetHandler(async (long number, string keyFile, string outFile) =>
+        command.SetHandler(async (long number, string publicKeyFile, string outFile) =>
         {
             try
             {
-                var keyJson = await File.ReadAllTextAsync(keyFile);
-                var keyPair = JsonSerializer.Deserialize<PaillierKeyPair>(keyJson)
-                    ?? throw new InvalidOperationException("Failed to deserialize key pair.");
+                var keyJson = await File.ReadAllTextAsync(publicKeyFile);
+                var publicKey = JsonSerializer.Deserialize<PaillierPublicKey>(keyJson)
+                    ?? throw new InvalidOperationException("Failed to deserialize public key.");
 
                 var component = new HomomorphicEncryptionComponent();
-                var encrypted = component.Encrypt(number, keyPair);
+                var encrypted = component.Encrypt(number, publicKey);
 
                 var json = JsonSerializer.Serialize(encrypted, JsonOptions);
                 await File.WriteAllTextAsync(outFile, json);
@@ -103,7 +115,7 @@ public static class CryptoCommand
                 Console.WriteLine($"Error: {ex.Message}");
                 Environment.Exit(1);
             }
-        }, numberOption, keyFileOption, outFileOption);
+        }, numberOption, publicKeyFileOption, outFileOption);
 
         return command;
     }
@@ -119,17 +131,17 @@ public static class CryptoCommand
             IsRequired = true
         };
 
-        var keyFileOption = new Option<string>(
-            aliases: ["--key-file"],
-            description: "Path to the key pair JSON file")
+        var privateKeyFileOption = new Option<string>(
+            aliases: ["--private-key-file"],
+            description: "Path to the private key JSON file")
         {
             IsRequired = true
         };
 
         command.AddOption(inFileOption);
-        command.AddOption(keyFileOption);
+        command.AddOption(privateKeyFileOption);
 
-        command.SetHandler(async (string inFile, string keyFile) =>
+        command.SetHandler(async (string inFile, string privateKeyFile) =>
         {
             try
             {
@@ -137,9 +149,9 @@ public static class CryptoCommand
                 var encrypted = JsonSerializer.Deserialize<EncryptedNumber>(encryptedJson)
                     ?? throw new InvalidOperationException("Failed to deserialize encrypted number.");
 
-                var keyJson = await File.ReadAllTextAsync(keyFile);
+                var keyJson = await File.ReadAllTextAsync(privateKeyFile);
                 var keyPair = JsonSerializer.Deserialize<PaillierKeyPair>(keyJson)
-                    ?? throw new InvalidOperationException("Failed to deserialize key pair.");
+                    ?? throw new InvalidOperationException("Failed to deserialize private key.");
 
                 var component = new HomomorphicEncryptionComponent();
                 var plaintext = component.Decrypt(encrypted, keyPair);
@@ -150,7 +162,7 @@ public static class CryptoCommand
                 Console.WriteLine($"Error: {ex.Message}");
                 Environment.Exit(1);
             }
-        }, inFileOption, keyFileOption);
+        }, inFileOption, privateKeyFileOption);
 
         return command;
     }
