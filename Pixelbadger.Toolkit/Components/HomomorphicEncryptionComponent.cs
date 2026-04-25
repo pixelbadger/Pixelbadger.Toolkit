@@ -6,15 +6,20 @@ namespace Pixelbadger.Toolkit.Components;
 
 public class HomomorphicEncryptionComponent
 {
-    public PaillierKeyPair GenerateKey(int bitLength = 512)
+    public const int DefaultKeyBitLength = 2048;
+    public const int MinimumKeyBitLength = 2048;
+
+    public PaillierKeyPair GenerateKey(int bitLength = DefaultKeyBitLength)
     {
+        ValidateKeyBitLength(bitLength);
+
         using var rng = RandomNumberGenerator.Create();
         BigInteger p, q;
         do
         {
             p = GeneratePrime(bitLength / 2, rng);
             q = GeneratePrime(bitLength / 2, rng);
-        } while (p == q);
+        } while (p == q || (p * q).GetBitLength() < bitLength);
 
         var n = p * q;
         var lambda = Lcm(p - 1, q - 1);
@@ -34,6 +39,7 @@ public class HomomorphicEncryptionComponent
             throw new ArgumentException("Plaintext must be non-negative.", nameof(plaintext));
 
         var n = BigInteger.Parse(publicKey.N);
+        ValidateModulus(n);
         var m = new BigInteger(plaintext);
 
         if (m >= n)
@@ -61,6 +67,7 @@ public class HomomorphicEncryptionComponent
     public BigInteger Decrypt(EncryptedNumber encryptedNumber, PaillierKeyPair key)
     {
         var n = BigInteger.Parse(key.N);
+        ValidateModulus(n);
         var lambda = BigInteger.Parse(key.Lambda);
         var mu = BigInteger.Parse(key.Mu);
         var c = BigInteger.Parse(encryptedNumber.Ciphertext);
@@ -76,6 +83,7 @@ public class HomomorphicEncryptionComponent
             throw new ArgumentException("Both encrypted numbers must use the same public key (N).");
 
         var n = BigInteger.Parse(a.N);
+        ValidateModulus(n);
         var nSquared = n * n;
         var c1 = BigInteger.Parse(a.Ciphertext);
         var c2 = BigInteger.Parse(b.Ciphertext);
@@ -88,6 +96,21 @@ public class HomomorphicEncryptionComponent
     }
 
     private static BigInteger L(BigInteger x, BigInteger n) => (x - 1) / n;
+
+    private static void ValidateKeyBitLength(int bitLength)
+    {
+        if (bitLength < MinimumKeyBitLength)
+            throw new ArgumentException($"Paillier keys must be at least {MinimumKeyBitLength} bits.", nameof(bitLength));
+
+        if (bitLength % 2 != 0 || bitLength % 8 != 0)
+            throw new ArgumentException("Paillier key bit length must be divisible by 8 and 2.", nameof(bitLength));
+    }
+
+    private static void ValidateModulus(BigInteger n)
+    {
+        if (n.GetBitLength() < MinimumKeyBitLength)
+            throw new ArgumentException($"Paillier modulus must be at least {MinimumKeyBitLength} bits.");
+    }
 
     private static BigInteger Lcm(BigInteger a, BigInteger b) =>
         a / BigInteger.GreatestCommonDivisor(a, b) * b;

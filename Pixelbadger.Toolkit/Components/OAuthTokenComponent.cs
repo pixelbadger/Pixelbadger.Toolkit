@@ -9,7 +9,12 @@ public class OAuthTokenComponent(IOAuthProfileService profileService, IOAuthHttp
         var profile = await profileService.GetProfileAsync(profileName)
             ?? throw new InvalidOperationException($"Profile '{profileName}' not found.");
 
+        var authorityUri = ValidateHttpsUri(profile.AuthorityUri, "authority URI");
         var tokenEndpoint = await httpClient.DiscoverTokenEndpointAsync(profile.AuthorityUri);
+        var tokenEndpointUri = ValidateHttpsUri(tokenEndpoint, "token endpoint");
+
+        if (!string.Equals(authorityUri.Host, tokenEndpointUri.Host, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("OAuth token endpoint host must match the authority host.");
 
         var parameters = new Dictionary<string, string>
         {
@@ -31,5 +36,13 @@ public class OAuthTokenComponent(IOAuthProfileService profileService, IOAuthHttp
             throw new InvalidOperationException("Token response did not contain an access token.");
 
         return tokenResponse.AccessToken;
+    }
+
+    private static Uri ValidateHttpsUri(string value, string description)
+    {
+        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps)
+            throw new InvalidOperationException($"OAuth {description} must be an absolute HTTPS URI.");
+
+        return uri;
     }
 }

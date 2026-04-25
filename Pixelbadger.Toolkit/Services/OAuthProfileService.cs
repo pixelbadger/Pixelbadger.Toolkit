@@ -24,8 +24,14 @@ public class OAuthProfileService : IOAuthProfileService
         var directory = Path.GetDirectoryName(ProfilesFilePath)!;
         Directory.CreateDirectory(directory);
 
+        if (!OperatingSystem.IsWindows())
+            File.SetUnixFileMode(directory, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+
         var json = JsonSerializer.Serialize(profiles, new JsonSerializerOptions { WriteIndented = true });
         await File.WriteAllTextAsync(ProfilesFilePath, json);
+
+        if (!OperatingSystem.IsWindows())
+            File.SetUnixFileMode(ProfilesFilePath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
     }
 
     public async Task<OAuthProfile?> GetProfileAsync(string name)

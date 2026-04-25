@@ -1,11 +1,17 @@
 using System.Diagnostics;
+using System.Numerics;
+using System.Text.Json;
 using FluentAssertions;
+using Pixelbadger.Toolkit.Components;
+using Pixelbadger.Toolkit.Models;
 
 namespace Pixelbadger.Toolkit.Tests;
 
 public class CryptoCommandIntegrationTests : IDisposable
 {
     private readonly string _testDirectory;
+    private static readonly Lazy<PaillierKeyPair> TestKey = new(() => new HomomorphicEncryptionComponent().GenerateKey());
+    private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
     public CryptoCommandIntegrationTests()
     {
@@ -35,6 +41,14 @@ public class CryptoCommandIntegrationTests : IDisposable
         stdout.Should().Contain("Private key written to");
         File.Exists(publicKeyFile).Should().BeTrue();
         File.Exists(privateKeyFile).Should().BeTrue();
+
+        var publicKey = JsonSerializer.Deserialize<PaillierPublicKey>(await File.ReadAllTextAsync(publicKeyFile));
+        BigInteger.Parse(publicKey!.N).GetBitLength().Should().BeGreaterThanOrEqualTo(HomomorphicEncryptionComponent.MinimumKeyBitLength);
+
+        if (!OperatingSystem.IsWindows())
+        {
+            File.GetUnixFileMode(privateKeyFile).Should().Be(UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        }
     }
 
     [Fact]
@@ -44,8 +58,7 @@ public class CryptoCommandIntegrationTests : IDisposable
         var privateKeyFile = Path.Combine(_testDirectory, "test.key");
         var encFile = Path.Combine(_testDirectory, "number.enc");
 
-        await RunToolkitCommandAsync("crypto", "generate-key",
-            "--public-key-file", publicKeyFile, "--private-key-file", privateKeyFile);
+        await WriteKeyFilesAsync(publicKeyFile, privateKeyFile);
 
         var (exitCode, stdout, _) = await RunToolkitCommandAsync(
             "crypto", "encrypt", "--number", "42", "--public-key-file", publicKeyFile, "--out-file", encFile);
@@ -62,8 +75,7 @@ public class CryptoCommandIntegrationTests : IDisposable
         var privateKeyFile = Path.Combine(_testDirectory, "test.key");
         var encFile = Path.Combine(_testDirectory, "number.enc");
 
-        await RunToolkitCommandAsync("crypto", "generate-key",
-            "--public-key-file", publicKeyFile, "--private-key-file", privateKeyFile);
+        await WriteKeyFilesAsync(publicKeyFile, privateKeyFile);
         await RunToolkitCommandAsync("crypto", "encrypt",
             "--number", "99", "--public-key-file", publicKeyFile, "--out-file", encFile);
 
@@ -83,8 +95,7 @@ public class CryptoCommandIntegrationTests : IDisposable
         var encFile2 = Path.Combine(_testDirectory, "b.enc");
         var sumFile = Path.Combine(_testDirectory, "sum.enc");
 
-        await RunToolkitCommandAsync("crypto", "generate-key",
-            "--public-key-file", publicKeyFile, "--private-key-file", privateKeyFile);
+        await WriteKeyFilesAsync(publicKeyFile, privateKeyFile);
         await RunToolkitCommandAsync("crypto", "encrypt",
             "--number", "37", "--public-key-file", publicKeyFile, "--out-file", encFile1);
         await RunToolkitCommandAsync("crypto", "encrypt",
@@ -105,8 +116,7 @@ public class CryptoCommandIntegrationTests : IDisposable
         var publicKeyFile = Path.Combine(_testDirectory, "test.pub");
         var privateKeyFile = Path.Combine(_testDirectory, "test.key");
 
-        await RunToolkitCommandAsync("crypto", "generate-key",
-            "--public-key-file", publicKeyFile, "--private-key-file", privateKeyFile);
+        await WriteKeyFilesAsync(publicKeyFile, privateKeyFile);
 
         var publicJson = await File.ReadAllTextAsync(publicKeyFile);
         publicJson.Should().Contain("\"N\"");
@@ -221,4 +231,13 @@ public class CryptoCommandIntegrationTests : IDisposable
         Path.GetFullPath(Path.Combine(
             AppContext.BaseDirectory,
             "../../../../Pixelbadger.Toolkit/Pixelbadger.Toolkit.csproj"));
+
+    private static async Task WriteKeyFilesAsync(string publicKeyFile, string privateKeyFile)
+    {
+        var key = TestKey.Value;
+        var publicKey = new PaillierPublicKey { N = key.N };
+
+        await File.WriteAllTextAsync(publicKeyFile, JsonSerializer.Serialize(publicKey, JsonOptions));
+        await File.WriteAllTextAsync(privateKeyFile, JsonSerializer.Serialize(key, JsonOptions));
+    }
 }

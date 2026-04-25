@@ -51,7 +51,7 @@ public static class CryptoCommand
                 var publicKey = new PaillierPublicKey { N = keyPair.N };
 
                 await File.WriteAllTextAsync(publicKeyFile, JsonSerializer.Serialize(publicKey, JsonOptions));
-                await File.WriteAllTextAsync(privateKeyFile, JsonSerializer.Serialize(keyPair, JsonOptions));
+                await WriteOwnerOnlyTextAsync(privateKeyFile, JsonSerializer.Serialize(keyPair, JsonOptions));
 
                 Console.WriteLine($"Public key written to '{publicKeyFile}'");
                 Console.WriteLine($"Private key written to '{privateKeyFile}'");
@@ -223,5 +223,16 @@ public static class CryptoCommand
         }, inFile1Option, inFile2Option, outFileOption);
 
         return command;
+    }
+
+    private static async Task WriteOwnerOnlyTextAsync(string path, string contents)
+    {
+        if (!OperatingSystem.IsWindows() && File.Exists(path))
+            File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+
+        await File.WriteAllTextAsync(path, contents);
+
+        if (!OperatingSystem.IsWindows())
+            File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
     }
 }

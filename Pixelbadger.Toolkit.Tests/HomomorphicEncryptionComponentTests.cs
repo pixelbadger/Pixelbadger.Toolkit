@@ -7,14 +7,14 @@ namespace Pixelbadger.Toolkit.Tests;
 
 public class HomomorphicEncryptionComponentTests
 {
-    // 64-bit keys (32-bit primes) for fast test execution
-    private const int TestKeyBitLength = 64;
     private readonly HomomorphicEncryptionComponent _component = new();
+    private static readonly Lazy<PaillierKeyPair> TestKey = new(() => new HomomorphicEncryptionComponent().GenerateKey());
+    private static readonly Lazy<PaillierKeyPair> SecondTestKey = new(() => new HomomorphicEncryptionComponent().GenerateKey());
 
     [Fact]
     public void GenerateKey_ShouldReturnKeyPairWithValidPositiveBigIntegerStrings()
     {
-        var key = _component.GenerateKey(TestKeyBitLength);
+        var key = TestKey.Value;
 
         BigInteger.TryParse(key.N, out var n).Should().BeTrue();
         BigInteger.TryParse(key.Lambda, out var lambda).Should().BeTrue();
@@ -27,7 +27,7 @@ public class HomomorphicEncryptionComponentTests
     [Fact]
     public void GenerateKey_ShouldSatisfyPaillierKeyRelationship_MuIsModularInverseOfLambdaModN()
     {
-        var key = _component.GenerateKey(TestKeyBitLength);
+        var key = TestKey.Value;
         var n = BigInteger.Parse(key.N);
         var lambda = BigInteger.Parse(key.Lambda);
         var mu = BigInteger.Parse(key.Mu);
@@ -39,7 +39,7 @@ public class HomomorphicEncryptionComponentTests
     [Fact]
     public void Encrypt_ShouldReturnCiphertextDifferentFromPlaintext()
     {
-        var key = _component.GenerateKey(TestKeyBitLength);
+        var key = TestKey.Value;
         var publicKey = new PaillierPublicKey { N = key.N };
 
         var encrypted = _component.Encrypt(42L, publicKey);
@@ -52,7 +52,7 @@ public class HomomorphicEncryptionComponentTests
     [Fact]
     public void Encrypt_ShouldProduceProbabilisticCiphertext_SamePlaintextYieldsDifferentCiphertexts()
     {
-        var key = _component.GenerateKey(TestKeyBitLength);
+        var key = TestKey.Value;
         var publicKey = new PaillierPublicKey { N = key.N };
 
         var encrypted1 = _component.Encrypt(7L, publicKey);
@@ -65,7 +65,7 @@ public class HomomorphicEncryptionComponentTests
     [Fact]
     public void Decrypt_ShouldReturnOriginalPlaintext_WhenDecryptingEncryptedNumber()
     {
-        var key = _component.GenerateKey(TestKeyBitLength);
+        var key = TestKey.Value;
         var publicKey = new PaillierPublicKey { N = key.N };
 
         var encrypted = _component.Encrypt(42L, publicKey);
@@ -81,7 +81,7 @@ public class HomomorphicEncryptionComponentTests
     [InlineData(999999L)]
     public void Decrypt_ShouldReturnCorrectValue_ForVariousPlaintextValues(long plaintext)
     {
-        var key = _component.GenerateKey(TestKeyBitLength);
+        var key = TestKey.Value;
         var publicKey = new PaillierPublicKey { N = key.N };
 
         var encrypted = _component.Encrypt(plaintext, publicKey);
@@ -93,7 +93,7 @@ public class HomomorphicEncryptionComponentTests
     [Fact]
     public void AddEncrypted_ShouldDecryptToSumOfOriginalValues()
     {
-        var key = _component.GenerateKey(TestKeyBitLength);
+        var key = TestKey.Value;
         var publicKey = new PaillierPublicKey { N = key.N };
 
         var encryptedA = _component.Encrypt(15L, publicKey);
@@ -107,7 +107,7 @@ public class HomomorphicEncryptionComponentTests
     [Fact]
     public void AddEncrypted_ShouldDecryptToCorrectSum_WhenAddingZero()
     {
-        var key = _component.GenerateKey(TestKeyBitLength);
+        var key = TestKey.Value;
         var publicKey = new PaillierPublicKey { N = key.N };
 
         var encryptedA = _component.Encrypt(99L, publicKey);
@@ -121,7 +121,7 @@ public class HomomorphicEncryptionComponentTests
     [Fact]
     public void AddEncrypted_ShouldReturnEncryptedNumberWithSameN_AsInputs()
     {
-        var key = _component.GenerateKey(TestKeyBitLength);
+        var key = TestKey.Value;
         var publicKey = new PaillierPublicKey { N = key.N };
 
         var encryptedA = _component.Encrypt(5L, publicKey);
@@ -134,7 +134,7 @@ public class HomomorphicEncryptionComponentTests
     [Fact]
     public void Encrypt_ShouldThrowArgumentException_WhenPlaintextIsNegative()
     {
-        var key = _component.GenerateKey(TestKeyBitLength);
+        var key = TestKey.Value;
         var publicKey = new PaillierPublicKey { N = key.N };
 
         var act = () => _component.Encrypt(-1L, publicKey);
@@ -146,8 +146,8 @@ public class HomomorphicEncryptionComponentTests
     [Fact]
     public void AddEncrypted_ShouldThrowArgumentException_WhenPublicKeysDoNotMatch()
     {
-        var key1 = _component.GenerateKey(TestKeyBitLength);
-        var key2 = _component.GenerateKey(TestKeyBitLength);
+        var key1 = TestKey.Value;
+        var key2 = SecondTestKey.Value;
 
         var encrypted1 = _component.Encrypt(5L, new PaillierPublicKey { N = key1.N });
         var encrypted2 = _component.Encrypt(3L, new PaillierPublicKey { N = key2.N });
@@ -156,5 +156,14 @@ public class HomomorphicEncryptionComponentTests
 
         act.Should().Throw<ArgumentException>()
             .WithMessage("*same public key*");
+    }
+
+    [Fact]
+    public void GenerateKey_ShouldThrowArgumentException_WhenBitLengthIsBelowSecurityMinimum()
+    {
+        var act = () => _component.GenerateKey(HomomorphicEncryptionComponent.MinimumKeyBitLength - 8);
+
+        act.Should().Throw<ArgumentException>()
+            .WithMessage("*at least 2048 bits*");
     }
 }

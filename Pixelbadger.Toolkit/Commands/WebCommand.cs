@@ -2,7 +2,6 @@ using System.CommandLine;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 
 namespace Pixelbadger.Toolkit.Commands;
@@ -54,16 +53,6 @@ public static class WebCommand
                 var builder = WebApplication.CreateBuilder();
                 var app = builder.Build();
 
-                var fileInfo = new FileInfo(file);
-                var directory = fileInfo.Directory?.FullName ?? Directory.GetCurrentDirectory();
-                var fileName = fileInfo.Name;
-
-                app.UseStaticFiles(new StaticFileOptions
-                {
-                    FileProvider = new PhysicalFileProvider(directory),
-                    RequestPath = ""
-                });
-
                 var fileContent = await File.ReadAllTextAsync(file);
                 var contentType = Path.GetExtension(file).ToLowerInvariant() switch
                 {
@@ -79,6 +68,12 @@ public static class WebCommand
                 {
                     context.Response.ContentType = contentType;
                     await context.Response.WriteAsync(fileContent);
+                });
+
+                app.MapGet("/{*path}", context =>
+                {
+                    context.Response.StatusCode = StatusCodes.Status404NotFound;
+                    return Task.CompletedTask;
                 });
 
                 Console.WriteLine($"Serving '{file}' on http://localhost:{port}");
