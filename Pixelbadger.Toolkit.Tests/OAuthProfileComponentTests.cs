@@ -77,6 +77,15 @@ public class OAuthProfileComponentTests
     }
 
     [Fact]
+    public async Task AddProfileAsync_ShouldThrow_WhenAuthorityIsNotHttps()
+    {
+        var act = async () => await _component.AddProfileAsync("dev", "http://auth.example.com", "id", "secret", null);
+
+        await act.Should().ThrowAsync<ArgumentException>()
+            .WithMessage("*absolute HTTPS URI*");
+    }
+
+    [Fact]
     public async Task AddProfileAsync_ShouldBeCaseInsensitive_WhenCheckingForDuplicates()
     {
         // Arrange
@@ -155,6 +164,21 @@ public class OAuthProfileComponentTests
         // Assert
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*'missing'*not found*");
+    }
+
+    [Fact]
+    public async Task UpdateProfileAsync_ShouldThrow_WhenAuthorityIsNotHttps()
+    {
+        var existing = new List<OAuthProfile>
+        {
+            new() { Name = "dev", AuthorityUri = "https://auth.example.com", ClientId = "id", ClientSecret = "secret" }
+        };
+        _mockProfileService.Setup(x => x.LoadProfilesAsync()).ReturnsAsync(existing);
+
+        var act = async () => await _component.UpdateProfileAsync("dev", "http://auth.example.com", null, null, null);
+
+        await act.Should().ThrowAsync<ArgumentException>()
+            .WithMessage("*absolute HTTPS URI*");
     }
 
     [Fact]

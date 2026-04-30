@@ -62,6 +62,68 @@ public class OAuthTokenComponentTests
     }
 
     [Fact]
+    public async Task GetTokenAsync_ShouldThrowBeforeDiscovery_WhenAuthorityIsNotHttps()
+    {
+        var profile = new OAuthProfile
+        {
+            Name = "dev",
+            AuthorityUri = "http://auth.example.com",
+            ClientId = "client-id",
+            ClientSecret = "secret"
+        };
+        _mockProfileService.Setup(x => x.GetProfileAsync("dev")).ReturnsAsync(profile);
+
+        var act = async () => await _component.GetTokenAsync("dev", "user", "pass");
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*absolute HTTPS URI*");
+        _mockHttpClient.Verify(x => x.DiscoverTokenEndpointAsync(It.IsAny<string>()), Times.Never);
+        _mockHttpClient.Verify(x => x.RequestTokenAsync(It.IsAny<string>(), It.IsAny<Dictionary<string, string>>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetTokenAsync_ShouldThrowBeforeRequest_WhenTokenEndpointIsNotHttps()
+    {
+        var profile = new OAuthProfile
+        {
+            Name = "dev",
+            AuthorityUri = "https://auth.example.com",
+            ClientId = "client-id",
+            ClientSecret = "secret"
+        };
+        _mockProfileService.Setup(x => x.GetProfileAsync("dev")).ReturnsAsync(profile);
+        _mockHttpClient.Setup(x => x.DiscoverTokenEndpointAsync("https://auth.example.com"))
+            .ReturnsAsync("http://auth.example.com/token");
+
+        var act = async () => await _component.GetTokenAsync("dev", "user", "pass");
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*absolute HTTPS URI*");
+        _mockHttpClient.Verify(x => x.RequestTokenAsync(It.IsAny<string>(), It.IsAny<Dictionary<string, string>>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetTokenAsync_ShouldThrowBeforeRequest_WhenTokenEndpointHostDiffersFromAuthority()
+    {
+        var profile = new OAuthProfile
+        {
+            Name = "dev",
+            AuthorityUri = "https://auth.example.com",
+            ClientId = "client-id",
+            ClientSecret = "secret"
+        };
+        _mockProfileService.Setup(x => x.GetProfileAsync("dev")).ReturnsAsync(profile);
+        _mockHttpClient.Setup(x => x.DiscoverTokenEndpointAsync("https://auth.example.com"))
+            .ReturnsAsync("https://evil.example.com/token");
+
+        var act = async () => await _component.GetTokenAsync("dev", "user", "pass");
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*host must match*");
+        _mockHttpClient.Verify(x => x.RequestTokenAsync(It.IsAny<string>(), It.IsAny<Dictionary<string, string>>()), Times.Never);
+    }
+
+    [Fact]
     public async Task GetTokenAsync_ShouldIncludeClientSecret_WhenProfileHasOne()
     {
         // Arrange

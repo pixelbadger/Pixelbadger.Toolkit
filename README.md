@@ -1,6 +1,6 @@
 # Pixelbadger.Toolkit
 
-A CLI toolkit exposing varied functionality organized by topic, including string manipulation, distance calculations, esoteric programming language interpreters, image steganography, web serving, OpenAI integration, and homomorphic encryption.
+A CLI toolkit exposing varied functionality organized by topic, including string manipulation, distance calculations, esoteric programming language interpreters, image steganography, web serving, OpenAI integration, OAuth utilities, and homomorphic encryption.
 
 > **Note**: Search and MCP RAG functionality has been extracted to the separate [Pixelbadger.Toolkit.Rag](https://github.com/pixelbadger/Pixelbadger.Toolkit.Rag) repository (`pbrag` CLI tool).
 
@@ -26,6 +26,9 @@ A CLI toolkit exposing varied functionality organized by topic, including string
     - [translate](#translate)
     - [ocaaar](#ocaaar)
     - [corpospeak](#corpospeak)
+  - [oauth](#oauth)
+    - [token](#token)
+    - [profile](#profile)
   - [crypto](#crypto)
     - [generate-key](#generate-key)
     - [encrypt](#encrypt)
@@ -233,7 +236,7 @@ pbtk images steganography --mode decode --image encoded.png
 Web server utilities.
 
 #### serve-html
-Serves a static HTML file via HTTP server.
+Serves a single static HTML file via HTTP server.
 
 **Usage:**
 ```bash
@@ -243,6 +246,9 @@ pbtk web serve-html --file <html-file> [--port <port>]
 **Options:**
 - `--file`: Path to the HTML file to serve (required)
 - `--port`: Port to bind the server to (default: 8080)
+
+**Details:**
+- Only the requested file is served from `/`; sibling files in the same directory are not exposed.
 
 **Examples:**
 ```bash
@@ -421,10 +427,33 @@ pbtk openai corpospeak --source "Database migration finished" --audience "operat
 - **hr**: People impact and organizational dynamics
 - **customer-success**: Customer experience and support focus
 
+### oauth
+OAuth utilities for managing local profiles and acquiring access tokens with Resource Owner Password Credentials.
+
+> **Security note**: OAuth authorities and discovered token endpoints must be absolute HTTPS URIs. The discovered token endpoint host must match the configured authority host before credentials are sent.
+
+#### token
+Acquires an OAuth access token using a saved profile. The command prompts for username and password, then prints the access token.
+
+**Usage:**
+```bash
+pbtk oauth token --profile <profile-name>
+```
+
+#### profile
+Manages OAuth profiles stored under the current user's home directory. On Unix-like systems, the profile directory is restricted to owner access and the profile file is written with owner read/write permissions.
+
+**Usage:**
+```bash
+pbtk oauth profile add --name <profile-name> --authority <https-authority-uri> --client-id <client-id> [--client-secret <client-secret>] [--scope <scope>]
+pbtk oauth profile update --name <profile-name> [--authority <https-authority-uri>] [--client-id <client-id>] [--client-secret <client-secret>] [--scope <scope>]
+pbtk oauth profile delete --name <profile-name>
+```
+
 ### crypto
 Homomorphic encryption utilities using the Paillier cryptosystem. Encrypted numbers can be added together without ever decrypting them — the result decrypts to the correct sum.
 
-> **Security note**: `generate-key` produces two separate files: a **public key** file (contains only `N`) which is safe to distribute to anyone who needs to encrypt values for you, and a **private key** file (contains `N`, `Lambda`, `Mu`) which must be kept secret and is required only for decryption.
+> **Security note**: `generate-key` produces a 2048-bit Paillier key pair in two separate files: a **public key** file (contains only `N`) which is safe to distribute to anyone who needs to encrypt values for you, and a **private key** file (contains `N`, `Lambda`, `Mu`) which must be kept secret and is required only for decryption. On Unix-like systems, private key files are written with owner read/write permissions only.
 
 #### generate-key
 Generates a Paillier key pair and writes separate public and private key files.
@@ -531,14 +560,7 @@ The steganography feature uses LSB (Least Significant Bit) encoding to hide mess
 - **Ook**: A Brainfuck derivative using "Ook." and "Ook?" syntax inspired by Terry Pratchett's Discworld orangutans
 
 ### Homomorphic Encryption Implementation
-The `crypto` topic uses the simplified Paillier cryptosystem, a partially homomorphic encryption scheme supporting additive operations on ciphertexts. Key generation uses Miller-Rabin primality testing (20 witnesses) via `System.Security.Cryptography.RandomNumberGenerator`. All big-integer arithmetic is performed using `System.Numerics.BigInteger` — no third-party cryptography library is required. The default key size is 512 bits; ciphertexts live in Z_{n²} and are therefore approximately 1024 bits in length. The scheme is partially homomorphic: addition of plaintexts corresponds to multiplication of their ciphertexts modulo n².
+The `crypto` topic uses the simplified Paillier cryptosystem, a partially homomorphic encryption scheme supporting additive operations on ciphertexts. Key generation uses Miller-Rabin primality testing (20 witnesses) via `System.Security.Cryptography.RandomNumberGenerator`. All big-integer arithmetic is performed using `System.Numerics.BigInteger` — no third-party cryptography library is required. The default and minimum key size is 2048 bits; ciphertexts live in Z_{n²} and are therefore approximately 4096 bits in length. The scheme is partially homomorphic: addition of plaintexts corresponds to multiplication of their ciphertexts modulo n².
 
 #### Performance
-Homomorphic addition (`add` command) operates on ~1024-bit `BigInteger` values (multiply + modular reduction over n²). Benchmarked on .NET 9 ARM64 against plain `long` addition:
-
-| Operation | Mean | Allocated |
-|---|---|---|
-| Regular `long` addition | ~0.2 ns | 0 B |
-| Homomorphic add (in-memory BigInteger) | ~2,777 ns | 432 B |
-
-The homomorphic operation is roughly **14,000× slower** than native integer addition and allocates ~432 bytes per call due to intermediate `BigInteger` heap objects. This is the irreducible cost of arbitrary-precision modular arithmetic on 512-bit keys — not parsing overhead.
+Homomorphic addition (`add` command) operates on ~4096-bit `BigInteger` values (multiply + modular reduction over n²). It is significantly slower than native integer addition due to arbitrary-precision modular arithmetic and intermediate `BigInteger` heap objects.
