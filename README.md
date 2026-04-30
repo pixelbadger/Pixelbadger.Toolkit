@@ -12,6 +12,7 @@ A CLI toolkit exposing varied functionality organized by topic, including string
   - [strings](#strings)
     - [reverse](#reverse)
     - [levenshtein-distance](#levenshtein-distance)
+    - [abjadify](#abjadify)
     - [flesch-reading-ease](#flesch-reading-ease)
   - [interpreters](#interpreters)
     - [brainfuck](#brainfuck)
@@ -34,6 +35,12 @@ A CLI toolkit exposing varied functionality organized by topic, including string
     - [encrypt](#encrypt)
     - [decrypt](#decrypt)
     - [add](#add)
+    - [subtract](#subtract)
+    - [multiply](#multiply)
+    - [encrypt-string](#encrypt-string)
+    - [decrypt-string](#decrypt-string)
+    - [replace](#replace)
+    - [substring](#substring)
 - [Help](#help)
 - [Requirements](#requirements)
 - [Technical Details](#technical-details)
@@ -115,6 +122,23 @@ pbtk strings levenshtein-distance --string1 "hello" --string2 "world"
 
 # Compare contents of two files
 pbtk strings levenshtein-distance --string1 file1.txt --string2 file2.txt
+```
+
+#### abjadify
+Strips English vowels from text while preserving single-vowel words (e.g. "a", "I").
+
+**Usage:**
+```bash
+pbtk strings abjadify --in-file <input-file> --out-file <output-file>
+```
+
+**Options:**
+- `--in-file`: Path to the input text file (required)
+- `--out-file`: Path to write the abjadified output file (required)
+
+**Example:**
+```bash
+pbtk strings abjadify --in-file article.txt --out-file article-abjad.txt
 ```
 
 #### flesch-reading-ease
@@ -529,6 +553,135 @@ pbtk crypto encrypt --number 5  --public-key-file my.pub --out-file b.enc
 pbtk crypto add --in-file1 a.enc --in-file2 b.enc --out-file sum.enc
 pbtk crypto decrypt --in-file sum.enc --private-key-file my.key
 # Output: 42
+```
+
+#### subtract
+Homomorphically subtracts one encrypted number from another without decrypting them. The result decrypts to the difference of the two original plaintexts. The minuend must be greater than or equal to the subtrahend.
+
+**Usage:**
+```bash
+pbtk crypto subtract --in-file1 <minuend-file> --in-file2 <subtrahend-file> --out-file <output-file>
+```
+
+**Options:**
+- `--in-file1`: Path to the first encrypted number JSON file (minuend) (required)
+- `--in-file2`: Path to the second encrypted number JSON file (subtrahend) (required)
+- `--out-file`: Path to write the encrypted difference JSON file (required)
+
+**Example:**
+```bash
+pbtk crypto encrypt --number 100 --public-key-file my.pub --out-file a.enc
+pbtk crypto encrypt --number 58  --public-key-file my.pub --out-file b.enc
+pbtk crypto subtract --in-file1 a.enc --in-file2 b.enc --out-file diff.enc
+pbtk crypto decrypt --in-file diff.enc --private-key-file my.key
+# Output: 42
+```
+
+#### multiply
+Homomorphically multiplies an encrypted number by a plaintext scalar without decrypting it. The result decrypts to the product of the original plaintext and the scalar.
+
+**Usage:**
+```bash
+pbtk crypto multiply --in-file <encrypted-file> --scalar <scalar> --out-file <output-file>
+```
+
+**Options:**
+- `--in-file`: Path to the encrypted number JSON file (required)
+- `--scalar`: The non-negative plaintext integer to multiply by (required)
+- `--out-file`: Path to write the encrypted product JSON file (required)
+
+**Example:**
+```bash
+pbtk crypto encrypt --number 7 --public-key-file my.pub --out-file a.enc
+pbtk crypto multiply --in-file a.enc --scalar 6 --out-file product.enc
+pbtk crypto decrypt --in-file product.enc --private-key-file my.key
+# Output: 42
+```
+
+#### encrypt-string
+Encrypts a UTF-8 string (up to 100 characters) as an array of independently homomorphically encrypted Unicode code points.
+
+**Usage:**
+```bash
+pbtk crypto encrypt-string --string <plaintext> --public-key-file <public-key-file> --out-file <output-file>
+```
+
+**Options:**
+- `--string`: The plaintext string to encrypt, max 100 characters (required)
+- `--public-key-file`: Path to the public key JSON file (required)
+- `--out-file`: Path to write the encrypted string JSON file (required)
+
+**Example:**
+```bash
+pbtk crypto encrypt-string --string "hello world" --public-key-file my.pub --out-file msg.estr
+```
+
+#### decrypt-string
+Decrypts a homomorphically encrypted string and prints the plaintext.
+
+**Usage:**
+```bash
+pbtk crypto decrypt-string --in-file <encrypted-string-file> --private-key-file <private-key-file>
+```
+
+**Options:**
+- `--in-file`: Path to the encrypted string JSON file (required)
+- `--private-key-file`: Path to the private key JSON file (required)
+
+**Example:**
+```bash
+pbtk crypto decrypt-string --in-file msg.estr --private-key-file my.key
+# Output: hello world
+```
+
+#### replace
+Replaces characters at a known position in an encrypted string without decrypting it. The replacement plaintext is re-encrypted; all other characters remain untouched.
+
+**Usage:**
+```bash
+pbtk crypto replace --in-file <encrypted-string-file> --start <index> --replacement <text> --out-file <output-file>
+```
+
+**Options:**
+- `--in-file`: Path to the encrypted string JSON file (required)
+- `--start`: Zero-based index of the first character to replace (required)
+- `--replacement`: Plaintext replacement characters (required)
+- `--out-file`: Path to write the updated encrypted string JSON file (required)
+
+**Example:**
+```bash
+pbtk crypto encrypt-string --string "hello world" --public-key-file my.pub --out-file msg.estr
+pbtk crypto replace --in-file msg.estr --start 6 --replacement "there" --out-file updated.estr
+pbtk crypto decrypt-string --in-file updated.estr --private-key-file my.key
+# Output: hello there
+```
+
+#### substring
+Extracts a positional slice from an encrypted string without decrypting it. The result is a new encrypted string containing only the selected characters.
+
+**Usage:**
+```bash
+pbtk crypto substring --in-file <encrypted-string-file> --start <index> [--length <length>] --out-file <output-file>
+```
+
+**Options:**
+- `--in-file`: Path to the encrypted string JSON file (required)
+- `--start`: Zero-based index of the first character to include (required)
+- `--length`: Number of characters to include (optional, defaults to the remainder of the string)
+- `--out-file`: Path to write the encrypted substring JSON file (required)
+
+**Example:**
+```bash
+pbtk crypto encrypt-string --string "hello world" --public-key-file my.pub --out-file msg.estr
+
+# Extract "world" using start + length
+pbtk crypto substring --in-file msg.estr --start 6 --length 5 --out-file sub.estr
+
+# Extract "world" using start only (remainder of string)
+pbtk crypto substring --in-file msg.estr --start 6 --out-file sub.estr
+
+pbtk crypto decrypt-string --in-file sub.estr --private-key-file my.key
+# Output: world
 ```
 
 ## Help
