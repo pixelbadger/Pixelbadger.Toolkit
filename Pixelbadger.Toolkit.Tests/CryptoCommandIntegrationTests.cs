@@ -178,6 +178,290 @@ public class CryptoCommandIntegrationTests : IDisposable
     }
 
     [Fact]
+    public async Task EncryptString_ThenDecryptString_ShouldReturnOriginalString()
+    {
+        var publicKeyFile = Path.Combine(_testDirectory, "test.pub");
+        var privateKeyFile = Path.Combine(_testDirectory, "test.key");
+        var encFile = Path.Combine(_testDirectory, "msg.estr");
+
+        await WriteKeyFilesAsync(publicKeyFile, privateKeyFile);
+        await RunToolkitCommandAsync("crypto", "encrypt-string",
+            "--string", "hello world", "--public-key-file", publicKeyFile, "--out-file", encFile);
+
+        var (exitCode, stdout, _) = await RunToolkitCommandAsync(
+            "crypto", "decrypt-string", "--in-file", encFile, "--private-key-file", privateKeyFile);
+
+        exitCode.Should().Be(0);
+        stdout.Trim().Should().Be("hello world");
+    }
+
+    [Fact]
+    public async Task Replace_ShouldProduceUpdatedStringAfterDecryption()
+    {
+        var publicKeyFile = Path.Combine(_testDirectory, "test.pub");
+        var privateKeyFile = Path.Combine(_testDirectory, "test.key");
+        var encFile = Path.Combine(_testDirectory, "msg.estr");
+        var updatedFile = Path.Combine(_testDirectory, "updated.estr");
+
+        await WriteKeyFilesAsync(publicKeyFile, privateKeyFile);
+        await RunToolkitCommandAsync("crypto", "encrypt-string",
+            "--string", "hello world", "--public-key-file", publicKeyFile, "--out-file", encFile);
+        await RunToolkitCommandAsync("crypto", "replace",
+            "--in-file", encFile, "--start", "6", "--replacement", "there", "--out-file", updatedFile);
+
+        var (exitCode, stdout, _) = await RunToolkitCommandAsync(
+            "crypto", "decrypt-string", "--in-file", updatedFile, "--private-key-file", privateKeyFile);
+
+        exitCode.Should().Be(0);
+        stdout.Trim().Should().Be("hello there");
+    }
+
+    [Fact]
+    public async Task Replace_ShouldReturnFailure_WhenRangeExceedsStringLength()
+    {
+        var publicKeyFile = Path.Combine(_testDirectory, "test.pub");
+        var privateKeyFile = Path.Combine(_testDirectory, "test.key");
+        var encFile = Path.Combine(_testDirectory, "msg.estr");
+        var updatedFile = Path.Combine(_testDirectory, "updated.estr");
+
+        await WriteKeyFilesAsync(publicKeyFile, privateKeyFile);
+        await RunToolkitCommandAsync("crypto", "encrypt-string",
+            "--string", "hi", "--public-key-file", publicKeyFile, "--out-file", encFile);
+
+        var (exitCode, stdout, _) = await RunToolkitCommandAsync(
+            "crypto", "replace", "--in-file", encFile, "--start", "1", "--replacement", "xyz", "--out-file", updatedFile);
+
+        exitCode.Should().Be(1);
+        stdout.Should().Contain("Error:");
+    }
+
+    [Fact]
+    public async Task EncryptString_ShouldReturnFailure_WhenStringExceedsMaxLength()
+    {
+        var publicKeyFile = Path.Combine(_testDirectory, "test.pub");
+        var privateKeyFile = Path.Combine(_testDirectory, "test.key");
+        var encFile = Path.Combine(_testDirectory, "msg.estr");
+
+        await WriteKeyFilesAsync(publicKeyFile, privateKeyFile);
+        var tooLong = new string('a', 101);
+
+        var (exitCode, stdout, _) = await RunToolkitCommandAsync(
+            "crypto", "encrypt-string", "--string", tooLong, "--public-key-file", publicKeyFile, "--out-file", encFile);
+
+        exitCode.Should().Be(1);
+        stdout.Should().Contain("Error:");
+    }
+
+    [Fact]
+    public async Task Multiply_ShouldProduceEncryptedProductThatDecryptsToCorrectValue()
+    {
+        var publicKeyFile = Path.Combine(_testDirectory, "test.pub");
+        var privateKeyFile = Path.Combine(_testDirectory, "test.key");
+        var encFile = Path.Combine(_testDirectory, "a.enc");
+        var productFile = Path.Combine(_testDirectory, "product.enc");
+
+        await WriteKeyFilesAsync(publicKeyFile, privateKeyFile);
+        await RunToolkitCommandAsync("crypto", "encrypt",
+            "--number", "7", "--public-key-file", publicKeyFile, "--out-file", encFile);
+
+        var (exitCode, stdout, _) = await RunToolkitCommandAsync(
+            "crypto", "multiply", "--in-file", encFile, "--scalar", "6", "--out-file", productFile);
+
+        exitCode.Should().Be(0);
+        stdout.Should().Contain("Encrypted product written to");
+
+        var (decryptExitCode, decryptStdout, _) = await RunToolkitCommandAsync(
+            "crypto", "decrypt", "--in-file", productFile, "--private-key-file", privateKeyFile);
+        decryptExitCode.Should().Be(0);
+        decryptStdout.Trim().Should().Be("42");
+    }
+
+    [Fact]
+    public async Task Multiply_ShouldProduceEncryptedZero_WhenScalarIsZero()
+    {
+        var publicKeyFile = Path.Combine(_testDirectory, "test.pub");
+        var privateKeyFile = Path.Combine(_testDirectory, "test.key");
+        var encFile = Path.Combine(_testDirectory, "a.enc");
+        var productFile = Path.Combine(_testDirectory, "product.enc");
+
+        await WriteKeyFilesAsync(publicKeyFile, privateKeyFile);
+        await RunToolkitCommandAsync("crypto", "encrypt",
+            "--number", "99", "--public-key-file", publicKeyFile, "--out-file", encFile);
+        await RunToolkitCommandAsync("crypto", "multiply",
+            "--in-file", encFile, "--scalar", "0", "--out-file", productFile);
+
+        var (exitCode, stdout, _) = await RunToolkitCommandAsync(
+            "crypto", "decrypt", "--in-file", productFile, "--private-key-file", privateKeyFile);
+
+        exitCode.Should().Be(0);
+        stdout.Trim().Should().Be("0");
+    }
+
+    [Fact]
+    public async Task Multiply_ShouldReturnFailure_WhenScalarIsNegative()
+    {
+        var publicKeyFile = Path.Combine(_testDirectory, "test.pub");
+        var privateKeyFile = Path.Combine(_testDirectory, "test.key");
+        var encFile = Path.Combine(_testDirectory, "a.enc");
+        var productFile = Path.Combine(_testDirectory, "product.enc");
+
+        await WriteKeyFilesAsync(publicKeyFile, privateKeyFile);
+        await RunToolkitCommandAsync("crypto", "encrypt",
+            "--number", "5", "--public-key-file", publicKeyFile, "--out-file", encFile);
+
+        var (exitCode, stdout, _) = await RunToolkitCommandAsync(
+            "crypto", "multiply", "--in-file", encFile, "--scalar", "-3", "--out-file", productFile);
+
+        exitCode.Should().Be(1);
+        stdout.Should().Contain("Error:");
+    }
+
+    [Fact]
+    public async Task Subtract_ShouldProduceEncryptedDifferenceThatDecryptsToCorrectValue()
+    {
+        var publicKeyFile = Path.Combine(_testDirectory, "test.pub");
+        var privateKeyFile = Path.Combine(_testDirectory, "test.key");
+        var encFile1 = Path.Combine(_testDirectory, "a.enc");
+        var encFile2 = Path.Combine(_testDirectory, "b.enc");
+        var diffFile = Path.Combine(_testDirectory, "diff.enc");
+
+        await WriteKeyFilesAsync(publicKeyFile, privateKeyFile);
+        await RunToolkitCommandAsync("crypto", "encrypt",
+            "--number", "100", "--public-key-file", publicKeyFile, "--out-file", encFile1);
+        await RunToolkitCommandAsync("crypto", "encrypt",
+            "--number", "58", "--public-key-file", publicKeyFile, "--out-file", encFile2);
+        await RunToolkitCommandAsync("crypto", "subtract",
+            "--in-file1", encFile1, "--in-file2", encFile2, "--out-file", diffFile);
+
+        var (exitCode, stdout, _) = await RunToolkitCommandAsync(
+            "crypto", "decrypt", "--in-file", diffFile, "--private-key-file", privateKeyFile);
+
+        exitCode.Should().Be(0);
+        stdout.Trim().Should().Be("42");
+    }
+
+    [Fact]
+    public async Task Subtract_ShouldProduceEncryptedZero_WhenValuesAreEqual()
+    {
+        var publicKeyFile = Path.Combine(_testDirectory, "test.pub");
+        var privateKeyFile = Path.Combine(_testDirectory, "test.key");
+        var encFile1 = Path.Combine(_testDirectory, "a.enc");
+        var encFile2 = Path.Combine(_testDirectory, "b.enc");
+        var diffFile = Path.Combine(_testDirectory, "diff.enc");
+
+        await WriteKeyFilesAsync(publicKeyFile, privateKeyFile);
+        await RunToolkitCommandAsync("crypto", "encrypt",
+            "--number", "77", "--public-key-file", publicKeyFile, "--out-file", encFile1);
+        await RunToolkitCommandAsync("crypto", "encrypt",
+            "--number", "77", "--public-key-file", publicKeyFile, "--out-file", encFile2);
+        await RunToolkitCommandAsync("crypto", "subtract",
+            "--in-file1", encFile1, "--in-file2", encFile2, "--out-file", diffFile);
+
+        var (exitCode, stdout, _) = await RunToolkitCommandAsync(
+            "crypto", "decrypt", "--in-file", diffFile, "--private-key-file", privateKeyFile);
+
+        exitCode.Should().Be(0);
+        stdout.Trim().Should().Be("0");
+    }
+
+    [Fact]
+    public async Task Subtract_ShouldReturnFailure_WhenFirstInputFileDoesNotExist()
+    {
+        var publicKeyFile = Path.Combine(_testDirectory, "test.pub");
+        var privateKeyFile = Path.Combine(_testDirectory, "test.key");
+        var missingFile = Path.Combine(_testDirectory, "missing.enc");
+        var encFile = Path.Combine(_testDirectory, "b.enc");
+        var diffFile = Path.Combine(_testDirectory, "diff.enc");
+
+        await WriteKeyFilesAsync(publicKeyFile, privateKeyFile);
+        await RunToolkitCommandAsync("crypto", "encrypt",
+            "--number", "5", "--public-key-file", publicKeyFile, "--out-file", encFile);
+
+        var (exitCode, stdout, _) = await RunToolkitCommandAsync(
+            "crypto", "subtract", "--in-file1", missingFile, "--in-file2", encFile, "--out-file", diffFile);
+
+        exitCode.Should().Be(1);
+        stdout.Should().Contain("Error:");
+    }
+
+    [Fact]
+    public async Task Substring_ShouldProduceSliceThatDecryptsToCorrectValue()
+    {
+        var publicKeyFile = Path.Combine(_testDirectory, "test.pub");
+        var privateKeyFile = Path.Combine(_testDirectory, "test.key");
+        var encFile = Path.Combine(_testDirectory, "msg.estr");
+        var subFile = Path.Combine(_testDirectory, "sub.estr");
+
+        await WriteKeyFilesAsync(publicKeyFile, privateKeyFile);
+        await RunToolkitCommandAsync("crypto", "encrypt-string",
+            "--string", "hello world", "--public-key-file", publicKeyFile, "--out-file", encFile);
+
+        var (exitCode, stdout, _) = await RunToolkitCommandAsync(
+            "crypto", "substring", "--in-file", encFile, "--start", "6", "--length", "5", "--out-file", subFile);
+
+        exitCode.Should().Be(0);
+        stdout.Should().Contain("Encrypted substring (5 characters) written to");
+
+        var (decryptExitCode, decryptStdout, _) = await RunToolkitCommandAsync(
+            "crypto", "decrypt-string", "--in-file", subFile, "--private-key-file", privateKeyFile);
+        decryptExitCode.Should().Be(0);
+        decryptStdout.Trim().Should().Be("world");
+    }
+
+    [Fact]
+    public async Task Substring_ShouldDecryptToRemainder_WhenLengthIsOmitted()
+    {
+        var publicKeyFile = Path.Combine(_testDirectory, "test.pub");
+        var privateKeyFile = Path.Combine(_testDirectory, "test.key");
+        var encFile = Path.Combine(_testDirectory, "msg.estr");
+        var subFile = Path.Combine(_testDirectory, "sub.estr");
+
+        await WriteKeyFilesAsync(publicKeyFile, privateKeyFile);
+        await RunToolkitCommandAsync("crypto", "encrypt-string",
+            "--string", "hello world", "--public-key-file", publicKeyFile, "--out-file", encFile);
+        await RunToolkitCommandAsync("crypto", "substring",
+            "--in-file", encFile, "--start", "6", "--out-file", subFile);
+
+        var (exitCode, stdout, _) = await RunToolkitCommandAsync(
+            "crypto", "decrypt-string", "--in-file", subFile, "--private-key-file", privateKeyFile);
+
+        exitCode.Should().Be(0);
+        stdout.Trim().Should().Be("world");
+    }
+
+    [Fact]
+    public async Task Substring_ShouldReturnFailure_WhenRangeExceedsStringLength()
+    {
+        var publicKeyFile = Path.Combine(_testDirectory, "test.pub");
+        var privateKeyFile = Path.Combine(_testDirectory, "test.key");
+        var encFile = Path.Combine(_testDirectory, "msg.estr");
+        var subFile = Path.Combine(_testDirectory, "sub.estr");
+
+        await WriteKeyFilesAsync(publicKeyFile, privateKeyFile);
+        await RunToolkitCommandAsync("crypto", "encrypt-string",
+            "--string", "hi", "--public-key-file", publicKeyFile, "--out-file", encFile);
+
+        var (exitCode, stdout, _) = await RunToolkitCommandAsync(
+            "crypto", "substring", "--in-file", encFile, "--start", "1", "--length", "5", "--out-file", subFile);
+
+        exitCode.Should().Be(1);
+        stdout.Should().Contain("Error:");
+    }
+
+    [Fact]
+    public async Task Substring_ShouldReturnFailure_WhenInputFileDoesNotExist()
+    {
+        var missingFile = Path.Combine(_testDirectory, "missing.estr");
+        var subFile = Path.Combine(_testDirectory, "sub.estr");
+
+        var (exitCode, stdout, _) = await RunToolkitCommandAsync(
+            "crypto", "substring", "--in-file", missingFile, "--start", "0", "--out-file", subFile);
+
+        exitCode.Should().Be(1);
+        stdout.Should().Contain("Error:");
+    }
+
+    [Fact]
     public async Task Add_ShouldReturnFailure_WhenFirstInputFileDoesNotExist()
     {
         var publicKeyFile = Path.Combine(_testDirectory, "test.pub");
