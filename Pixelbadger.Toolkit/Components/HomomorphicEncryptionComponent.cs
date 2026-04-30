@@ -77,6 +77,95 @@ public class HomomorphicEncryptionComponent
         return L(x, n) * mu % n;
     }
 
+    public const int MaxStringLength = 100;
+
+    public EncryptedString EncryptString(string plaintext, PaillierPublicKey publicKey)
+    {
+        if (plaintext.Length > MaxStringLength)
+            throw new ArgumentException($"String must be at most {MaxStringLength} characters.", nameof(plaintext));
+
+        return new EncryptedString
+        {
+            Characters = plaintext.EnumerateRunes()
+                .Select(r => Encrypt(r.Value, publicKey))
+                .ToArray()
+        };
+    }
+
+    public string DecryptString(EncryptedString encryptedString, PaillierKeyPair key)
+    {
+        var sb = new System.Text.StringBuilder();
+        foreach (var encChar in encryptedString.Characters)
+            sb.Append(char.ConvertFromUtf32((int)Decrypt(encChar, key)));
+        return sb.ToString();
+    }
+
+    public EncryptedString SubstringEncrypted(EncryptedString encryptedString, int start, int? length = null)
+    {
+        var len = length ?? encryptedString.Characters.Length - start;
+
+        if (start < 0)
+            throw new ArgumentException("Start index must be non-negative.", nameof(start));
+        if (len < 0)
+            throw new ArgumentException("Length must be non-negative.", nameof(length));
+        if (start + len > encryptedString.Characters.Length)
+            throw new ArgumentException(
+                $"Range [{start}, {start + len}) exceeds string length {encryptedString.Characters.Length}.");
+
+        return new EncryptedString { Characters = encryptedString.Characters[start..(start + len)] };
+    }
+
+    public EncryptedString ReplaceInString(EncryptedString encryptedString, int start, string replacement)
+    {
+        var runes = replacement.EnumerateRunes().ToArray();
+
+        if (start < 0 || start + runes.Length > encryptedString.Characters.Length)
+            throw new ArgumentException(
+                $"Replacement range [{start}, {start + runes.Length}) exceeds string length {encryptedString.Characters.Length}.");
+
+        var publicKey = new PaillierPublicKey { N = encryptedString.Characters[0].N };
+        var newChars = (EncryptedNumber[])encryptedString.Characters.Clone();
+        for (var i = 0; i < runes.Length; i++)
+            newChars[start + i] = Encrypt(runes[i].Value, publicKey);
+
+        return new EncryptedString { Characters = newChars };
+    }
+
+    public EncryptedNumber MultiplyEncrypted(EncryptedNumber a, long scalar)
+    {
+        if (scalar < 0)
+            throw new ArgumentException("Scalar must be non-negative.", nameof(scalar));
+
+        var n = BigInteger.Parse(a.N);
+        ValidateModulus(n);
+        var nSquared = n * n;
+        var c = BigInteger.Parse(a.Ciphertext);
+
+        return new EncryptedNumber
+        {
+            Ciphertext = BigInteger.ModPow(c, new BigInteger(scalar), nSquared).ToString(),
+            N = a.N
+        };
+    }
+
+    public EncryptedNumber SubtractEncrypted(EncryptedNumber a, EncryptedNumber b)
+    {
+        if (a.N != b.N)
+            throw new ArgumentException("Both encrypted numbers must use the same public key (N).");
+
+        var n = BigInteger.Parse(a.N);
+        ValidateModulus(n);
+        var nSquared = n * n;
+        var ca = BigInteger.Parse(a.Ciphertext);
+        var cb = BigInteger.Parse(b.Ciphertext);
+
+        return new EncryptedNumber
+        {
+            Ciphertext = (ca * ModInverse(cb, nSquared) % nSquared).ToString(),
+            N = a.N
+        };
+    }
+
     public EncryptedNumber AddEncrypted(EncryptedNumber a, EncryptedNumber b)
     {
         if (a.N != b.N)
