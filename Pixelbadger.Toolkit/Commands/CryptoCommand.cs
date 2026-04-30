@@ -467,6 +467,10 @@ public static class CryptoCommand
             IsRequired = true
         };
 
+        var lengthOption = new Option<int?>(
+            aliases: ["--length"],
+            description: "Number of characters to remove (defaults to the length of --replacement)");
+
         var outFileOption = new Option<string>(
             aliases: ["--out-file"],
             description: "Path to write the updated encrypted string JSON file")
@@ -477,9 +481,10 @@ public static class CryptoCommand
         command.AddOption(inFileOption);
         command.AddOption(startOption);
         command.AddOption(replacementOption);
+        command.AddOption(lengthOption);
         command.AddOption(outFileOption);
 
-        command.SetHandler(async (string inFile, int start, string replacement, string outFile) =>
+        command.SetHandler(async (string inFile, int start, string replacement, int? length, string outFile) =>
         {
             try
             {
@@ -488,7 +493,7 @@ public static class CryptoCommand
                     ?? throw new InvalidOperationException("Failed to deserialize encrypted string.");
 
                 var component = new HomomorphicEncryptionComponent();
-                var updated = component.ReplaceInString(encrypted, start, replacement);
+                var updated = component.ReplaceInString(encrypted, start, replacement, length);
 
                 await File.WriteAllTextAsync(outFile, JsonSerializer.Serialize(updated, JsonOptions));
                 Console.WriteLine($"Updated encrypted string written to '{outFile}'");
@@ -498,7 +503,7 @@ public static class CryptoCommand
                 Console.WriteLine($"Error: {ex.Message}");
                 Environment.Exit(1);
             }
-        }, inFileOption, startOption, replacementOption, outFileOption);
+        }, inFileOption, startOption, replacementOption, lengthOption, outFileOption);
 
         return command;
     }

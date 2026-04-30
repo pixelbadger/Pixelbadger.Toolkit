@@ -217,6 +217,28 @@ public class CryptoCommandIntegrationTests : IDisposable
     }
 
     [Fact]
+    public async Task Replace_ShouldShrinkString_WhenReplacementIsShorterThanLength()
+    {
+        var publicKeyFile = Path.Combine(_testDirectory, "test.pub");
+        var privateKeyFile = Path.Combine(_testDirectory, "test.key");
+        var encFile = Path.Combine(_testDirectory, "msg.estr");
+        var updatedFile = Path.Combine(_testDirectory, "updated.estr");
+
+        await WriteKeyFilesAsync(publicKeyFile, privateKeyFile);
+        await RunToolkitCommandAsync("crypto", "encrypt-string",
+            "--string", "the quick brown fox", "--public-key-file", publicKeyFile, "--out-file", encFile);
+
+        await RunToolkitCommandAsync("crypto", "replace",
+            "--in-file", encFile, "--start", "4", "--replacement", "slow", "--length", "5", "--out-file", updatedFile);
+
+        var (exitCode, stdout, _) = await RunToolkitCommandAsync(
+            "crypto", "decrypt-string", "--in-file", updatedFile, "--private-key-file", privateKeyFile);
+
+        exitCode.Should().Be(0);
+        stdout.Trim().Should().Be("the slow brown fox");
+    }
+
+    [Fact]
     public async Task Replace_ShouldReturnFailure_WhenRangeExceedsStringLength()
     {
         var publicKeyFile = Path.Combine(_testDirectory, "test.pub");

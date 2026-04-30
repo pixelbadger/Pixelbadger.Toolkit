@@ -635,25 +635,38 @@ pbtk crypto decrypt-string --in-file msg.estr --private-key-file my.key
 ```
 
 #### replace
-Replaces characters at a known position in an encrypted string without decrypting it. The replacement plaintext is re-encrypted; all other characters remain untouched.
+Replaces characters at a known position in an encrypted string without decrypting it. The replacement plaintext is re-encrypted; characters outside the affected range remain untouched. The resulting string may be shorter or longer than the original.
 
 **Usage:**
 ```bash
-pbtk crypto replace --in-file <encrypted-string-file> --start <index> --replacement <text> --out-file <output-file>
+pbtk crypto replace --in-file <encrypted-string-file> --start <index> --replacement <text> [--length <length>] --out-file <output-file>
 ```
 
 **Options:**
 - `--in-file`: Path to the encrypted string JSON file (required)
 - `--start`: Zero-based index of the first character to replace (required)
 - `--replacement`: Plaintext replacement characters (required)
+- `--length`: Number of characters to remove from the original string (optional, defaults to the length of `--replacement`)
 - `--out-file`: Path to write the updated encrypted string JSON file (required)
 
-**Example:**
+**Examples:**
 ```bash
+# Same-length replacement (default behaviour)
 pbtk crypto encrypt-string --string "hello world" --public-key-file my.pub --out-file msg.estr
 pbtk crypto replace --in-file msg.estr --start 6 --replacement "there" --out-file updated.estr
 pbtk crypto decrypt-string --in-file updated.estr --private-key-file my.key
 # Output: hello there
+
+# Shorter replacement — removes 5 chars ("quick"), inserts 4 ("slow"), string shrinks by 1
+pbtk crypto encrypt-string --string "the quick brown fox" --public-key-file my.pub --out-file msg.estr
+pbtk crypto replace --in-file msg.estr --start 4 --replacement "slow" --length 5 --out-file updated.estr
+pbtk crypto decrypt-string --in-file updated.estr --private-key-file my.key
+# Output: the slow brown fox
+
+# Deletion — remove 6 chars with empty replacement
+pbtk crypto replace --in-file msg.estr --start 5 --replacement "" --length 6 --out-file updated.estr
+pbtk crypto decrypt-string --in-file updated.estr --private-key-file my.key
+# Output: hello
 ```
 
 #### substring

@@ -115,20 +115,37 @@ public class HomomorphicEncryptionComponent
         return new EncryptedString { Characters = encryptedString.Characters[start..(start + len)] };
     }
 
-    public EncryptedString ReplaceInString(EncryptedString encryptedString, int start, string replacement)
+    public EncryptedString ReplaceInString(EncryptedString encryptedString, int start, string replacement, int? length = null)
     {
         var runes = replacement.EnumerateRunes().ToArray();
+        var removeCount = length ?? runes.Length;
 
-        if (start < 0 || start + runes.Length > encryptedString.Characters.Length)
+        if (start < 0)
+            throw new ArgumentException("Start index must be non-negative.", nameof(start));
+        if (removeCount < 0)
+            throw new ArgumentException("Length must be non-negative.", nameof(length));
+        if (start + removeCount > encryptedString.Characters.Length)
             throw new ArgumentException(
-                $"Replacement range [{start}, {start + runes.Length}) exceeds string length {encryptedString.Characters.Length}.");
+                $"Replacement range [{start}, {start + removeCount}) exceeds string length {encryptedString.Characters.Length}.");
 
-        var publicKey = new PaillierPublicKey { N = encryptedString.Characters[0].N };
-        var newChars = (EncryptedNumber[])encryptedString.Characters.Clone();
-        for (var i = 0; i < runes.Length; i++)
-            newChars[start + i] = Encrypt(runes[i].Value, publicKey);
+        var before = encryptedString.Characters[0..start];
+        var after = encryptedString.Characters[(start + removeCount)..];
 
-        return new EncryptedString { Characters = newChars };
+        EncryptedNumber[] newMiddle;
+        if (runes.Length == 0)
+        {
+            newMiddle = [];
+        }
+        else
+        {
+            var n = encryptedString.Characters.Length > 0
+                ? encryptedString.Characters[0].N
+                : throw new InvalidOperationException("Cannot insert characters into an empty encrypted string.");
+            var publicKey = new PaillierPublicKey { N = n };
+            newMiddle = runes.Select(r => Encrypt(r.Value, publicKey)).ToArray();
+        }
+
+        return new EncryptedString { Characters = [..before, ..newMiddle, ..after] };
     }
 
     public EncryptedNumber MultiplyEncrypted(EncryptedNumber a, long scalar)

@@ -256,6 +256,59 @@ public class HomomorphicEncryptionComponentTests
     }
 
     [Fact]
+    public void ReplaceInString_ShouldShrinkString_WhenReplacementIsShorterThanLength()
+    {
+        var key = TestKey.Value;
+        var publicKey = new PaillierPublicKey { N = key.N };
+
+        var encrypted = _component.EncryptString("the quick brown fox", publicKey);
+        var replaced = _component.ReplaceInString(encrypted, 4, "slow", 5);
+        var decrypted = _component.DecryptString(replaced, key);
+
+        decrypted.Should().Be("the slow brown fox");
+    }
+
+    [Fact]
+    public void ReplaceInString_ShouldGrowString_WhenReplacementIsLongerThanLength()
+    {
+        var key = TestKey.Value;
+        var publicKey = new PaillierPublicKey { N = key.N };
+
+        var encrypted = _component.EncryptString("the fox", publicKey);
+        var replaced = _component.ReplaceInString(encrypted, 4, "quick fox", 3);
+        var decrypted = _component.DecryptString(replaced, key);
+
+        decrypted.Should().Be("the quick fox");
+    }
+
+    [Fact]
+    public void ReplaceInString_ShouldDeleteCharacters_WhenReplacementIsEmpty()
+    {
+        var key = TestKey.Value;
+        var publicKey = new PaillierPublicKey { N = key.N };
+
+        var encrypted = _component.EncryptString("hello world", publicKey);
+        var replaced = _component.ReplaceInString(encrypted, 5, "", 6);
+        var decrypted = _component.DecryptString(replaced, key);
+
+        decrypted.Should().Be("hello");
+    }
+
+    [Fact]
+    public void ReplaceInString_ShouldThrowArgumentException_WhenLengthIsNegative()
+    {
+        var key = TestKey.Value;
+        var publicKey = new PaillierPublicKey { N = key.N };
+
+        var encrypted = _component.EncryptString("hello", publicKey);
+
+        var act = () => _component.ReplaceInString(encrypted, 0, "x", -1);
+
+        act.Should().Throw<ArgumentException>()
+            .WithMessage("*non-negative*");
+    }
+
+    [Fact]
     public void ReplaceInString_ShouldThrowArgumentException_WhenRangeExceedsStringLength()
     {
         var key = TestKey.Value;
