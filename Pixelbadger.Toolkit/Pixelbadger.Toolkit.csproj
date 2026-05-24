@@ -10,7 +10,7 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>pbtk</ToolCommandName>
     <PackageId>Pixelbadger.Toolkit</PackageId>
-    <Version>4.1.0</Version>
+    <Version>4.1.1</Version>
     <Authors>Pixelbadger</Authors>
     <Description>A CLI toolkit exposing varied functionality organized by topic, including string manipulation, distance calculations, esoteric programming language interpreters, image steganography, web serving, OpenAI integration, and homomorphic encryption.</Description>
     <PackageTags>cli;toolkit;strings;interpreters;steganography;openai;crypto;homomorphic-encryption</PackageTags>
