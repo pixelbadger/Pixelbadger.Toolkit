@@ -29,13 +29,13 @@ jobs:
             - 'Pixelbadger.Toolkit/**'
             - '!Pixelbadger.Toolkit.Tests/**'
             - '!Pixelbadger.Toolkit.Benchmarks/**'
-            - '!reports/**'
+            - '!docs/**'
             - '!.github/**'
           main-any:
             - 'Pixelbadger.Toolkit/**'
             - 'Pixelbadger.Toolkit.Tests/**'
             - '!Pixelbadger.Toolkit.Benchmarks/**'
-            - '!reports/**'
+            - '!docs/**'
             - '!.github/**'
 
   check-version:

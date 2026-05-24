@@ -8,7 +8,7 @@ on:
       - '!**/*.Tests/**'
       - '!.github/**'
       - '!Pixelbadger.Toolkit.Benchmarks/**'
-      - '!reports/**'
+      - '!docs/**'
 
 jobs:
   check-changes:
@@ -28,7 +28,7 @@ jobs:
             - 'Pixelbadger.Toolkit/**'
             - '!Pixelbadger.Toolkit.Tests/**'
             - '!Pixelbadger.Toolkit.Benchmarks/**'
-            - '!reports/**'
+            - '!docs/**'
             - '!.github/**'
 
   build-and-test:
