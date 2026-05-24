@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Pixelbadger.Toolkit", "Pixe
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Pixelbadger.Toolkit.Tests", "Pixelbadger.Toolkit.Tests\Pixelbadger.Toolkit.Tests.csproj", "{33230B5F-DF98-4B89-92BD-622D17B5871D}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Pixelbadger.Toolkit.Benchmarks", "Pixelbadger.Toolkit.Benchmarks\Pixelbadger.Toolkit.Benchmarks.csproj", "{65F386DD-7483-4941-966F-F8EE05372DC9}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -41,6 +43,18 @@ Global
 		{33230B5F-DF98-4B89-92BD-622D17B5871D}.Release|x64.Build.0 = Release|Any CPU
 		{33230B5F-DF98-4B89-92BD-622D17B5871D}.Release|x86.ActiveCfg = Release|Any CPU
 		{33230B5F-DF98-4B89-92BD-622D17B5871D}.Release|x86.Build.0 = Release|Any CPU
+		{65F386DD-7483-4941-966F-F8EE05372DC9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{65F386DD-7483-4941-966F-F8EE05372DC9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{65F386DD-7483-4941-966F-F8EE05372DC9}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{65F386DD-7483-4941-966F-F8EE05372DC9}.Debug|x64.Build.0 = Debug|Any CPU
+		{65F386DD-7483-4941-966F-F8EE05372DC9}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{65F386DD-7483-4941-966F-F8EE05372DC9}.Debug|x86.Build.0 = Debug|Any CPU
+		{65F386DD-7483-4941-966F-F8EE05372DC9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{65F386DD-7483-4941-966F-F8EE05372DC9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{65F386DD-7483-4941-966F-F8EE05372DC9}.Release|x64.ActiveCfg = Release|Any CPU
+		{65F386DD-7483-4941-966F-F8EE05372DC9}.Release|x64.Build.0 = Release|Any CPU
+		{65F386DD-7483-4941-966F-F8EE05372DC9}.Release|x86.ActiveCfg = Release|Any CPU
+		{65F386DD-7483-4941-966F-F8EE05372DC9}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -7,6 +7,8 @@ on:
       - 'Pixelbadger.Toolkit/**'
       - '!**/*.Tests/**'
       - '!.github/**'
+      - '!Pixelbadger.Toolkit.Benchmarks/**'
+      - '!reports/**'
 
 jobs:
   check-changes:
@@ -25,6 +27,8 @@ jobs:
           main-code:
             - 'Pixelbadger.Toolkit/**'
             - '!Pixelbadger.Toolkit.Tests/**'
+            - '!Pixelbadger.Toolkit.Benchmarks/**'
+            - '!reports/**'
             - '!.github/**'
 
   build-and-test:

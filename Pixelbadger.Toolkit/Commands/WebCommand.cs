@@ -76,10 +76,10 @@ public static class WebCommand
                     return Task.CompletedTask;
                 });
 
-                Console.WriteLine($"Serving '{file}' on http://localhost:{port}");
+                Console.WriteLine($"Serving '{file}' on http://0.0.0.0:{port}");
                 Console.WriteLine("Press Ctrl+C to stop the server");
 
-                await app.RunAsync($"http://localhost:{port}");
+                await app.RunAsync($"http://0.0.0.0:{port}");
             }
             catch (Exception ex)
             {

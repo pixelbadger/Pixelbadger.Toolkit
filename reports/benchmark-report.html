@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pixelbadger Toolkit — Benchmark Report</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      line-height: 1.6;
+    }
+
+    header {
+      background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+      border-bottom: 1px solid #334155;
+      padding: 2rem 2.5rem;
+    }
+
+    header h1 { font-size: 1.75rem; font-weight: 700; color: #f8fafc; }
+    header .meta { margin-top: 0.5rem; font-size: 0.85rem; color: #94a3b8; }
+    header .meta span { margin-right: 1.5rem; }
+
+    .badge {
+      display: inline-block;
+      background: #1e40af;
+      color: #bfdbfe;
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 999px;
+      letter-spacing: 0.05em;
+      vertical-align: middle;
+      margin-left: 0.5rem;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 1rem;
+      padding: 1.5rem 2.5rem;
+      background: #0f1117;
+      border-bottom: 1px solid #1e293b;
+    }
+
+    .stat-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+    }
+    .stat-card .label { font-size: 0.72rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.08em; }
+    .stat-card .value { font-size: 1.5rem; font-weight: 700; color: #f1f5f9; margin-top: 0.2rem; }
+    .stat-card .sub { font-size: 0.72rem; color: #64748b; margin-top: 0.1rem; }
+
+    main { padding: 2rem 2.5rem; max-width: 1400px; margin: 0 auto; }
+
+    section { margin-bottom: 3rem; }
+    section h2 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #f8fafc;
+      border-left: 3px solid #3b82f6;
+      padding-left: 0.75rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .chart-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem;
+    }
+    @media (max-width: 900px) { .chart-grid { grid-template-columns: 1fr; } }
+
+    .chart-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+    }
+    .chart-card h3 {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 1rem;
+    }
+    .chart-card canvas { max-height: 280px; }
+
+    .chart-full {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1.25rem;
+    }
+    .chart-full h3 {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 1rem;
+    }
+    .chart-full canvas { max-height: 300px; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+      margin-top: 1.25rem;
+    }
+    th {
+      background: #0f172a;
+      color: #94a3b8;
+      text-align: left;
+      padding: 0.6rem 0.75rem;
+      font-weight: 600;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      border-bottom: 1px solid #334155;
+    }
+    td {
+      padding: 0.55rem 0.75rem;
+      border-bottom: 1px solid #1e293b;
+      color: #cbd5e1;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #0f172a; }
+    td.num { text-align: right; font-family: 'SF Mono', 'Fira Code', monospace; }
+    td.fast { color: #4ade80; }
+    td.mid  { color: #facc15; }
+    td.slow { color: #f87171; }
+
+    .note {
+      font-size: 0.78rem;
+      color: #475569;
+      margin-top: 0.75rem;
+      font-style: italic;
+    }
+
+    footer {
+      text-align: center;
+      padding: 2rem;
+      color: #334155;
+      font-size: 0.78rem;
+      border-top: 1px solid #1e293b;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Pixelbadger Toolkit — Benchmark Report <span class="badge">ShortRun</span></h1>
+  <div class="meta">
+    <span>Date: 2026-05-24</span>
+    <span>Runtime: .NET 9.0.16 · Arm64 RyuJIT</span>
+    <span>Hardware: Cortex-A520 / X4 / A725 · 6 physical cores</span>
+    <span>BenchmarkDotNet v0.15.8</span>
+  </div>
+</header>
+
+<div class="summary-grid">
+  <div class="stat-card">
+    <div class="label">Total Benchmarks</div>
+    <div class="value">42</div>
+    <div class="sub">across 7 classes</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Fastest Op</div>
+    <div class="value">29 ns</div>
+    <div class="sub">Homomorphic Substring</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Slowest Op</div>
+    <div class="value">7.5 s</div>
+    <div class="sub">Homomorphic Decrypt Long</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Warmup / Iterations</div>
+    <div class="value">3 / 3</div>
+    <div class="sub">ShortRun job</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Topics Covered</div>
+    <div class="value">4</div>
+    <div class="sub">Strings · Interpreters · Images · Crypto</div>
+  </div>
+</div>
+
+<main>
+
+  <!-- ──────────────────────── STRINGS ──────────────────────── -->
+  <section>
+    <h2>Strings</h2>
+    <div class="chart-grid">
+      <div class="chart-card">
+        <h3>Abjadify — Execution Time (µs)</h3>
+        <canvas id="abjadifyTime"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>Abjadify — Memory Allocated (KB)</h3>
+        <canvas id="abjadifyMem"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>Levenshtein Distance — Execution Time (µs)</h3>
+        <canvas id="levTime"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>Levenshtein Distance — Memory Allocated (KB)</h3>
+        <canvas id="levMem"></canvas>
+      </div>
+    </div>
+
+    <table>
+      <thead><tr>
+        <th>Benchmark</th><th>Mean</th><th>Error</th><th>StdDev</th><th>Gen0</th><th>Allocated</th>
+      </tr></thead>
+      <tbody>
+        <tr><td>Abjadify · ShortText</td><td class="num fast">2.537 µs</td><td class="num">±0.568 µs</td><td class="num">0.031 µs</td><td class="num">0.97</td><td class="num">3.95 KB</td></tr>
+        <tr><td>Abjadify · Paragraph</td><td class="num mid">14.016 µs</td><td class="num">±0.956 µs</td><td class="num">0.052 µs</td><td class="num">4.94</td><td class="num">20.21 KB</td></tr>
+        <tr><td>Abjadify · Document</td><td class="num slow">290.770 µs</td><td class="num">±56.92 µs</td><td class="num">3.12 µs</td><td class="num">108.89</td><td class="num">445.45 KB</td></tr>
+        <tr><td>Levenshtein · EmptyVsLong</td><td class="num fast">3.933 µs</td><td class="num">±2.772 µs</td><td class="num">0.152 µs</td><td class="num">0.31</td><td class="num">1.28 KB</td></tr>
+        <tr><td>Levenshtein · ShortStrings</td><td class="num fast">6.812 µs</td><td class="num">±3.690 µs</td><td class="num">0.202 µs</td><td class="num">0.40</td><td class="num">1.68 KB</td></tr>
+        <tr><td>Levenshtein · MediumStrings</td><td class="num mid">10.650 µs</td><td class="num">±1.860 µs</td><td class="num">0.102 µs</td><td class="num">2.23</td><td class="num">9.13 KB</td></tr>
+        <tr><td>Levenshtein · IdenticalStrings</td><td class="num slow">168.090 µs</td><td class="num">±53.90 µs</td><td class="num">2.955 µs</td><td class="num">45.41</td><td class="num">146.21 KB</td></tr>
+        <tr><td>Levenshtein · LongStrings</td><td class="num slow">173.491 µs</td><td class="num">±54.78 µs</td><td class="num">3.003 µs</td><td class="num">45.41</td><td class="num">146.21 KB</td></tr>
+      </tbody>
+    </table>
+    <p class="note">Levenshtein identical-string and long-string cases take similar time — the algorithm does not short-circuit on equality.</p>
+  </section>
+
+  <!-- ──────────────────────── INTERPRETERS ──────────────────────── -->
+  <section>
+    <h2>Interpreters</h2>
+    <div class="chart-grid">
+      <div class="chart-card">
+        <h3>Brainfuck Interpreter — Execution Time (µs)</h3>
+        <canvas id="bfTime"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>Ook — Translation &amp; Execution Time (µs)</h3>
+        <canvas id="ookTime"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>Brainfuck — Memory Allocated (KB)</h3>
+        <canvas id="bfMem"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>Ook — Memory Allocated (KB)</h3>
+        <canvas id="ookMem"></canvas>
+      </div>
+    </div>
+
+    <table>
+      <thead><tr>
+        <th>Benchmark</th><th>Mean</th><th>Error</th><th>StdDev</th><th>Gen0</th><th>Allocated</th>
+      </tr></thead>
+      <tbody>
+        <tr><td>Brainfuck · Tiny</td><td class="num fast">1.198 µs</td><td class="num">±0.865 µs</td><td class="num">0.047 µs</td><td class="num">7.19</td><td class="num">29.51 KB</td></tr>
+        <tr><td>Brainfuck · HelloWorld</td><td class="num fast">1.795 µs</td><td class="num">±0.584 µs</td><td class="num">0.032 µs</td><td class="num">7.19</td><td class="num">29.57 KB</td></tr>
+        <tr><td>Brainfuck · MultiplyIntensive</td><td class="num mid">5.189 µs</td><td class="num">±12.84 µs</td><td class="num">0.704 µs</td><td class="num">7.19</td><td class="num">29.52 KB</td></tr>
+        <tr><td>Ook · BF→Ook (Short)</td><td class="num fast">1.292 µs</td><td class="num">±0.325 µs</td><td class="num">0.018 µs</td><td class="num">1.38</td><td class="num">5.63 KB</td></tr>
+        <tr><td>Ook · BF→Ook (HelloWorld)</td><td class="num fast">2.132 µs</td><td class="num">±0.181 µs</td><td class="num">0.010 µs</td><td class="num">1.55</td><td class="num">6.35 KB</td></tr>
+        <tr><td>Ook · Ook→BF (Short)</td><td class="num mid">9.151 µs</td><td class="num">±2.133 µs</td><td class="num">0.117 µs</td><td class="num">2.69</td><td class="num">10.98 KB</td></tr>
+        <tr><td>Ook · Ook→BF (HelloWorld)</td><td class="num mid">9.592 µs</td><td class="num">±1.904 µs</td><td class="num">0.104 µs</td><td class="num">3.42</td><td class="num">14.01 KB</td></tr>
+        <tr><td>Ook · Execute (Short)</td><td class="num mid">12.724 µs</td><td class="num">±14.95 µs</td><td class="num">0.820 µs</td><td class="num">9.89</td><td class="num">40.48 KB</td></tr>
+        <tr><td>Ook · Execute (HelloWorld)</td><td class="num mid">22.218 µs</td><td class="num">±27.09 µs</td><td class="num">1.485 µs</td><td class="num">10.62</td><td class="num">43.58 KB</td></tr>
+      </tbody>
+    </table>
+    <p class="note">Ook→BF translation is ~7× slower than BF→Ook — the verbose Ook token format requires significantly more lexing work.</p>
+  </section>
+
+  <!-- ──────────────────────── IMAGES ──────────────────────── -->
+  <section>
+    <h2>Images</h2>
+    <div class="chart-grid">
+      <div class="chart-card">
+        <h3>Steganography — Execution Time (ms)</h3>
+        <canvas id="stegTime"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>Steganography — Memory Allocated (KB)</h3>
+        <canvas id="stegMem"></canvas>
+      </div>
+    </div>
+
+    <table>
+      <thead><tr>
+        <th>Benchmark</th><th>Mean</th><th>Error</th><th>StdDev</th><th>Gen0</th><th>Gen1</th><th>Gen2</th><th>Allocated</th>
+      </tr></thead>
+      <tbody>
+        <tr><td>Encode · Short msg, Small img (200×200)</td><td class="num fast">2.438 ms</td><td class="num">±7.294 ms</td><td class="num">0.400 ms</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">22.92 KB</td></tr>
+        <tr><td>Decode · Small img (200×200)</td><td class="num fast">2.193 ms</td><td class="num">±7.013 ms</td><td class="num">0.384 ms</td><td class="num">117.19</td><td class="num">66.41</td><td class="num">66.41</td><td class="num">460.81 KB</td></tr>
+        <tr><td>Encode · Long msg, Large img (800×800)</td><td class="num slow">22.238 ms</td><td class="num">±18.53 ms</td><td class="num">1.016 ms</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">53.52 KB</td></tr>
+        <tr><td>Decode · Large img (800×800)</td><td class="num slow">25.317 ms</td><td class="num">±46.15 ms</td><td class="num">2.530 ms</td><td class="num">1031.25</td><td class="num">968.75</td><td class="num">968.75</td><td class="num">7205.3 KB</td></tr>
+      </tbody>
+    </table>
+    <p class="note">Decode allocates ~20× more memory than encode — it must load the full decoded pixel buffer to reconstruct the message from LSBs. Large image decode reaches 7 MB.</p>
+  </section>
+
+  <!-- ──────────────────────── CRYPTO ──────────────────────── -->
+  <section>
+    <h2>Crypto — Homomorphic Encryption (Paillier)</h2>
+
+    <div class="chart-full">
+      <h3>Encrypt / Decrypt — Execution Time (ms) · param="hello"</h3>
+      <canvas id="cryptoSlowTime"></canvas>
+    </div>
+
+    <div class="chart-grid">
+      <div class="chart-card">
+        <h3>Slice Operations — Execution Time (ns) · param="hello"</h3>
+        <canvas id="cryptoFastTime"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>Encrypt / Decrypt — Memory Allocated (KB) · param="hello"</h3>
+        <canvas id="cryptoMem"></canvas>
+      </div>
+    </div>
+
+    <table>
+      <thead><tr>
+        <th>Benchmark</th><th>Param</th><th>Mean</th><th>Allocated</th>
+      </tr></thead>
+      <tbody>
+        <tr><td>SubstringEncrypted · FromStart</td><td>hello</td><td class="num fast">29.5 ns</td><td class="num">128 B</td></tr>
+        <tr><td>SubstringEncrypted · FromMiddle</td><td>hello</td><td class="num fast">36.4 ns</td><td class="num">208 B</td></tr>
+        <tr><td>SubstringEncrypted · ToEnd</td><td>hello</td><td class="num fast">53.4 ns</td><td class="num">344 B</td></tr>
+        <tr><td>ReplaceInString · SingleChar</td><td>hello</td><td class="num slow">154.1 ms</td><td class="num">6.88 KB</td></tr>
+        <tr><td>ReplaceInString · Word (4 chars)</td><td>hello</td><td class="num slow">304.6 ms</td><td class="num">25.64 KB</td></tr>
+        <tr><td>EncryptString · Short (5 chars)</td><td>hello</td><td class="num slow">656.4 ms</td><td class="num">32.55 KB</td></tr>
+        <tr><td>DecryptString · Short (5 chars)</td><td>hello</td><td class="num slow">676.9 ms</td><td class="num">18.80 KB</td></tr>
+        <tr><td>EncryptString · Long (56 chars)</td><td>hello</td><td class="num slow">4,208 ms</td><td class="num">362.9 KB</td></tr>
+        <tr><td>DecryptString · Long (56 chars)</td><td>hello</td><td class="num slow">7,528 ms</td><td class="num">213.3 KB</td></tr>
+      </tbody>
+    </table>
+    <p class="note">Slice/substring operations on encrypted data are O(1) pointer slices (~30–55 ns) — no decryption occurs. Encrypt/decrypt cost scales linearly with character count due to per-character Paillier operations.</p>
+  </section>
+
+  <!-- ──────────────────────── CROSS-TOPIC OVERVIEW ──────────────────────── -->
+  <section>
+    <h2>Cross-Topic Overview</h2>
+    <div class="chart-full">
+      <h3>Representative Operation — Mean Execution Time (log scale, µs)</h3>
+      <canvas id="overview"></canvas>
+    </div>
+    <p class="note">Crypto encrypt/decrypt operations are shown here in µs for scale comparison. Homomorphic substring slices (&lt;0.1 µs) are omitted as they would not be visible.</p>
+  </section>
+
+</main>
+
+<footer>Generated by Claude Code · Pixelbadger Toolkit · BenchmarkDotNet ShortRun · 2026-05-24</footer>
+
+<script>
+  const DARK_GRID  = '#1e293b';
+  const TICK_COLOR = '#64748b';
+  const LEGEND_COLOR = '#94a3b8';
+
+  const defaults = {
+    plugins: {
+      legend: { labels: { color: LEGEND_COLOR, font: { size: 11 } } },
+      tooltip: { backgroundColor: '#0f172a', borderColor: '#334155', borderWidth: 1 }
+    },
+    scales: {
+      x: { grid: { color: DARK_GRID }, ticks: { color: TICK_COLOR, font: { size: 11 } } },
+      y: { grid: { color: DARK_GRID }, ticks: { color: TICK_COLOR, font: { size: 11 } } }
+    }
+  };
+
+  function barChart(id, labels, datasets, unit, opts = {}) {
+    const ctx = document.getElementById(id).getContext('2d');
+    new Chart(ctx, {
+      type: 'bar',
+      data: { labels, datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        ...defaults,
+        plugins: {
+          ...defaults.plugins,
+          tooltip: {
+            ...defaults.plugins.tooltip,
+            callbacks: {
+              label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y.toLocaleString(undefined, {maximumFractionDigits: 3})} ${unit}`
+            }
+          }
+        },
+        scales: {
+          ...defaults.scales,
+          y: {
+            ...defaults.scales.y,
+            beginAtZero: true,
+            title: { display: true, text: unit, color: TICK_COLOR, font: { size: 10 } },
+            ...((opts.log) ? { type: 'logarithmic' } : {}),
+          }
+        },
+        ...opts
+      }
+    });
+  }
+
+  const BLUE   = 'rgba(59,130,246,0.8)';
+  const INDIGO = 'rgba(99,102,241,0.8)';
+  const TEAL   = 'rgba(20,184,166,0.8)';
+  const GREEN  = 'rgba(74,222,128,0.8)';
+  const AMBER  = 'rgba(251,191,36,0.8)';
+  const ROSE   = 'rgba(248,113,113,0.8)';
+  const PURPLE = 'rgba(168,85,247,0.8)';
+
+  barChart('abjadifyTime',
+    ['ShortText', 'Paragraph', 'Document'],
+    [{ label: 'Mean (µs)', data: [2.537, 14.016, 290.770], backgroundColor: [GREEN, AMBER, ROSE] }],
+    'µs'
+  );
+  barChart('abjadifyMem',
+    ['ShortText', 'Paragraph', 'Document'],
+    [{ label: 'Allocated (KB)', data: [3.95, 20.21, 445.45], backgroundColor: BLUE }],
+    'KB'
+  );
+
+  barChart('levTime',
+    ['Empty vs Long', 'Short', 'Medium', 'Identical', 'Long'],
+    [{ label: 'Mean (µs)', data: [3.933, 6.812, 10.650, 168.090, 173.491], backgroundColor: [GREEN, GREEN, AMBER, ROSE, ROSE] }],
+    'µs'
+  );
+  barChart('levMem',
+    ['Empty vs Long', 'Short', 'Medium', 'Identical', 'Long'],
+    [{ label: 'Allocated (KB)', data: [1.28, 1.68, 9.13, 146.21, 146.21], backgroundColor: INDIGO }],
+    'KB'
+  );
+
+  barChart('bfTime',
+    ['Tiny', 'HelloWorld', 'MultiplyIntensive'],
+    [{ label: 'Mean (µs)', data: [1.198, 1.795, 5.189], backgroundColor: [GREEN, GREEN, AMBER] }],
+    'µs'
+  );
+  barChart('bfMem',
+    ['Tiny', 'HelloWorld', 'MultiplyIntensive'],
+    [{ label: 'Allocated (KB)', data: [29.51, 29.57, 29.52], backgroundColor: TEAL }],
+    'KB'
+  );
+
+  barChart('ookTime',
+    ['BF→Ook Short', 'BF→Ook HW', 'Ook→BF Short', 'Ook→BF HW', 'Execute Short', 'Execute HW'],
+    [{ label: 'Mean (µs)', data: [1.292, 2.132, 9.151, 9.592, 12.724, 22.218], backgroundColor: [GREEN, GREEN, AMBER, AMBER, ROSE, ROSE] }],
+    'µs'
+  );
+  barChart('ookMem',
+    ['BF→Ook S', 'BF→Ook HW', 'Ook→BF S', 'Ook→BF HW', 'Exec S', 'Exec HW'],
+    [{ label: 'Allocated (KB)', data: [5.63, 6.35, 10.98, 14.01, 40.48, 43.58], backgroundColor: PURPLE }],
+    'KB'
+  );
+
+  barChart('stegTime',
+    ['Encode Small', 'Decode Small', 'Encode Large', 'Decode Large'],
+    [
+      { label: 'Encode (ms)', data: [2.438, null, 22.238, null], backgroundColor: BLUE },
+      { label: 'Decode (ms)', data: [null, 2.193, null, 25.317], backgroundColor: ROSE }
+    ],
+    'ms'
+  );
+  barChart('stegMem',
+    ['Encode Small', 'Decode Small', 'Encode Large', 'Decode Large'],
+    [{ label: 'Allocated (KB)', data: [22.92, 460.81, 53.52, 7205.3], backgroundColor: [TEAL, ROSE, TEAL, ROSE] }],
+    'KB'
+  );
+
+  barChart('cryptoSlowTime',
+    ['Encrypt Short (5ch)', 'Decrypt Short (5ch)', 'Encrypt Long (56ch)', 'Decrypt Long (56ch)'],
+    [{ label: 'Mean (ms)', data: [656.4, 676.9, 4208.1, 7527.8], backgroundColor: [BLUE, INDIGO, AMBER, ROSE] }],
+    'ms'
+  );
+
+  barChart('cryptoFastTime',
+    ['Substr FromStart', 'Substr FromMiddle', 'Substr ToEnd'],
+    [{ label: 'Mean (ns)', data: [29.54, 36.41, 53.44], backgroundColor: GREEN }],
+    'ns'
+  );
+
+  barChart('cryptoMem',
+    ['Enc Short', 'Dec Short', 'Enc Long', 'Dec Long'],
+    [{ label: 'Allocated (KB)', data: [32.55, 18.80, 362.93, 213.33], backgroundColor: [BLUE, INDIGO, AMBER, ROSE] }],
+    'KB'
+  );
+
+  barChart('overview',
+    ['Abjadify Short', 'Levenshtein Short', 'BF Tiny', 'Ook BF→Ook', 'Steg Encode Small', 'Steg Decode Large', 'Crypto Enc Short', 'Crypto Dec Long'],
+    [{
+      label: 'Mean (µs, log scale)',
+      data: [2.537, 6.812, 1.198, 1.292, 2438, 25317, 656416, 7527826],
+      backgroundColor: [TEAL, TEAL, GREEN, GREEN, AMBER, ROSE, PURPLE, PURPLE]
+    }],
+    'µs',
+    { log: true }
+  );
+</script>
+</body>
+</html>
