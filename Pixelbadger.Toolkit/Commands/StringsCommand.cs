@@ -9,10 +9,10 @@ public static class StringsCommand
     {
         var command = new Command("strings", "String manipulation utilities");
 
-        command.AddCommand(CreateReverseCommand());
-        command.AddCommand(CreateLevenshteinDistanceCommand());
-        command.AddCommand(CreateAbjadifyCommand());
-        command.AddCommand(CreateFleschReadingEaseCommand());
+        command.Add(CreateReverseCommand());
+        command.Add(CreateLevenshteinDistanceCommand());
+        command.Add(CreateAbjadifyCommand());
+        command.Add(CreateFleschReadingEaseCommand());
 
         return command;
     }
@@ -21,30 +21,21 @@ public static class StringsCommand
     {
         var command = new Command("reverse", "Reverses the content of a file");
 
-        var inFileOption = new Option<string>(
-            aliases: ["--in-file"],
-            description: "Input file path")
-        {
-            IsRequired = true
-        };
+        var inFileOption = new Option<string>("--in-file") { Description = "Input file path", Required = true };
+        var outFileOption = new Option<string>("--out-file") { Description = "Output file path", Required = true };
 
-        var outFileOption = new Option<string>(
-            aliases: ["--out-file"],
-            description: "Output file path")
-        {
-            IsRequired = true
-        };
+        command.Add(inFileOption);
+        command.Add(outFileOption);
 
-        command.AddOption(inFileOption);
-        command.AddOption(outFileOption);
-
-        command.SetHandler(async (string inFile, string outFile) =>
+        command.SetAction(async (parseResult, cancellationToken) =>
         {
             try
             {
+                var inFile = parseResult.GetValue(inFileOption)!;
+                var outFile = parseResult.GetValue(outFileOption)!;
                 var stringReverser = new StringReverser();
                 await stringReverser.ReverseFileAsync(inFile, outFile);
-                
+
                 Console.WriteLine($"Successfully reversed content from '{inFile}' to '{outFile}'");
             }
             catch (Exception ex)
@@ -52,7 +43,7 @@ public static class StringsCommand
                 Console.WriteLine($"Error: {ex.Message}");
                 Environment.Exit(1);
             }
-        }, inFileOption, outFileOption);
+        });
 
         return command;
     }
@@ -61,30 +52,21 @@ public static class StringsCommand
     {
         var command = new Command("levenshtein-distance", "Calculates the Levenshtein distance between two strings or files");
 
-        var string1Option = new Option<string>(
-            aliases: ["--string1"],
-            description: "First string or file path")
-        {
-            IsRequired = true
-        };
+        var string1Option = new Option<string>("--string1") { Description = "First string or file path", Required = true };
+        var string2Option = new Option<string>("--string2") { Description = "Second string or file path", Required = true };
 
-        var string2Option = new Option<string>(
-            aliases: ["--string2"],
-            description: "Second string or file path")
-        {
-            IsRequired = true
-        };
+        command.Add(string1Option);
+        command.Add(string2Option);
 
-        command.AddOption(string1Option);
-        command.AddOption(string2Option);
-
-        command.SetHandler(async (string string1, string string2) =>
+        command.SetAction(async (parseResult, cancellationToken) =>
         {
             try
             {
+                var string1 = parseResult.GetValue(string1Option)!;
+                var string2 = parseResult.GetValue(string2Option)!;
                 var calculator = new LevenshteinCalculator();
                 var distance = await calculator.CalculateDistanceAsync(string1, string2);
-                
+
                 Console.WriteLine($"Levenshtein distance: {distance}");
             }
             catch (Exception ex)
@@ -92,7 +74,7 @@ public static class StringsCommand
                 Console.WriteLine($"Error: {ex.Message}");
                 Environment.Exit(1);
             }
-        }, string1Option, string2Option);
+        });
 
         return command;
     }
@@ -101,27 +83,18 @@ public static class StringsCommand
     {
         var command = new Command("abjadify", "Strips English vowels from text while preserving single vowel words");
 
-        var inFileOption = new Option<string>(
-            aliases: ["--in-file"],
-            description: "Input file path")
-        {
-            IsRequired = true
-        };
+        var inFileOption = new Option<string>("--in-file") { Description = "Input file path", Required = true };
+        var outFileOption = new Option<string>("--out-file") { Description = "Output file path", Required = true };
 
-        var outFileOption = new Option<string>(
-            aliases: ["--out-file"],
-            description: "Output file path")
-        {
-            IsRequired = true
-        };
+        command.Add(inFileOption);
+        command.Add(outFileOption);
 
-        command.AddOption(inFileOption);
-        command.AddOption(outFileOption);
-
-        command.SetHandler(async (string inFile, string outFile) =>
+        command.SetAction(async (parseResult, cancellationToken) =>
         {
             try
             {
+                var inFile = parseResult.GetValue(inFileOption)!;
+                var outFile = parseResult.GetValue(outFileOption)!;
                 var abjadifyComponent = new AbjadifyComponent();
                 await abjadifyComponent.AbjadifyFileAsync(inFile, outFile);
 
@@ -132,7 +105,7 @@ public static class StringsCommand
                 Console.WriteLine($"Error: {ex.Message}");
                 Environment.Exit(1);
             }
-        }, inFileOption, outFileOption);
+        });
 
         return command;
     }
@@ -141,19 +114,15 @@ public static class StringsCommand
     {
         var command = new Command("flesch-reading-ease", "Analyzes plain text readability using the Flesch Reading Ease score");
 
-        var inFileOption = new Option<string>(
-            aliases: ["--in-file"],
-            description: "Input plain-text file path")
-        {
-            IsRequired = true
-        };
+        var inFileOption = new Option<string>("--in-file") { Description = "Input plain-text file path", Required = true };
 
-        command.AddOption(inFileOption);
+        command.Add(inFileOption);
 
-        command.SetHandler(async (string inFile) =>
+        command.SetAction(async (parseResult, cancellationToken) =>
         {
             try
             {
+                var inFile = parseResult.GetValue(inFileOption)!;
                 var component = new FleschReadingEaseComponent();
                 var result = await component.AnalyzeFileAsync(inFile);
 
@@ -168,7 +137,7 @@ public static class StringsCommand
                 Console.WriteLine($"Error: {ex.Message}");
                 Environment.Exit(1);
             }
-        }, inFileOption);
+        });
 
         return command;
     }

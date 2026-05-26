@@ -10,8 +10,8 @@ public static class OAuthCommand
     {
         var command = new Command("oauth", "OAuth utilities for managing profiles and acquiring tokens");
 
-        command.AddCommand(CreateTokenCommand());
-        command.AddCommand(CreateProfileCommand());
+        command.Add(CreateTokenCommand());
+        command.Add(CreateProfileCommand());
 
         return command;
     }
@@ -20,19 +20,15 @@ public static class OAuthCommand
     {
         var command = new Command("token", "Acquire an OAuth access token using Resource Owner Password Credentials");
 
-        var profileOption = new Option<string>(
-            aliases: ["--profile"],
-            description: "Name of the OAuth profile to use")
-        {
-            IsRequired = true
-        };
+        var profileOption = new Option<string>("--profile") { Description = "Name of the OAuth profile to use", Required = true };
 
-        command.AddOption(profileOption);
+        command.Add(profileOption);
 
-        command.SetHandler(async (string profile) =>
+        command.SetAction(async (parseResult, cancellationToken) =>
         {
             try
             {
+                var profile = parseResult.GetValue(profileOption)!;
                 Console.Write("Username: ");
                 var username = Console.ReadLine() ?? string.Empty;
 
@@ -50,7 +46,7 @@ public static class OAuthCommand
                 Console.WriteLine($"Error: {ex.Message}");
                 Environment.Exit(1);
             }
-        }, profileOption);
+        });
 
         return command;
     }
@@ -59,9 +55,9 @@ public static class OAuthCommand
     {
         var command = new Command("profile", "Manage OAuth profiles");
 
-        command.AddCommand(CreateProfileAddCommand());
-        command.AddCommand(CreateProfileUpdateCommand());
-        command.AddCommand(CreateProfileDeleteCommand());
+        command.Add(CreateProfileAddCommand());
+        command.Add(CreateProfileUpdateCommand());
+        command.Add(CreateProfileDeleteCommand());
 
         return command;
     }
@@ -70,51 +66,28 @@ public static class OAuthCommand
     {
         var command = new Command("add", "Add a new OAuth profile");
 
-        var nameOption = new Option<string>(
-            aliases: ["--name"],
-            description: "Profile name")
-        {
-            IsRequired = true
-        };
+        var nameOption = new Option<string>("--name") { Description = "Profile name", Required = true };
+        var authorityOption = new Option<string>("--authority") { Description = "OAuth authority URI (e.g. https://login.microsoftonline.com/tenant)", Required = true };
+        var clientIdOption = new Option<string>("--client-id") { Description = "OAuth client ID", Required = true };
+        var clientSecretOption = new Option<string?>("--client-secret") { Description = "OAuth client secret (will be prompted securely if omitted)" };
+        var scopeOption = new Option<string?>("--scope") { Description = "OAuth scope (optional)" };
 
-        var authorityOption = new Option<string>(
-            aliases: ["--authority"],
-            description: "OAuth authority URI (e.g. https://login.microsoftonline.com/tenant)")
-        {
-            IsRequired = true
-        };
+        command.Add(nameOption);
+        command.Add(authorityOption);
+        command.Add(clientIdOption);
+        command.Add(clientSecretOption);
+        command.Add(scopeOption);
 
-        var clientIdOption = new Option<string>(
-            aliases: ["--client-id"],
-            description: "OAuth client ID")
-        {
-            IsRequired = true
-        };
-
-        var clientSecretOption = new Option<string?>(
-            aliases: ["--client-secret"],
-            description: "OAuth client secret (will be prompted securely if omitted)")
-        {
-            IsRequired = false
-        };
-
-        var scopeOption = new Option<string?>(
-            aliases: ["--scope"],
-            description: "OAuth scope (optional)")
-        {
-            IsRequired = false
-        };
-
-        command.AddOption(nameOption);
-        command.AddOption(authorityOption);
-        command.AddOption(clientIdOption);
-        command.AddOption(clientSecretOption);
-        command.AddOption(scopeOption);
-
-        command.SetHandler(async (string name, string authority, string clientId, string? clientSecret, string? scope) =>
+        command.SetAction(async (parseResult, cancellationToken) =>
         {
             try
             {
+                var name = parseResult.GetValue(nameOption)!;
+                var authority = parseResult.GetValue(authorityOption)!;
+                var clientId = parseResult.GetValue(clientIdOption)!;
+                var clientSecret = parseResult.GetValue(clientSecretOption);
+                var scope = parseResult.GetValue(scopeOption);
+
                 if (clientSecret is null)
                     clientSecret = ReadSecureInput("Client Secret (leave blank if none): ");
 
@@ -129,7 +102,7 @@ public static class OAuthCommand
                 Console.WriteLine($"Error: {ex.Message}");
                 Environment.Exit(1);
             }
-        }, nameOption, authorityOption, clientIdOption, clientSecretOption, scopeOption);
+        });
 
         return command;
     }
@@ -138,51 +111,28 @@ public static class OAuthCommand
     {
         var command = new Command("update", "Update an existing OAuth profile");
 
-        var nameOption = new Option<string>(
-            aliases: ["--name"],
-            description: "Profile name to update")
-        {
-            IsRequired = true
-        };
+        var nameOption = new Option<string>("--name") { Description = "Profile name to update", Required = true };
+        var authorityOption = new Option<string?>("--authority") { Description = "New OAuth authority URI" };
+        var clientIdOption = new Option<string?>("--client-id") { Description = "New OAuth client ID" };
+        var clientSecretOption = new Option<string?>("--client-secret") { Description = "New OAuth client secret (will be prompted securely if omitted)" };
+        var scopeOption = new Option<string?>("--scope") { Description = "New OAuth scope" };
 
-        var authorityOption = new Option<string?>(
-            aliases: ["--authority"],
-            description: "New OAuth authority URI")
-        {
-            IsRequired = false
-        };
+        command.Add(nameOption);
+        command.Add(authorityOption);
+        command.Add(clientIdOption);
+        command.Add(clientSecretOption);
+        command.Add(scopeOption);
 
-        var clientIdOption = new Option<string?>(
-            aliases: ["--client-id"],
-            description: "New OAuth client ID")
-        {
-            IsRequired = false
-        };
-
-        var clientSecretOption = new Option<string?>(
-            aliases: ["--client-secret"],
-            description: "New OAuth client secret (will be prompted securely if omitted)")
-        {
-            IsRequired = false
-        };
-
-        var scopeOption = new Option<string?>(
-            aliases: ["--scope"],
-            description: "New OAuth scope")
-        {
-            IsRequired = false
-        };
-
-        command.AddOption(nameOption);
-        command.AddOption(authorityOption);
-        command.AddOption(clientIdOption);
-        command.AddOption(clientSecretOption);
-        command.AddOption(scopeOption);
-
-        command.SetHandler(async (string name, string? authority, string? clientId, string? clientSecret, string? scope) =>
+        command.SetAction(async (parseResult, cancellationToken) =>
         {
             try
             {
+                var name = parseResult.GetValue(nameOption)!;
+                var authority = parseResult.GetValue(authorityOption);
+                var clientId = parseResult.GetValue(clientIdOption);
+                var clientSecret = parseResult.GetValue(clientSecretOption);
+                var scope = parseResult.GetValue(scopeOption);
+
                 var profileService = new OAuthProfileService();
                 var profileComponent = new OAuthProfileComponent(profileService);
                 await profileComponent.UpdateProfileAsync(name, authority, clientId, clientSecret, scope);
@@ -194,7 +144,7 @@ public static class OAuthCommand
                 Console.WriteLine($"Error: {ex.Message}");
                 Environment.Exit(1);
             }
-        }, nameOption, authorityOption, clientIdOption, clientSecretOption, scopeOption);
+        });
 
         return command;
     }
@@ -203,19 +153,15 @@ public static class OAuthCommand
     {
         var command = new Command("delete", "Delete an OAuth profile");
 
-        var nameOption = new Option<string>(
-            aliases: ["--name"],
-            description: "Profile name to delete")
-        {
-            IsRequired = true
-        };
+        var nameOption = new Option<string>("--name") { Description = "Profile name to delete", Required = true };
 
-        command.AddOption(nameOption);
+        command.Add(nameOption);
 
-        command.SetHandler(async (string name) =>
+        command.SetAction(async (parseResult, cancellationToken) =>
         {
             try
             {
+                var name = parseResult.GetValue(nameOption)!;
                 var profileService = new OAuthProfileService();
                 var profileComponent = new OAuthProfileComponent(profileService);
                 await profileComponent.DeleteProfileAsync(name);
@@ -227,7 +173,7 @@ public static class OAuthCommand
                 Console.WriteLine($"Error: {ex.Message}");
                 Environment.Exit(1);
             }
-        }, nameOption);
+        });
 
         return command;
     }

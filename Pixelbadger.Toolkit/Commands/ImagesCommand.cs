@@ -9,7 +9,7 @@ public static class ImagesCommand
     {
         var command = new Command("images", "Image processing and manipulation utilities");
 
-        command.AddCommand(CreateSteganographyCommand());
+        command.Add(CreateSteganographyCommand());
 
         return command;
     }
@@ -18,43 +18,24 @@ public static class ImagesCommand
     {
         var command = new Command("steganography", "Encode or decode hidden messages in images using LSB steganography");
 
-        var modeOption = new Option<string>(
-            aliases: ["--mode"],
-            description: "Operation mode: 'encode' or 'decode'")
-        {
-            IsRequired = true
-        };
+        var modeOption = new Option<string>("--mode") { Description = "Operation mode: 'encode' or 'decode'", Required = true };
+        var imageOption = new Option<string>("--image") { Description = "Input image file path", Required = true };
+        var messageOption = new Option<string?>("--message") { Description = "Message to encode (required for encode mode)" };
+        var outputOption = new Option<string?>("--output") { Description = "Output image file path (required for encode mode)" };
 
-        var imageOption = new Option<string>(
-            aliases: ["--image"],
-            description: "Input image file path")
-        {
-            IsRequired = true
-        };
+        command.Add(modeOption);
+        command.Add(imageOption);
+        command.Add(messageOption);
+        command.Add(outputOption);
 
-        var messageOption = new Option<string?>(
-            aliases: ["--message"],
-            description: "Message to encode (required for encode mode)")
-        {
-            IsRequired = false
-        };
-
-        var outputOption = new Option<string?>(
-            aliases: ["--output"],
-            description: "Output image file path (required for encode mode)")
-        {
-            IsRequired = false
-        };
-
-        command.AddOption(modeOption);
-        command.AddOption(imageOption);
-        command.AddOption(messageOption);
-        command.AddOption(outputOption);
-
-        command.SetHandler(async (string mode, string image, string? message, string? output) =>
+        command.SetAction(async (parseResult, cancellationToken) =>
         {
             try
             {
+                var mode = parseResult.GetValue(modeOption)!;
+                var image = parseResult.GetValue(imageOption)!;
+                var message = parseResult.GetValue(messageOption);
+                var output = parseResult.GetValue(outputOption);
                 var steganography = new ImageSteganography();
 
                 if (mode.ToLower() == "encode")
@@ -92,9 +73,8 @@ public static class ImagesCommand
                 Console.WriteLine($"Error: {ex.Message}");
                 Environment.Exit(1);
             }
-        }, modeOption, imageOption, messageOption, outputOption);
+        });
 
         return command;
     }
-
 }

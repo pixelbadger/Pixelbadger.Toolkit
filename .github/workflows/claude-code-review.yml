@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pull-requests: read
+      pull-requests: write
       issues: read
       id-token: write
     
@@ -37,7 +37,7 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
-            Review this pull request against the following checklist only. Be concise — flag issues, don't praise. Post your findings as a single comment using `gh pr comment`.
+            Review this pull request against the following checklist only. Be concise — flag issues, don't praise.
 
             **1. Version bump** — If any `.cs` or `.csproj` files changed outside of `*.Tests/` or `*.Benchmarks/`, the `<Version>` element in `Pixelbadger.Toolkit/Pixelbadger.Toolkit.csproj` must be incremented. Flag if missing.
 
@@ -47,7 +47,9 @@ jobs:
 
             **4. Sanity check** — Flag obvious bugs, unhandled nulls in critical paths, prompt injection risks (user-controlled strings passed directly to LLMs), or path traversal in file operations.
 
-            If everything passes, post a brief "LGTM — all checks passed" comment.
+            Once you have completed the review, submit a formal GitHub review using `gh pr review`:
+            - If all checks pass: `gh pr review <PR_NUMBER> --approve --body "LGTM — all checks passed."`
+            - If any check fails: `gh pr review <PR_NUMBER> --request-changes --body "<summary of issues found>"`
 
-          claude_args: '--model claude-haiku-4-5-20251001 --allowed-tools "Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*)"'
+          claude_args: '--model claude-haiku-4-5-20251001 --allowed-tools "Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*),Bash(gh pr review:*)"'
 

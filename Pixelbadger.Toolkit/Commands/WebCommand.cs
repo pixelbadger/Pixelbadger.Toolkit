@@ -12,7 +12,7 @@ public static class WebCommand
     {
         var command = new Command("web", "Web server utilities");
 
-        command.AddCommand(CreateServeHtmlCommand());
+        command.Add(CreateServeHtmlCommand());
 
         return command;
     }
@@ -21,28 +21,19 @@ public static class WebCommand
     {
         var command = new Command("serve-html", "Serves a static HTML file via HTTP server");
 
-        var fileOption = new Option<string>(
-            aliases: ["--file"],
-            description: "Path to the HTML file to serve")
-        {
-            IsRequired = true
-        };
+        var fileOption = new Option<string>("--file") { Description = "Path to the HTML file to serve", Required = true };
+        var portOption = new Option<int>("--port") { Description = "Port to bind the server to", DefaultValueFactory = _ => 8080 };
 
-        var portOption = new Option<int>(
-            aliases: ["--port"],
-            description: "Port to bind the server to")
-        {
-            IsRequired = false
-        };
-        portOption.SetDefaultValue(8080);
+        command.Add(fileOption);
+        command.Add(portOption);
 
-        command.AddOption(fileOption);
-        command.AddOption(portOption);
-
-        command.SetHandler(async (string file, int port) =>
+        command.SetAction(async (parseResult, cancellationToken) =>
         {
             try
             {
+                var file = parseResult.GetValue(fileOption)!;
+                var port = parseResult.GetValue(portOption);
+
                 if (!File.Exists(file))
                 {
                     Console.WriteLine($"Error: File '{file}' not found");
@@ -86,7 +77,7 @@ public static class WebCommand
                 Console.WriteLine($"Error: {ex.Message}");
                 Environment.Exit(1);
             }
-        }, fileOption, portOption);
+        });
 
         return command;
     }

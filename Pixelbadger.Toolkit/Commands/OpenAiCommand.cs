@@ -10,10 +10,10 @@ public static class OpenAiCommand
     {
         var command = new Command("openai", "OpenAI utilities");
 
-        command.AddCommand(CreateChatCommand());
-        command.AddCommand(CreateTranslateCommand());
-        command.AddCommand(CreateOcaaarCommand());
-        command.AddCommand(CreateCorpospeakCommand());
+        command.Add(CreateChatCommand());
+        command.Add(CreateTranslateCommand());
+        command.Add(CreateOcaaarCommand());
+        command.Add(CreateCorpospeakCommand());
 
         return command;
     }
@@ -22,36 +22,22 @@ public static class OpenAiCommand
     {
         var command = new Command("chat", "Chat with OpenAI maintaining conversation history");
 
-        var messageOption = new Option<string>(
-            aliases: ["--message"],
-            description: "The message to send to the LLM")
-        {
-            IsRequired = true
-        };
+        var messageOption = new Option<string>("--message") { Description = "The message to send to the LLM", Required = true };
+        var chatHistoryOption = new Option<string?>("--chat-history") { Description = "Path to JSON file containing chat history (will be created if it doesn't exist)" };
+        var modelOption = new Option<string>("--model") { Description = "The OpenAI model to use", DefaultValueFactory = _ => "gpt-5-nano" };
 
-        var chatHistoryOption = new Option<string?>(
-            aliases: ["--chat-history"],
-            description: "Path to JSON file containing chat history (will be created if it doesn't exist)")
-        {
-            IsRequired = false
-        };
+        command.Add(messageOption);
+        command.Add(chatHistoryOption);
+        command.Add(modelOption);
 
-        var modelOption = new Option<string>(
-            aliases: ["--model"],
-            description: "The OpenAI model to use",
-            getDefaultValue: () => "gpt-5-nano")
-        {
-            IsRequired = false
-        };
-
-        command.AddOption(messageOption);
-        command.AddOption(chatHistoryOption);
-        command.AddOption(modelOption);
-
-        command.SetHandler(async (string message, string? chatHistory, string model) =>
+        command.SetAction(async (parseResult, cancellationToken) =>
         {
             try
             {
+                var message = parseResult.GetValue(messageOption)!;
+                var chatHistory = parseResult.GetValue(chatHistoryOption);
+                var model = parseResult.GetValue(modelOption)!;
+
                 var openAiClientService = new OpenAiClientService(model);
                 var chatComponent = new ChatComponent(openAiClientService);
                 var response = await chatComponent.ChatAsync(message, chatHistory);
@@ -63,7 +49,7 @@ public static class OpenAiCommand
                 Console.WriteLine($"Error: {ex.Message}");
                 Environment.Exit(1);
             }
-        }, messageOption, chatHistoryOption, modelOption);
+        });
 
         return command;
     }
@@ -72,36 +58,22 @@ public static class OpenAiCommand
     {
         var command = new Command("translate", "Translate text to a target language using OpenAI");
 
-        var textOption = new Option<string>(
-            aliases: ["--text"],
-            description: "The text to translate")
-        {
-            IsRequired = true
-        };
+        var textOption = new Option<string>("--text") { Description = "The text to translate", Required = true };
+        var targetLanguageOption = new Option<string>("--target-language") { Description = "The target language to translate to", Required = true };
+        var modelOption = new Option<string>("--model") { Description = "The OpenAI model to use", DefaultValueFactory = _ => "gpt-5-nano" };
 
-        var targetLanguageOption = new Option<string>(
-            aliases: ["--target-language"],
-            description: "The target language to translate to")
-        {
-            IsRequired = true
-        };
+        command.Add(textOption);
+        command.Add(targetLanguageOption);
+        command.Add(modelOption);
 
-        var modelOption = new Option<string>(
-            aliases: ["--model"],
-            description: "The OpenAI model to use",
-            getDefaultValue: () => "gpt-5-nano")
-        {
-            IsRequired = false
-        };
-
-        command.AddOption(textOption);
-        command.AddOption(targetLanguageOption);
-        command.AddOption(modelOption);
-
-        command.SetHandler(async (string text, string targetLanguage, string model) =>
+        command.SetAction(async (parseResult, cancellationToken) =>
         {
             try
             {
+                var text = parseResult.GetValue(textOption)!;
+                var targetLanguage = parseResult.GetValue(targetLanguageOption)!;
+                var model = parseResult.GetValue(modelOption)!;
+
                 var openAiClientService = new OpenAiClientService(model);
                 var translateComponent = new TranslateComponent(openAiClientService);
                 var translation = await translateComponent.TranslateAsync(text, targetLanguage);
@@ -113,7 +85,7 @@ public static class OpenAiCommand
                 Console.WriteLine($"Error: {ex.Message}");
                 Environment.Exit(1);
             }
-        }, textOption, targetLanguageOption, modelOption);
+        });
 
         return command;
     }
@@ -122,28 +94,19 @@ public static class OpenAiCommand
     {
         var command = new Command("ocaaar", "Extract text from an image and translate it to pirate speak");
 
-        var imagePathOption = new Option<string>(
-            aliases: ["--image-path"],
-            description: "Path to the image file to process")
-        {
-            IsRequired = true
-        };
+        var imagePathOption = new Option<string>("--image-path") { Description = "Path to the image file to process", Required = true };
+        var modelOption = new Option<string>("--model") { Description = "The OpenAI model to use", DefaultValueFactory = _ => "gpt-5-nano" };
 
-        var modelOption = new Option<string>(
-            aliases: ["--model"],
-            description: "The OpenAI model to use",
-            getDefaultValue: () => "gpt-5-nano")
-        {
-            IsRequired = false
-        };
+        command.Add(imagePathOption);
+        command.Add(modelOption);
 
-        command.AddOption(imagePathOption);
-        command.AddOption(modelOption);
-
-        command.SetHandler(async (string imagePath, string model) =>
+        command.SetAction(async (parseResult, cancellationToken) =>
         {
             try
             {
+                var imagePath = parseResult.GetValue(imagePathOption)!;
+                var model = parseResult.GetValue(modelOption)!;
+
                 var openAiClientService = new OpenAiClientService(model);
                 var ocaaarComponent = new OcaaarComponent(openAiClientService);
                 var response = await ocaaarComponent.OcaaarAsync(imagePath);
@@ -155,7 +118,7 @@ public static class OpenAiCommand
                 Console.WriteLine($"Error: {ex.Message}");
                 Environment.Exit(1);
             }
-        }, imagePathOption, modelOption);
+        });
 
         return command;
     }
@@ -164,48 +127,28 @@ public static class OpenAiCommand
     {
         var command = new Command("corpospeak", "Rewrite text for enterprise audiences with optional idiolect adaptation");
 
-        var sourceOption = new Option<string>(
-            aliases: ["--source"],
-            description: "The source text to rewrite (or path to file containing the text)")
-        {
-            IsRequired = true
-        };
+        var sourceOption = new Option<string>("--source") { Description = "The source text to rewrite (or path to file containing the text)", Required = true };
+        var audienceOption = new Option<string>("--audience") { Description = "Target audience (csuite, engineering, product, sales, marketing, operations, finance, legal, hr, customer-success)", Required = true };
+        var userMessagesOption = new Option<string[]>("--user-messages") { Description = "Optional user messages to learn idiolect from (text or file paths, multiple values allowed)", AllowMultipleArgumentsPerToken = true };
+        var modelOption = new Option<string>("--model") { Description = "The OpenAI model to use", DefaultValueFactory = _ => "gpt-5-nano" };
 
-        var audienceOption = new Option<string>(
-            aliases: ["--audience"],
-            description: "Target audience (csuite, engineering, product, sales, marketing, operations, finance, legal, hr, customer-success)")
-        {
-            IsRequired = true
-        };
+        command.Add(sourceOption);
+        command.Add(audienceOption);
+        command.Add(userMessagesOption);
+        command.Add(modelOption);
 
-        var userMessagesOption = new Option<string[]>(
-            aliases: ["--user-messages"],
-            description: "Optional user messages to learn idiolect from (text or file paths, multiple values allowed)")
-        {
-            IsRequired = false,
-            AllowMultipleArgumentsPerToken = true
-        };
-
-        var modelOption = new Option<string>(
-            aliases: ["--model"],
-            description: "The OpenAI model to use",
-            getDefaultValue: () => "gpt-5-nano")
-        {
-            IsRequired = false
-        };
-
-        command.AddOption(sourceOption);
-        command.AddOption(audienceOption);
-        command.AddOption(userMessagesOption);
-        command.AddOption(modelOption);
-
-        command.SetHandler(async (string source, string audience, string[] userMessages, string model) =>
+        command.SetAction(async (parseResult, cancellationToken) =>
         {
             try
             {
+                var source = parseResult.GetValue(sourceOption)!;
+                var audience = parseResult.GetValue(audienceOption)!;
+                var userMessages = parseResult.GetValue(userMessagesOption) ?? [];
+                var model = parseResult.GetValue(modelOption)!;
+
                 var openAiClientService = new OpenAiClientService(model);
                 var corpospeakComponent = new CorpospeakComponent(openAiClientService);
-                var result = await corpospeakComponent.CorpospeakAsync(source, audience, userMessages ?? []);
+                var result = await corpospeakComponent.CorpospeakAsync(source, audience, userMessages);
 
                 Console.WriteLine(result);
             }
@@ -214,7 +157,7 @@ public static class OpenAiCommand
                 Console.WriteLine($"Error: {ex.Message}");
                 Environment.Exit(1);
             }
-        }, sourceOption, audienceOption, userMessagesOption, modelOption);
+        });
 
         return command;
     }
