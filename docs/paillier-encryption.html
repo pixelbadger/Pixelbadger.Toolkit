@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pixelbadger Toolkit — Paillier Homomorphic Encryption</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      line-height: 1.6;
+    }
+
+    header {
+      background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+      border-bottom: 1px solid #334155;
+      padding: 2rem 2.5rem;
+    }
+
+    header h1 { font-size: 1.75rem; font-weight: 700; color: #f8fafc; }
+    header .subtitle { margin-top: 0.4rem; font-size: 1rem; color: #94a3b8; }
+    header .meta { margin-top: 0.5rem; font-size: 0.85rem; color: #64748b; }
+
+    .badge {
+      display: inline-block;
+      background: #1e40af;
+      color: #bfdbfe;
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 999px;
+      letter-spacing: 0.05em;
+      vertical-align: middle;
+      margin-left: 0.5rem;
+    }
+
+    .badge.green { background: #14532d; color: #bbf7d0; }
+    .badge.purple { background: #3b0764; color: #e9d5ff; }
+
+    nav {
+      background: #0f1117;
+      border-bottom: 1px solid #1e293b;
+      padding: 0.75rem 2.5rem;
+      display: flex;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+    }
+
+    nav a {
+      color: #60a5fa;
+      text-decoration: none;
+      font-size: 0.85rem;
+      font-weight: 500;
+    }
+
+    nav a:hover { color: #93c5fd; text-decoration: underline; }
+
+    .content { max-width: 1100px; margin: 0 auto; padding: 2rem 2.5rem; }
+
+    section { margin-bottom: 3rem; }
+
+    h2 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: #f1f5f9;
+      border-bottom: 1px solid #1e293b;
+      padding-bottom: 0.5rem;
+      margin-bottom: 1.25rem;
+    }
+
+    h3 {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: #cbd5e1;
+      margin: 1.5rem 0 0.75rem;
+    }
+
+    p { color: #94a3b8; margin-bottom: 0.75rem; }
+
+    .card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .card h3 { margin-top: 0; color: #e2e8f0; }
+    .card p { margin-bottom: 0.5rem; }
+
+    .math-block {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-left: 3px solid #3b82f6;
+      border-radius: 4px;
+      padding: 1rem 1.25rem;
+      margin: 0.75rem 0;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9rem;
+      color: #93c5fd;
+      overflow-x: auto;
+    }
+
+    code {
+      background: #1e293b;
+      color: #7dd3fc;
+      font-family: 'Courier New', monospace;
+      font-size: 0.85em;
+      padding: 0.15em 0.4em;
+      border-radius: 3px;
+    }
+
+    .cmd-block {
+      background: #020617;
+      border: 1px solid #1e293b;
+      border-left: 3px solid #22d3ee;
+      border-radius: 4px;
+      padding: 0.75rem 1rem;
+      margin: 0.5rem 0;
+      font-family: 'Courier New', monospace;
+      font-size: 0.85rem;
+      color: #e2e8f0;
+      overflow-x: auto;
+    }
+
+    .cmd-block .prompt { color: #64748b; user-select: none; }
+    .cmd-block .cmd { color: #22d3ee; }
+    .cmd-block .opt { color: #a78bfa; }
+    .cmd-block .val { color: #86efac; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+      margin: 1rem 0;
+    }
+
+    th {
+      background: #1e293b;
+      color: #cbd5e1;
+      font-weight: 600;
+      text-align: left;
+      padding: 0.6rem 0.9rem;
+      border: 1px solid #334155;
+    }
+
+    td {
+      padding: 0.55rem 0.9rem;
+      border: 1px solid #1e293b;
+      color: #94a3b8;
+      vertical-align: top;
+    }
+
+    tr:nth-child(even) td { background: #0f172a; }
+    tr:nth-child(odd) td { background: #131b2e; }
+
+    td code { font-size: 0.8rem; }
+
+    .diagram-wrap {
+      background: #131b2e;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin: 1rem 0;
+      overflow-x: auto;
+    }
+
+    .diagram-wrap .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .key-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem;
+      margin: 1rem 0;
+    }
+
+    .key-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      padding: 1rem;
+    }
+
+    .key-card .label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #64748b;
+      margin-bottom: 0.25rem;
+    }
+
+    .key-card .name {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #60a5fa;
+      font-family: 'Courier New', monospace;
+      margin-bottom: 0.35rem;
+    }
+
+    .key-card p {
+      font-size: 0.82rem;
+      color: #64748b;
+      margin: 0;
+    }
+
+    .op-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1rem;
+      margin: 1rem 0;
+    }
+
+    .op-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 1.25rem;
+    }
+
+    .op-card h4 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #e2e8f0;
+      margin-bottom: 0.5rem;
+    }
+
+    .op-card .formula {
+      font-family: 'Courier New', monospace;
+      font-size: 0.82rem;
+      color: #93c5fd;
+      background: #0f172a;
+      padding: 0.5rem 0.75rem;
+      border-radius: 4px;
+      margin: 0.5rem 0;
+    }
+
+    .op-card p { font-size: 0.85rem; margin: 0.25rem 0 0; }
+
+    .info-box {
+      background: #0c2340;
+      border: 1px solid #1d4ed8;
+      border-left: 3px solid #3b82f6;
+      border-radius: 4px;
+      padding: 0.9rem 1.1rem;
+      margin: 1rem 0;
+      font-size: 0.88rem;
+      color: #93c5fd;
+    }
+
+    .warning-box {
+      background: #1c1008;
+      border: 1px solid #92400e;
+      border-left: 3px solid #f59e0b;
+      border-radius: 4px;
+      padding: 0.9rem 1.1rem;
+      margin: 1rem 0;
+      font-size: 0.88rem;
+      color: #fcd34d;
+    }
+
+    footer {
+      border-top: 1px solid #1e293b;
+      padding: 1.5rem 2.5rem;
+      text-align: center;
+      font-size: 0.8rem;
+      color: #475569;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Paillier Homomorphic Encryption <span class="badge">crypto</span></h1>
+  <div class="subtitle">How the Paillier cryptosystem works and how to use each CLI command</div>
+  <div class="meta">Pixelbadger Toolkit &mdash; <code>pbtk crypto</code></div>
+</header>
+
+<nav>
+  <a href="#overview">Overview</a>
+  <a href="#theory">How It Works</a>
+  <a href="#keygen">Key Generation</a>
+  <a href="#numeric-ops">Numeric Operations</a>
+  <a href="#string-ops">String Operations</a>
+  <a href="#command-ref">Command Reference</a>
+</nav>
+
+<div class="content">
+
+  <!-- OVERVIEW -->
+  <section id="overview">
+    <h2>Overview</h2>
+    <p>
+      The Paillier cryptosystem is a probabilistic, asymmetric encryption scheme with a remarkable property:
+      arithmetic can be performed directly on encrypted data — no decryption required. The server performing
+      the computation never sees the underlying values.
+    </p>
+    <p>
+      This implementation exposes a set of CLI commands under the <code>crypto</code> topic that let you
+      generate keys, encrypt and decrypt integers and strings, and perform addition, subtraction, and
+      scalar multiplication on ciphertext.
+    </p>
+
+    <div class="key-grid">
+      <div class="key-card">
+        <div class="label">Property</div>
+        <div class="name">Additive HE</div>
+        <p>Add, subtract, and multiply (by a scalar) without decrypting.</p>
+      </div>
+      <div class="key-card">
+        <div class="label">Security</div>
+        <div class="name">2048-bit RSA</div>
+        <p>Keys use 2048-bit primes, matching NIST minimum for asymmetric encryption.</p>
+      </div>
+      <div class="key-card">
+        <div class="label">Randomness</div>
+        <div class="name">Probabilistic</div>
+        <p>Each encryption of the same value produces a different ciphertext.</p>
+      </div>
+      <div class="key-card">
+        <div class="label">Key files</div>
+        <div class="name">JSON</div>
+        <p>Keys are stored as human-readable JSON with BigInteger fields.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- THEORY -->
+  <section id="theory">
+    <h2>How the Paillier Cryptosystem Works</h2>
+
+    <h3>Key Components</h3>
+    <p>
+      Paillier encryption uses four mathematical values. Two form the public key (safe to share) and
+      three form the private key (must be kept secret).
+    </p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Symbol</th>
+          <th>Name</th>
+          <th>Visibility</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>n</code></td>
+          <td>Modulus</td>
+          <td><span class="badge green">Public</span></td>
+          <td>Product of two large primes <code>p × q</code>. All arithmetic is performed mod <code>n²</code>.</td>
+        </tr>
+        <tr>
+          <td><code>g</code></td>
+          <td>Generator</td>
+          <td><span class="badge green">Public</span></td>
+          <td>Fixed as <code>n + 1</code> in this implementation (a common simplification).</td>
+        </tr>
+        <tr>
+          <td><code>λ</code></td>
+          <td>Lambda</td>
+          <td><span class="badge purple">Private</span></td>
+          <td><code>lcm(p-1, q-1)</code>. Used as the decryption exponent.</td>
+        </tr>
+        <tr>
+          <td><code>μ</code></td>
+          <td>Mu</td>
+          <td><span class="badge purple">Private</span></td>
+          <td>Modular inverse of <code>λ</code> mod <code>n</code>. Scales the result during decryption.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Encryption</h3>
+    <p>
+      To encrypt a plaintext integer <code>m</code>, a fresh random value <code>r</code> (coprime with <code>n</code>)
+      is chosen. The ciphertext is:
+    </p>
+    <div class="math-block">c = g^m · r^n  (mod n²)</div>
+    <p>
+      Because <code>r</code> is random and discarded, encrypting the same <code>m</code> twice produces
+      different ciphertexts — this is the probabilistic nature of the scheme.
+    </p>
+
+    <h3>Decryption</h3>
+    <p>
+      Given the private key, the original plaintext is recovered in two steps. First, the L-function
+      removes the randomness; then <code>μ</code> rescales the result:
+    </p>
+    <div class="math-block">L(x, n) = (x - 1) / n</div>
+    <div class="math-block">m = L(c^λ mod n², n) · μ  (mod n)</div>
+
+    <h3>Homomorphic Addition</h3>
+    <p>
+      Multiplying two ciphertexts together in the encrypted domain produces the ciphertext of their
+      plaintext sum:
+    </p>
+    <div class="math-block">Enc(m₁ + m₂) = Enc(m₁) · Enc(m₂)  (mod n²)</div>
+
+    <h3>Homomorphic Subtraction</h3>
+    <p>
+      Multiplication by the modular inverse of a ciphertext computes the difference:
+    </p>
+    <div class="math-block">Enc(m₁ - m₂) = Enc(m₁) · Enc(m₂)⁻¹  (mod n²)</div>
+
+    <h3>Homomorphic Scalar Multiplication</h3>
+    <p>
+      Raising a ciphertext to an integer power multiplies the plaintext by that scalar:
+    </p>
+    <div class="math-block">Enc(m · k) = Enc(m)^k  (mod n²)</div>
+    <p>
+      Note: this is multiplication by a <em>known plaintext</em> scalar, not by another encrypted value.
+      Fully encrypted multiplication requires a different (more expensive) scheme.
+    </p>
+
+    <div class="warning-box">
+      <strong>Limitation:</strong> Paillier is additively homomorphic only. Multiplying two
+      <em>encrypted</em> values together is not supported in this scheme.
+    </div>
+  </section>
+
+  <!-- KEY GENERATION -->
+  <section id="keygen">
+    <h2>Key Generation</h2>
+
+    <p>
+      The <code>generate-key</code> command creates a fresh Paillier key pair and writes two JSON files:
+      a public key (safe to distribute) and a private key (keep secret).
+    </p>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk crypto generate-key</span>
+      <span class="opt"> --public-key-file</span> <span class="val">public.json</span>
+      <span class="opt"> --private-key-file</span> <span class="val">private.json</span>
+    </div>
+
+    <div class="diagram-wrap">
+      <div class="mermaid">
+flowchart TD
+    A([Start]) --> B[Generate large prime p\n~1024 bits]
+    A --> C[Generate large prime q\n~1024 bits]
+    B --> D{p ≠ q and\nn ≥ 2048 bits?}
+    C --> D
+    D -- No --> B
+    D -- Yes --> E[n = p × q]
+    E --> F[λ = lcm p−1, q−1]
+    F --> G[μ = λ⁻¹ mod n]
+    G --> H[Public key: n\nwrite to file]
+    G --> I[Private key: n, λ, μ\nwrite owner-only file]
+    H --> J([Done])
+    I --> J
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Public key file (public.json)</h3>
+      <p>Contains only <code>N</code> (the modulus). Safe to share freely.</p>
+      <div class="math-block">{ "N": "2650...7391" }</div>
+    </div>
+
+    <div class="card">
+      <h3>Private key file (private.json)</h3>
+      <p>Contains <code>N</code>, <code>Lambda</code>, and <code>Mu</code>. Written with owner-only
+      Unix permissions (<code>600</code>) and must never be shared.</p>
+      <div class="math-block">{ "N": "2650...7391", "Lambda": "1325...8432", "Mu": "9812...2049" }</div>
+    </div>
+
+    <div class="info-box">
+      Prime candidates are tested using the Miller-Rabin primality test with 20 witness rounds,
+      giving a false-positive probability of less than 4⁻²⁰ ≈ 10⁻¹².
+    </div>
+  </section>
+
+  <!-- NUMERIC OPERATIONS -->
+  <section id="numeric-ops">
+    <h2>Numeric Operations</h2>
+
+    <h3>Encrypt a number</h3>
+    <p>Takes a non-negative integer and a public key file. Writes the ciphertext to a JSON file.</p>
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk crypto encrypt</span>
+      <span class="opt"> --number</span> <span class="val">42</span>
+      <span class="opt"> --public-key-file</span> <span class="val">public.json</span>
+      <span class="opt"> --out-file</span> <span class="val">enc42.json</span>
+    </div>
+
+    <div class="diagram-wrap">
+      <div class="mermaid">
+flowchart LR
+    M[Plaintext\nm = 42] --> E
+    PK[public.json\nn, g] --> E
+    R([Random r\ncoprime with n]) --> E
+    E[["c = gᵐ · rⁿ mod n²"]] --> OF[enc42.json\nciphertext, n]
+      </div>
+    </div>
+
+    <h3>Decrypt a number</h3>
+    <p>Reads an encrypted number file and private key, writes the plaintext to stdout.</p>
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk crypto decrypt</span>
+      <span class="opt"> --in-file</span> <span class="val">enc42.json</span>
+      <span class="opt"> --private-key-file</span> <span class="val">private.json</span>
+    </div>
+
+    <div class="diagram-wrap">
+      <div class="mermaid">
+flowchart LR
+    EF[enc42.json\nciphertext c] --> D
+    SK[private.json\nn, λ, μ] --> D
+    D[["m = L(cλ mod n², n) · μ mod n"]] --> OUT([stdout: 42])
+      </div>
+    </div>
+
+    <h3>Homomorphic Operations on Encrypted Numbers</h3>
+    <p>
+      These commands operate entirely on ciphertext. No private key is needed and the plaintext
+      values are never revealed to the process performing the computation.
+    </p>
+
+    <div class="op-grid">
+      <div class="op-card">
+        <h4>add <span class="badge">pbtk crypto add</span></h4>
+        <div class="formula">Enc(a) · Enc(b) mod n²  →  Enc(a + b)</div>
+        <p>Multiplies the two ciphertexts together. Decrypting the result yields <code>a + b</code>.</p>
+        <div class="cmd-block" style="font-size:0.78rem">
+          <span class="cmd">pbtk crypto add</span>
+          <span class="opt"> --in-file1</span> <span class="val">enc_a.json</span>
+          <span class="opt"> --in-file2</span> <span class="val">enc_b.json</span>
+          <span class="opt"> --out-file</span> <span class="val">enc_sum.json</span>
+        </div>
+      </div>
+
+      <div class="op-card">
+        <h4>subtract <span class="badge">pbtk crypto subtract</span></h4>
+        <div class="formula">Enc(a) · Enc(b)⁻¹ mod n²  →  Enc(a − b)</div>
+        <p>Multiplies the first ciphertext by the modular inverse of the second.</p>
+        <div class="cmd-block" style="font-size:0.78rem">
+          <span class="cmd">pbtk crypto subtract</span>
+          <span class="opt"> --in-file1</span> <span class="val">enc_a.json</span>
+          <span class="opt"> --in-file2</span> <span class="val">enc_b.json</span>
+          <span class="opt"> --out-file</span> <span class="val">enc_diff.json</span>
+        </div>
+      </div>
+
+      <div class="op-card">
+        <h4>multiply <span class="badge">pbtk crypto multiply</span></h4>
+        <div class="formula">Enc(m)^k mod n²  →  Enc(m × k)</div>
+        <p>Raises the ciphertext to the power of a known plaintext scalar <code>k</code>.</p>
+        <div class="cmd-block" style="font-size:0.78rem">
+          <span class="cmd">pbtk crypto multiply</span>
+          <span class="opt"> --in-file</span> <span class="val">enc_m.json</span>
+          <span class="opt"> --scalar</span> <span class="val">3</span>
+          <span class="opt"> --out-file</span> <span class="val">enc_product.json</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="diagram-wrap">
+      <div class="mermaid">
+flowchart TD
+    A([Enc a]) --> ADD["add\nEnc(a) · Enc(b) mod n²"]
+    B([Enc b]) --> ADD
+    A --> SUB["subtract\nEnc(a) · Enc(b)⁻¹ mod n²"]
+    B --> SUB
+    A --> MUL["multiply\nEnc(a)^k mod n²"]
+    K([Scalar k]) --> MUL
+    ADD --> RA([Enc a+b])
+    SUB --> RS([Enc a−b])
+    MUL --> RM([Enc a×k])
+      </div>
+    </div>
+  </section>
+
+  <!-- STRING OPERATIONS -->
+  <section id="string-ops">
+    <h2>String Operations</h2>
+
+    <p>
+      Strings are encrypted character-by-character: each Unicode code point is independently
+      encrypted as an integer using the Paillier scheme. The result is a JSON array of encrypted
+      numbers, one per character. This representation enables position-aware operations on the
+      ciphertext without decryption.
+    </p>
+
+    <div class="info-box">
+      Strings are limited to 100 characters. Each character is encrypted independently,
+      so the ciphertext reveals the <em>length</em> of the plaintext string but nothing else.
+    </div>
+
+    <h3>encrypt-string</h3>
+    <p>Encrypts a UTF-8 string as an array of encrypted Unicode code points.</p>
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk crypto encrypt-string</span>
+      <span class="opt"> --string</span> <span class="val">"Hello"</span>
+      <span class="opt"> --public-key-file</span> <span class="val">public.json</span>
+      <span class="opt"> --out-file</span> <span class="val">enc_str.json</span>
+    </div>
+
+    <div class="diagram-wrap">
+      <div class="mermaid">
+flowchart LR
+    S["Plaintext string\n\"Hello\""] --> RUNES["Enumerate\nUnicode runes\nH=72, e=101, l=108, l=108, o=111"]
+    RUNES --> ENC["Encrypt each\ncode point\nwith public key"]
+    PK["public.json"] --> ENC
+    ENC --> OUT["enc_str.json\n[EncryptedNumber × 5]"]
+      </div>
+    </div>
+
+    <h3>decrypt-string</h3>
+    <p>Decrypts each code point and reconstructs the original string.</p>
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk crypto decrypt-string</span>
+      <span class="opt"> --in-file</span> <span class="val">enc_str.json</span>
+      <span class="opt"> --private-key-file</span> <span class="val">private.json</span>
+    </div>
+
+    <div class="diagram-wrap">
+      <div class="mermaid">
+flowchart LR
+    EF["enc_str.json\n[EncryptedNumber × 5]"] --> DEC["Decrypt each\ncode point\nwith private key"]
+    SK["private.json"] --> DEC
+    DEC --> CHARS["Code points\n72, 101, 108, 108, 111"]
+    CHARS --> STR(["stdout: \"Hello\""])
+      </div>
+    </div>
+
+    <h3>replace</h3>
+    <p>
+      Overwrites characters at a known position in an encrypted string <em>without decrypting it</em>.
+      The replacement plaintext is re-encrypted with the same public key (recovered from the ciphertext
+      metadata) and substituted into the array at the specified index.
+    </p>
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk crypto replace</span>
+      <span class="opt"> --in-file</span> <span class="val">enc_str.json</span>
+      <span class="opt"> --start</span> <span class="val">0</span>
+      <span class="opt"> --replacement</span> <span class="val">"J"</span>
+      <span class="opt"> --out-file</span> <span class="val">enc_str2.json</span>
+    </div>
+
+    <div class="diagram-wrap">
+      <div class="mermaid">
+flowchart LR
+    EF["enc_str.json\n[Enc H, Enc e, Enc l, Enc l, Enc o]"] --> CLONE[Clone array]
+    REP["Replacement\n\"J\" at index 0"] --> RUNES2["Enumerate runes\nJ=74"]
+    RUNES2 --> REENC["Re-encrypt each\nrune with public key\n(from ciphertext N)"]
+    CLONE --> SPLICE["Splice at start index"]
+    REENC --> SPLICE
+    SPLICE --> OUT["enc_str2.json\n[Enc J, Enc e, Enc l, Enc l, Enc o]"]
+      </div>
+    </div>
+
+    <h3>substring</h3>
+    <p>
+      Slices an encrypted string by position, returning a new encrypted array of the selected range.
+      No private key is needed.
+    </p>
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk crypto substring</span>
+      <span class="opt"> --in-file</span> <span class="val">enc_str.json</span>
+      <span class="opt"> --start</span> <span class="val">1</span>
+      <span class="opt"> --length</span> <span class="val">3</span>
+      <span class="opt"> --out-file</span> <span class="val">enc_sub.json</span>
+    </div>
+
+    <div class="diagram-wrap">
+      <div class="mermaid">
+flowchart LR
+    EF["enc_str.json\n[Enc H, Enc e, Enc l, Enc l, Enc o]"] --> SLICE["Slice [start .. start+length)\ne.g. [1..4)"]
+    SLICE --> OUT["enc_sub.json\n[Enc e, Enc l, Enc l]"]
+      </div>
+    </div>
+  </section>
+
+  <!-- COMMAND REFERENCE -->
+  <section id="command-ref">
+    <h2>Command Reference</h2>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Command</th>
+          <th>Required options</th>
+          <th>Optional options</th>
+          <th>Output</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>crypto generate-key</code></td>
+          <td><code>--public-key-file</code> <code>--private-key-file</code></td>
+          <td>&mdash;</td>
+          <td>Two JSON files (public + private key)</td>
+        </tr>
+        <tr>
+          <td><code>crypto encrypt</code></td>
+          <td><code>--number</code> <code>--public-key-file</code> <code>--out-file</code></td>
+          <td>&mdash;</td>
+          <td>Encrypted number JSON file</td>
+        </tr>
+        <tr>
+          <td><code>crypto decrypt</code></td>
+          <td><code>--in-file</code> <code>--private-key-file</code></td>
+          <td>&mdash;</td>
+          <td>Plaintext integer (stdout)</td>
+        </tr>
+        <tr>
+          <td><code>crypto add</code></td>
+          <td><code>--in-file1</code> <code>--in-file2</code> <code>--out-file</code></td>
+          <td>&mdash;</td>
+          <td>Encrypted sum JSON file</td>
+        </tr>
+        <tr>
+          <td><code>crypto subtract</code></td>
+          <td><code>--in-file1</code> <code>--in-file2</code> <code>--out-file</code></td>
+          <td>&mdash;</td>
+          <td>Encrypted difference JSON file</td>
+        </tr>
+        <tr>
+          <td><code>crypto multiply</code></td>
+          <td><code>--in-file</code> <code>--scalar</code> <code>--out-file</code></td>
+          <td>&mdash;</td>
+          <td>Encrypted product JSON file</td>
+        </tr>
+        <tr>
+          <td><code>crypto encrypt-string</code></td>
+          <td><code>--string</code> <code>--public-key-file</code> <code>--out-file</code></td>
+          <td>&mdash;</td>
+          <td>Encrypted string JSON file (array of encrypted code points)</td>
+        </tr>
+        <tr>
+          <td><code>crypto decrypt-string</code></td>
+          <td><code>--in-file</code> <code>--private-key-file</code></td>
+          <td>&mdash;</td>
+          <td>Plaintext string (stdout)</td>
+        </tr>
+        <tr>
+          <td><code>crypto replace</code></td>
+          <td><code>--in-file</code> <code>--start</code> <code>--replacement</code> <code>--out-file</code></td>
+          <td>&mdash;</td>
+          <td>Updated encrypted string JSON file</td>
+        </tr>
+        <tr>
+          <td><code>crypto substring</code></td>
+          <td><code>--in-file</code> <code>--start</code> <code>--out-file</code></td>
+          <td><code>--length</code> (defaults to end of string)</td>
+          <td>Encrypted substring JSON file</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Constraints and Limits</h3>
+    <table>
+      <thead>
+        <tr><th>Constraint</th><th>Value</th><th>Reason</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Minimum key size</td>
+          <td>2048 bits</td>
+          <td>NIST minimum recommendation for asymmetric security</td>
+        </tr>
+        <tr>
+          <td>Plaintext range (numbers)</td>
+          <td>0 ≤ m &lt; n</td>
+          <td>Paillier requires the message to be smaller than the modulus</td>
+        </tr>
+        <tr>
+          <td>Plaintext integers</td>
+          <td>Non-negative only</td>
+          <td>Paillier works in Z/nZ; negative values are not natively supported</td>
+        </tr>
+        <tr>
+          <td>Max string length</td>
+          <td>100 characters</td>
+          <td>Each character requires one full 2048-bit ciphertext; enforced to limit file size</td>
+        </tr>
+        <tr>
+          <td>String character set</td>
+          <td>Full Unicode (UTF-32 code points)</td>
+          <td>Characters are stored as Unicode scalar values, supporting any language</td>
+        </tr>
+        <tr>
+          <td>Scalar multiplier</td>
+          <td>Non-negative integer</td>
+          <td>Negative scalars not supported; multiply by 0 produces Enc(0)</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+</div>
+
+<footer>
+  Pixelbadger Toolkit &mdash; Paillier Homomorphic Encryption Documentation
+</footer>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'dark',
+    themeVariables: {
+      background: '#0f172a',
+      primaryColor: '#1e3a5f',
+      primaryTextColor: '#e2e8f0',
+      primaryBorderColor: '#3b82f6',
+      lineColor: '#475569',
+      secondaryColor: '#1e293b',
+      tertiaryColor: '#0f172a',
+      edgeLabelBackground: '#1e293b',
+      clusterBkg: '#1e293b',
+      titleColor: '#f1f5f9',
+      nodeTextColor: '#e2e8f0',
+    }
+  });
+</script>
+</body>
+</html>
