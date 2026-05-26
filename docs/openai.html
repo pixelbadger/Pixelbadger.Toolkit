@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pixelbadger Toolkit — OpenAI</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      line-height: 1.6;
+    }
+
+    header {
+      background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+      border-bottom: 1px solid #334155;
+      padding: 2rem 2.5rem;
+    }
+
+    header h1 { font-size: 1.75rem; font-weight: 700; color: #f8fafc; }
+    header .subtitle { margin-top: 0.4rem; font-size: 1rem; color: #94a3b8; }
+    header .meta { margin-top: 0.5rem; font-size: 0.85rem; color: #64748b; }
+
+    .badge {
+      display: inline-block;
+      background: #1e40af;
+      color: #bfdbfe;
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 999px;
+      letter-spacing: 0.05em;
+      vertical-align: middle;
+      margin-left: 0.5rem;
+    }
+
+    nav {
+      background: #0f1117;
+      border-bottom: 1px solid #1e293b;
+      padding: 0.75rem 2.5rem;
+      display: flex;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+    }
+
+    nav a {
+      color: #60a5fa;
+      text-decoration: none;
+      font-size: 0.85rem;
+      font-weight: 500;
+    }
+
+    nav a:hover { color: #93c5fd; text-decoration: underline; }
+
+    .content { max-width: 1100px; margin: 0 auto; padding: 2rem 2.5rem; }
+
+    section { margin-bottom: 3rem; }
+
+    h2 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: #f1f5f9;
+      border-bottom: 1px solid #1e293b;
+      padding-bottom: 0.5rem;
+      margin-bottom: 1.25rem;
+    }
+
+    h3 {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: #cbd5e1;
+      margin: 1.5rem 0 0.75rem;
+    }
+
+    p { color: #94a3b8; margin-bottom: 0.75rem; }
+
+    code {
+      background: #1e293b;
+      color: #7dd3fc;
+      font-family: 'Courier New', monospace;
+      font-size: 0.85em;
+      padding: 0.15em 0.4em;
+      border-radius: 3px;
+    }
+
+    .cmd-block {
+      background: #020617;
+      border: 1px solid #1e293b;
+      border-left: 3px solid #22d3ee;
+      border-radius: 4px;
+      padding: 0.75rem 1rem;
+      margin: 0.5rem 0;
+      font-family: 'Courier New', monospace;
+      font-size: 0.85rem;
+      color: #e2e8f0;
+      overflow-x: auto;
+    }
+
+    .cmd-block .prompt { color: #64748b; user-select: none; }
+    .cmd-block .cmd { color: #22d3ee; }
+    .cmd-block .opt { color: #a78bfa; }
+    .cmd-block .val { color: #86efac; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+      margin: 1rem 0;
+    }
+
+    th {
+      background: #1e293b;
+      color: #cbd5e1;
+      font-weight: 600;
+      text-align: left;
+      padding: 0.6rem 0.9rem;
+      border: 1px solid #334155;
+    }
+
+    td {
+      padding: 0.55rem 0.9rem;
+      border: 1px solid #1e293b;
+      color: #94a3b8;
+      vertical-align: top;
+    }
+
+    tr:nth-child(even) td { background: #0f172a; }
+    tr:nth-child(odd) td { background: #131b2e; }
+
+    td code { font-size: 0.8rem; }
+
+    .diagram-wrap {
+      background: #131b2e;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin: 1rem 0;
+      overflow-x: auto;
+    }
+
+    .diagram-wrap .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .audience-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 0.6rem;
+      margin: 1rem 0;
+    }
+
+    .audience-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      padding: 0.7rem 0.9rem;
+    }
+
+    .audience-card .aud-name {
+      font-family: 'Courier New', monospace;
+      font-size: 0.8rem;
+      color: #86efac;
+      font-weight: 600;
+      margin-bottom: 0.2rem;
+    }
+
+    .audience-card p {
+      font-size: 0.78rem;
+      color: #64748b;
+      margin: 0;
+    }
+
+    .info-box {
+      background: #0c2340;
+      border: 1px solid #1d4ed8;
+      border-left: 3px solid #3b82f6;
+      border-radius: 4px;
+      padding: 0.9rem 1.1rem;
+      margin: 1rem 0;
+      font-size: 0.88rem;
+      color: #93c5fd;
+    }
+
+    footer {
+      border-top: 1px solid #1e293b;
+      padding: 1.5rem 2.5rem;
+      text-align: center;
+      font-size: 0.8rem;
+      color: #475569;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>OpenAI <span class="badge">openai</span></h1>
+  <div class="subtitle">OpenAI-powered utilities — chat, translation, image OCR, and corpospeak rewriting</div>
+  <div class="meta">Pixelbadger Toolkit &mdash; <code>pbtk openai</code> &mdash; <a href="index.html" style="color:#60a5fa">&#8592; all topics</a></div>
+</header>
+
+<nav>
+  <a href="#prerequisites">Prerequisites</a>
+  <a href="#chat">chat</a>
+  <a href="#translate">translate</a>
+  <a href="#ocaaar">ocaaar</a>
+  <a href="#corpospeak">corpospeak</a>
+  <a href="#command-ref">Command Reference</a>
+</nav>
+
+<div class="content">
+
+  <!-- PREREQUISITES -->
+  <section id="prerequisites">
+    <h2>Prerequisites</h2>
+    <p>
+      All commands in this topic call the OpenAI API. The <code>OPENAI_API_KEY</code> environment variable
+      must be set before running any command.
+    </p>
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">export</span>
+      <span class="val"> OPENAI_API_KEY=sk-...</span>
+    </div>
+    <p>
+      By default all commands use the <code>gpt-5-nano</code> model. Pass <code>--model</code> to override.
+    </p>
+  </section>
+
+  <!-- CHAT -->
+  <section id="chat">
+    <h2>chat</h2>
+    <p>
+      Sends a message to the OpenAI chat completion API and prints the response. Conversation history
+      is persisted in a JSON file so that follow-up messages can reference earlier context.
+    </p>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk openai chat</span>
+      <span class="opt"> --message</span> <span class="val">"Hello, how are you?"</span>
+    </div>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk openai chat</span>
+      <span class="opt"> --message</span> <span class="val">"Continue our conversation"</span>
+      <span class="opt"> --chat-history</span> <span class="val">./chat.json</span>
+      <span class="opt"> --model</span> <span class="val">gpt-4o-mini</span>
+    </div>
+
+    <div class="diagram-wrap">
+      <div class="mermaid">
+flowchart LR
+    MSG["--message"] --> COMP["Append to history\nand send to\nOpenAI chat API"]
+    HIST["--chat-history\n(optional JSON file)"] --> COMP
+    COMP --> RESP(["stdout: assistant reply"])
+    COMP --> SAVE["Updated history\nwritten back to file"]
+      </div>
+    </div>
+
+    <p>
+      When <code>--chat-history</code> is provided, the file is read at startup to restore prior messages,
+      the new exchange is appended, and the file is rewritten. If the file does not exist it is created.
+      Omitting <code>--chat-history</code> starts a stateless single-turn conversation.
+    </p>
+
+    <table>
+      <thead><tr><th>Option</th><th>Required</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--message</code></td><td>Yes</td><td>&mdash;</td><td>The user message to send</td></tr>
+        <tr><td><code>--chat-history</code></td><td>No</td><td>&mdash;</td><td>JSON file to read/write conversation history</td></tr>
+        <tr><td><code>--model</code></td><td>No</td><td><code>gpt-5-nano</code></td><td>OpenAI model to use</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- TRANSLATE -->
+  <section id="translate">
+    <h2>translate</h2>
+    <p>
+      Translates a given text into a specified target language using the OpenAI API. The output is
+      the translated text printed to stdout. No conversation history is maintained.
+    </p>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk openai translate</span>
+      <span class="opt"> --text</span> <span class="val">"Hello, how are you?"</span>
+      <span class="opt"> --target-language</span> <span class="val">Spanish</span>
+    </div>
+
+    <div class="diagram-wrap">
+      <div class="mermaid">
+flowchart LR
+    T["--text"] --> CALL["OpenAI\nchat completion"]
+    LANG["--target-language"] --> CALL
+    CALL --> OUT(["stdout: translated text"])
+      </div>
+    </div>
+
+    <table>
+      <thead><tr><th>Option</th><th>Required</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--text</code></td><td>Yes</td><td>&mdash;</td><td>The text to translate</td></tr>
+        <tr><td><code>--target-language</code></td><td>Yes</td><td>&mdash;</td><td>Target language (e.g. <code>Spanish</code>, <code>French</code>, <code>Japanese</code>)</td></tr>
+        <tr><td><code>--model</code></td><td>No</td><td><code>gpt-5-nano</code></td><td>OpenAI model to use</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- OCAAAR -->
+  <section id="ocaaar">
+    <h2>ocaaar</h2>
+    <p>
+      <strong>OCR as a Pirate.</strong> Sends an image file to the OpenAI vision API, extracts any text
+      found in the image, and returns it rewritten in pirate speak. Useful for testing vision models
+      and for amusement.
+    </p>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk openai ocaaar</span>
+      <span class="opt"> --image-path</span> <span class="val">./sign.jpg</span>
+    </div>
+
+    <div class="diagram-wrap">
+      <div class="mermaid">
+flowchart LR
+    IMG["--image-path\n(local image file)"] --> ENC["Base64 encode\nimage"]
+    ENC --> CALL["OpenAI vision\nchat completion\n(extract text + pirate-speak prompt)"]
+    CALL --> OUT(["stdout: pirate-speak text"])
+      </div>
+    </div>
+
+    <div class="info-box">
+      The image is base64-encoded and sent inline with the API request. Supported formats are those
+      accepted by the OpenAI vision API: JPEG, PNG, GIF, and WebP.
+    </div>
+
+    <table>
+      <thead><tr><th>Option</th><th>Required</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--image-path</code></td><td>Yes</td><td>&mdash;</td><td>Path to the image file to process</td></tr>
+        <tr><td><code>--model</code></td><td>No</td><td><code>gpt-5-nano</code></td><td>OpenAI model to use (must support vision)</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- CORPOSPEAK -->
+  <section id="corpospeak">
+    <h2>corpospeak</h2>
+    <p>
+      Rewrites source text in the communication style appropriate for a chosen enterprise audience,
+      optionally learning from example messages to match an individual's idiolect. Input can be a
+      literal string or a file path.
+    </p>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk openai corpospeak</span>
+      <span class="opt"> --source</span> <span class="val">"API performance is great"</span>
+      <span class="opt"> --audience</span> <span class="val">csuite</span>
+    </div>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk openai corpospeak</span>
+      <span class="opt"> --source</span> <span class="val">"New feature deployed"</span>
+      <span class="opt"> --audience</span> <span class="val">engineering</span>
+      <span class="opt"> --user-messages</span> <span class="val">"Hey team"</span> <span class="val">"Let's ship this"</span>
+    </div>
+
+    <h3>Audiences</h3>
+    <div class="audience-grid">
+      <div class="audience-card"><div class="aud-name">csuite</div><p>Executive language, strategic framing.</p></div>
+      <div class="audience-card"><div class="aud-name">engineering</div><p>Technical, precise, low jargon.</p></div>
+      <div class="audience-card"><div class="aud-name">product</div><p>User-focused, outcome-driven.</p></div>
+      <div class="audience-card"><div class="aud-name">sales</div><p>Value propositions, persuasive tone.</p></div>
+      <div class="audience-card"><div class="aud-name">marketing</div><p>Brand voice, engaging copy.</p></div>
+      <div class="audience-card"><div class="aud-name">operations</div><p>Process-oriented, practical.</p></div>
+      <div class="audience-card"><div class="aud-name">finance</div><p>Metrics-focused, precise numbers.</p></div>
+      <div class="audience-card"><div class="aud-name">legal</div><p>Formal, risk-aware language.</p></div>
+      <div class="audience-card"><div class="aud-name">hr</div><p>People-centric, inclusive tone.</p></div>
+      <div class="audience-card"><div class="aud-name">customer-success</div><p>Empathetic, supportive language.</p></div>
+    </div>
+
+    <div class="diagram-wrap">
+      <div class="mermaid">
+flowchart LR
+    SRC["--source\n(text or file path)"] --> CALL["OpenAI\nchat completion\n(audience-tuned prompt)"]
+    AUD["--audience"] --> CALL
+    UM["--user-messages\n(optional idiolect examples)"] --> CALL
+    CALL --> OUT(["stdout: rewritten text"])
+      </div>
+    </div>
+
+    <p>
+      When <code>--user-messages</code> is provided, the examples are included in the prompt so the
+      model can infer and mimic the writer's personal style. Each value can be a literal string or
+      a path to a file containing example text. Multiple values are accepted.
+    </p>
+
+    <table>
+      <thead><tr><th>Option</th><th>Required</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--source</code></td><td>Yes</td><td>&mdash;</td><td>Source text to rewrite (or file path)</td></tr>
+        <tr><td><code>--audience</code></td><td>Yes</td><td>&mdash;</td><td>Target audience slug (see list above)</td></tr>
+        <tr><td><code>--user-messages</code></td><td>No</td><td>&mdash;</td><td>Example messages to learn idiolect from (text or file paths, repeatable)</td></tr>
+        <tr><td><code>--model</code></td><td>No</td><td><code>gpt-5-nano</code></td><td>OpenAI model to use</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- COMMAND REFERENCE -->
+  <section id="command-ref">
+    <h2>Command Reference</h2>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Command</th>
+          <th>Required options</th>
+          <th>Optional options</th>
+          <th>Output</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>openai chat</code></td>
+          <td><code>--message</code></td>
+          <td><code>--chat-history</code> <code>--model</code></td>
+          <td>Assistant reply to stdout</td>
+        </tr>
+        <tr>
+          <td><code>openai translate</code></td>
+          <td><code>--text</code> <code>--target-language</code></td>
+          <td><code>--model</code></td>
+          <td>Translated text to stdout</td>
+        </tr>
+        <tr>
+          <td><code>openai ocaaar</code></td>
+          <td><code>--image-path</code></td>
+          <td><code>--model</code></td>
+          <td>Pirate-speak OCR result to stdout</td>
+        </tr>
+        <tr>
+          <td><code>openai corpospeak</code></td>
+          <td><code>--source</code> <code>--audience</code></td>
+          <td><code>--user-messages</code> <code>--model</code></td>
+          <td>Rewritten text to stdout</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+</div>
+
+<footer>
+  Pixelbadger Toolkit &mdash; OpenAI Documentation
+</footer>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'dark',
+    themeVariables: {
+      background: '#0f172a',
+      primaryColor: '#1e3a5f',
+      primaryTextColor: '#e2e8f0',
+      primaryBorderColor: '#3b82f6',
+      lineColor: '#475569',
+      secondaryColor: '#1e293b',
+      tertiaryColor: '#0f172a',
+      edgeLabelBackground: '#1e293b',
+      clusterBkg: '#1e293b',
+      titleColor: '#f1f5f9',
+      nodeTextColor: '#e2e8f0',
+    }
+  });
+</script>
+</body>
+</html>

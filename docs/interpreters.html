@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pixelbadger Toolkit — Interpreters</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      line-height: 1.6;
+    }
+
+    header {
+      background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+      border-bottom: 1px solid #334155;
+      padding: 2rem 2.5rem;
+    }
+
+    header h1 { font-size: 1.75rem; font-weight: 700; color: #f8fafc; }
+    header .subtitle { margin-top: 0.4rem; font-size: 1rem; color: #94a3b8; }
+    header .meta { margin-top: 0.5rem; font-size: 0.85rem; color: #64748b; }
+
+    .badge {
+      display: inline-block;
+      background: #1e40af;
+      color: #bfdbfe;
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 999px;
+      letter-spacing: 0.05em;
+      vertical-align: middle;
+      margin-left: 0.5rem;
+    }
+
+    nav {
+      background: #0f1117;
+      border-bottom: 1px solid #1e293b;
+      padding: 0.75rem 2.5rem;
+      display: flex;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+    }
+
+    nav a {
+      color: #60a5fa;
+      text-decoration: none;
+      font-size: 0.85rem;
+      font-weight: 500;
+    }
+
+    nav a:hover { color: #93c5fd; text-decoration: underline; }
+
+    .content { max-width: 1100px; margin: 0 auto; padding: 2rem 2.5rem; }
+
+    section { margin-bottom: 3rem; }
+
+    h2 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: #f1f5f9;
+      border-bottom: 1px solid #1e293b;
+      padding-bottom: 0.5rem;
+      margin-bottom: 1.25rem;
+    }
+
+    h3 {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: #cbd5e1;
+      margin: 1.5rem 0 0.75rem;
+    }
+
+    p { color: #94a3b8; margin-bottom: 0.75rem; }
+
+    .card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .card h3 { margin-top: 0; color: #e2e8f0; }
+    .card p { margin-bottom: 0.5rem; }
+
+    code {
+      background: #1e293b;
+      color: #7dd3fc;
+      font-family: 'Courier New', monospace;
+      font-size: 0.85em;
+      padding: 0.15em 0.4em;
+      border-radius: 3px;
+    }
+
+    .cmd-block {
+      background: #020617;
+      border: 1px solid #1e293b;
+      border-left: 3px solid #22d3ee;
+      border-radius: 4px;
+      padding: 0.75rem 1rem;
+      margin: 0.5rem 0;
+      font-family: 'Courier New', monospace;
+      font-size: 0.85rem;
+      color: #e2e8f0;
+      overflow-x: auto;
+    }
+
+    .cmd-block .prompt { color: #64748b; user-select: none; }
+    .cmd-block .cmd { color: #22d3ee; }
+    .cmd-block .opt { color: #a78bfa; }
+    .cmd-block .val { color: #86efac; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+      margin: 1rem 0;
+    }
+
+    th {
+      background: #1e293b;
+      color: #cbd5e1;
+      font-weight: 600;
+      text-align: left;
+      padding: 0.6rem 0.9rem;
+      border: 1px solid #334155;
+    }
+
+    td {
+      padding: 0.55rem 0.9rem;
+      border: 1px solid #1e293b;
+      color: #94a3b8;
+      vertical-align: top;
+    }
+
+    tr:nth-child(even) td { background: #0f172a; }
+    tr:nth-child(odd) td { background: #131b2e; }
+
+    td code { font-size: 0.8rem; }
+
+    .diagram-wrap {
+      background: #131b2e;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin: 1rem 0;
+      overflow-x: auto;
+    }
+
+    .diagram-wrap .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .op-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 0.75rem;
+      margin: 1rem 0;
+    }
+
+    .op-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      padding: 0.9rem;
+    }
+
+    .op-card .symbol {
+      font-size: 1.3rem;
+      font-weight: 700;
+      font-family: 'Courier New', monospace;
+      color: #22d3ee;
+      margin-bottom: 0.2rem;
+    }
+
+    .op-card p {
+      font-size: 0.8rem;
+      color: #64748b;
+      margin: 0;
+    }
+
+    .ook-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 0.75rem;
+      margin: 1rem 0;
+    }
+
+    .ook-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      padding: 0.9rem 1rem;
+    }
+
+    .ook-card .ook-token {
+      font-family: 'Courier New', monospace;
+      font-size: 0.78rem;
+      color: #a78bfa;
+      margin-bottom: 0.25rem;
+    }
+
+    .ook-card .bf-equiv {
+      font-family: 'Courier New', monospace;
+      font-size: 0.8rem;
+      color: #22d3ee;
+      margin-bottom: 0.2rem;
+    }
+
+    .ook-card p {
+      font-size: 0.8rem;
+      color: #64748b;
+      margin: 0;
+    }
+
+    .info-box {
+      background: #0c2340;
+      border: 1px solid #1d4ed8;
+      border-left: 3px solid #3b82f6;
+      border-radius: 4px;
+      padding: 0.9rem 1.1rem;
+      margin: 1rem 0;
+      font-size: 0.88rem;
+      color: #93c5fd;
+    }
+
+    footer {
+      border-top: 1px solid #1e293b;
+      padding: 1.5rem 2.5rem;
+      text-align: center;
+      font-size: 0.8rem;
+      color: #475569;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Interpreters <span class="badge">interpreters</span></h1>
+  <div class="subtitle">Esoteric language interpreters — execute Brainfuck and Ook programs, or translate between them</div>
+  <div class="meta">Pixelbadger Toolkit &mdash; <code>pbtk interpreters</code> &mdash; <a href="index.html" style="color:#60a5fa">&#8592; all topics</a></div>
+</header>
+
+<nav>
+  <a href="#brainfuck">brainfuck</a>
+  <a href="#ook">ook</a>
+  <a href="#bf-to-ook">bf-to-ook</a>
+  <a href="#command-ref">Command Reference</a>
+</nav>
+
+<div class="content">
+
+  <!-- BRAINFUCK -->
+  <section id="brainfuck">
+    <h2>brainfuck</h2>
+    <p>
+      Executes a Brainfuck program read from a file. Brainfuck is a Turing-complete esoteric language
+      with only eight instructions that operate on a tape of 30,000 byte cells.
+    </p>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk interpreters brainfuck</span>
+      <span class="opt"> --file</span> <span class="val">hello.bf</span>
+    </div>
+
+    <div class="diagram-wrap">
+      <div class="mermaid">
+flowchart LR
+    F["hello.bf\nBrainfuck source"] --> PARSE["Read program text"]
+    PARSE --> EXEC["Execute on\n30,000-byte tape"]
+    EXEC --> OUT(["stdout: program output"])
+      </div>
+    </div>
+
+    <h3>Instruction Set</h3>
+    <div class="op-grid">
+      <div class="op-card">
+        <div class="symbol">&gt;</div>
+        <p>Move data pointer right one cell.</p>
+      </div>
+      <div class="op-card">
+        <div class="symbol">&lt;</div>
+        <p>Move data pointer left one cell.</p>
+      </div>
+      <div class="op-card">
+        <div class="symbol">+</div>
+        <p>Increment the current cell by 1 (wraps at 255).</p>
+      </div>
+      <div class="op-card">
+        <div class="symbol">-</div>
+        <p>Decrement the current cell by 1 (wraps at 0).</p>
+      </div>
+      <div class="op-card">
+        <div class="symbol">.</div>
+        <p>Output the current cell as an ASCII character.</p>
+      </div>
+      <div class="op-card">
+        <div class="symbol">,</div>
+        <p>Read one character from stdin into the current cell.</p>
+      </div>
+      <div class="op-card">
+        <div class="symbol">[</div>
+        <p>If the current cell is 0, jump forward to the matching <code>]</code>.</p>
+      </div>
+      <div class="op-card">
+        <div class="symbol">]</div>
+        <p>If the current cell is non-zero, jump back to the matching <code>[</code>.</p>
+      </div>
+    </div>
+
+    <div class="info-box">
+      All characters other than <code>&gt; &lt; + - . , [ ]</code> are treated as comments and ignored.
+      The tape is 30,000 bytes, all initialised to zero.
+    </div>
+
+    <table>
+      <thead><tr><th>Option</th><th>Required</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--file</code></td><td>Yes</td><td>Path to the Brainfuck program file (<code>.bf</code>)</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- OOK -->
+  <section id="ook">
+    <h2>ook</h2>
+    <p>
+      Executes an Ook! program read from a file. Ook! is a joke language invented by David Morgan-Mar
+      that is semantically identical to Brainfuck but uses only the word "Ook" combined with punctuation.
+      Each instruction is a two-token pair.
+    </p>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk interpreters ook</span>
+      <span class="opt"> --file</span> <span class="val">hello.ook</span>
+    </div>
+
+    <h3>Instruction Mapping</h3>
+    <div class="ook-grid">
+      <div class="ook-card">
+        <div class="ook-token">Ook. Ook?</div>
+        <div class="bf-equiv">→ &gt;</div>
+        <p>Move pointer right.</p>
+      </div>
+      <div class="ook-card">
+        <div class="ook-token">Ook? Ook.</div>
+        <div class="bf-equiv">→ &lt;</div>
+        <p>Move pointer left.</p>
+      </div>
+      <div class="ook-card">
+        <div class="ook-token">Ook. Ook.</div>
+        <div class="bf-equiv">→ +</div>
+        <p>Increment current cell.</p>
+      </div>
+      <div class="ook-card">
+        <div class="ook-token">Ook! Ook!</div>
+        <div class="bf-equiv">→ -</div>
+        <p>Decrement current cell.</p>
+      </div>
+      <div class="ook-card">
+        <div class="ook-token">Ook! Ook.</div>
+        <div class="bf-equiv">→ .</div>
+        <p>Output current cell as ASCII.</p>
+      </div>
+      <div class="ook-card">
+        <div class="ook-token">Ook. Ook!</div>
+        <div class="bf-equiv">→ ,</div>
+        <p>Read character into current cell.</p>
+      </div>
+      <div class="ook-card">
+        <div class="ook-token">Ook! Ook?</div>
+        <div class="bf-equiv">→ [</div>
+        <p>Jump forward if cell is zero.</p>
+      </div>
+      <div class="ook-card">
+        <div class="ook-token">Ook? Ook!</div>
+        <div class="bf-equiv">→ ]</div>
+        <p>Jump back if cell is non-zero.</p>
+      </div>
+    </div>
+
+    <table>
+      <thead><tr><th>Option</th><th>Required</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--file</code></td><td>Yes</td><td>Path to the Ook program file (<code>.ook</code>)</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- BF-TO-OOK -->
+  <section id="bf-to-ook">
+    <h2>bf-to-ook</h2>
+    <p>
+      Translates a Brainfuck source file into equivalent Ook! source and writes the output to a file.
+      The conversion is a straightforward one-to-one token substitution — every Brainfuck instruction
+      becomes its two-token Ook! equivalent separated by a space.
+    </p>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk interpreters bf-to-ook</span>
+      <span class="opt"> --source</span> <span class="val">hello.bf</span>
+      <span class="opt"> --output</span> <span class="val">hello.ook</span>
+    </div>
+
+    <div class="diagram-wrap">
+      <div class="mermaid">
+flowchart LR
+    BF["hello.bf\n&gt;&lt;+-.,[]"] --> MAP["One-to-one\ninstruction substitution"]
+    MAP --> OOK["hello.ook\nOok. Ook? Ook? Ook. ..."]
+      </div>
+    </div>
+
+    <div class="info-box">
+      Non-instruction characters (comments) in the Brainfuck source are silently dropped — the output
+      Ook file contains only valid Ook tokens.
+    </div>
+
+    <table>
+      <thead><tr><th>Option</th><th>Required</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--source</code></td><td>Yes</td><td>Path to the source Brainfuck file to translate</td></tr>
+        <tr><td><code>--output</code></td><td>Yes</td><td>Path to write the generated Ook file</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- COMMAND REFERENCE -->
+  <section id="command-ref">
+    <h2>Command Reference</h2>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Command</th>
+          <th>Required options</th>
+          <th>Optional options</th>
+          <th>Output</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>interpreters brainfuck</code></td>
+          <td><code>--file</code></td>
+          <td>&mdash;</td>
+          <td>Program output to stdout</td>
+        </tr>
+        <tr>
+          <td><code>interpreters ook</code></td>
+          <td><code>--file</code></td>
+          <td>&mdash;</td>
+          <td>Program output to stdout</td>
+        </tr>
+        <tr>
+          <td><code>interpreters bf-to-ook</code></td>
+          <td><code>--source</code> <code>--output</code></td>
+          <td>&mdash;</td>
+          <td>Ook source written to <code>--output</code></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+</div>
+
+<footer>
+  Pixelbadger Toolkit &mdash; Interpreters Documentation
+</footer>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'dark',
+    themeVariables: {
+      background: '#0f172a',
+      primaryColor: '#1e3a5f',
+      primaryTextColor: '#e2e8f0',
+      primaryBorderColor: '#3b82f6',
+      lineColor: '#475569',
+      secondaryColor: '#1e293b',
+      tertiaryColor: '#0f172a',
+      edgeLabelBackground: '#1e293b',
+      clusterBkg: '#1e293b',
+      titleColor: '#f1f5f9',
+      nodeTextColor: '#e2e8f0',
+    }
+  });
+</script>
+</body>
+</html>

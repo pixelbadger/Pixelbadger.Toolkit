@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pixelbadger Toolkit — Strings</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      line-height: 1.6;
+    }
+
+    header {
+      background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+      border-bottom: 1px solid #334155;
+      padding: 2rem 2.5rem;
+    }
+
+    header h1 { font-size: 1.75rem; font-weight: 700; color: #f8fafc; }
+    header .subtitle { margin-top: 0.4rem; font-size: 1rem; color: #94a3b8; }
+    header .meta { margin-top: 0.5rem; font-size: 0.85rem; color: #64748b; }
+
+    .badge {
+      display: inline-block;
+      background: #1e40af;
+      color: #bfdbfe;
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 999px;
+      letter-spacing: 0.05em;
+      vertical-align: middle;
+      margin-left: 0.5rem;
+    }
+
+    nav {
+      background: #0f1117;
+      border-bottom: 1px solid #1e293b;
+      padding: 0.75rem 2.5rem;
+      display: flex;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+    }
+
+    nav a {
+      color: #60a5fa;
+      text-decoration: none;
+      font-size: 0.85rem;
+      font-weight: 500;
+    }
+
+    nav a:hover { color: #93c5fd; text-decoration: underline; }
+
+    .content { max-width: 1100px; margin: 0 auto; padding: 2rem 2.5rem; }
+
+    section { margin-bottom: 3rem; }
+
+    h2 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: #f1f5f9;
+      border-bottom: 1px solid #1e293b;
+      padding-bottom: 0.5rem;
+      margin-bottom: 1.25rem;
+    }
+
+    h3 {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: #cbd5e1;
+      margin: 1.5rem 0 0.75rem;
+    }
+
+    p { color: #94a3b8; margin-bottom: 0.75rem; }
+
+    .card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .card h3 { margin-top: 0; color: #e2e8f0; }
+    .card p { margin-bottom: 0.5rem; }
+
+    .math-block {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-left: 3px solid #3b82f6;
+      border-radius: 4px;
+      padding: 1rem 1.25rem;
+      margin: 0.75rem 0;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9rem;
+      color: #93c5fd;
+      overflow-x: auto;
+    }
+
+    code {
+      background: #1e293b;
+      color: #7dd3fc;
+      font-family: 'Courier New', monospace;
+      font-size: 0.85em;
+      padding: 0.15em 0.4em;
+      border-radius: 3px;
+    }
+
+    .cmd-block {
+      background: #020617;
+      border: 1px solid #1e293b;
+      border-left: 3px solid #22d3ee;
+      border-radius: 4px;
+      padding: 0.75rem 1rem;
+      margin: 0.5rem 0;
+      font-family: 'Courier New', monospace;
+      font-size: 0.85rem;
+      color: #e2e8f0;
+      overflow-x: auto;
+    }
+
+    .cmd-block .prompt { color: #64748b; user-select: none; }
+    .cmd-block .cmd { color: #22d3ee; }
+    .cmd-block .opt { color: #a78bfa; }
+    .cmd-block .val { color: #86efac; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+      margin: 1rem 0;
+    }
+
+    th {
+      background: #1e293b;
+      color: #cbd5e1;
+      font-weight: 600;
+      text-align: left;
+      padding: 0.6rem 0.9rem;
+      border: 1px solid #334155;
+    }
+
+    td {
+      padding: 0.55rem 0.9rem;
+      border: 1px solid #1e293b;
+      color: #94a3b8;
+      vertical-align: top;
+    }
+
+    tr:nth-child(even) td { background: #0f172a; }
+    tr:nth-child(odd) td { background: #131b2e; }
+
+    td code { font-size: 0.8rem; }
+
+    .diagram-wrap {
+      background: #131b2e;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin: 1rem 0;
+      overflow-x: auto;
+    }
+
+    .diagram-wrap .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .score-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 0.75rem;
+      margin: 1rem 0;
+    }
+
+    .score-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      padding: 0.9rem;
+    }
+
+    .score-card .range {
+      font-size: 0.75rem;
+      font-weight: 700;
+      font-family: 'Courier New', monospace;
+      color: #60a5fa;
+      margin-bottom: 0.2rem;
+    }
+
+    .score-card .band {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #e2e8f0;
+      margin-bottom: 0.2rem;
+    }
+
+    .score-card p {
+      font-size: 0.8rem;
+      color: #64748b;
+      margin: 0;
+    }
+
+    .info-box {
+      background: #0c2340;
+      border: 1px solid #1d4ed8;
+      border-left: 3px solid #3b82f6;
+      border-radius: 4px;
+      padding: 0.9rem 1.1rem;
+      margin: 1rem 0;
+      font-size: 0.88rem;
+      color: #93c5fd;
+    }
+
+    footer {
+      border-top: 1px solid #1e293b;
+      padding: 1.5rem 2.5rem;
+      text-align: center;
+      font-size: 0.8rem;
+      color: #475569;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Strings <span class="badge">strings</span></h1>
+  <div class="subtitle">String manipulation utilities — file reversal, edit distance, vowel stripping, and readability analysis</div>
+  <div class="meta">Pixelbadger Toolkit &mdash; <code>pbtk strings</code> &mdash; <a href="index.html" style="color:#60a5fa">&#8592; all topics</a></div>
+</header>
+
+<nav>
+  <a href="#reverse">reverse</a>
+  <a href="#levenshtein">levenshtein-distance</a>
+  <a href="#abjadify">abjadify</a>
+  <a href="#flesch">flesch-reading-ease</a>
+  <a href="#command-ref">Command Reference</a>
+</nav>
+
+<div class="content">
+
+  <!-- REVERSE -->
+  <section id="reverse">
+    <h2>reverse</h2>
+    <p>
+      Reads the entire content of a file and writes it back in reverse character order.
+      The reversal operates on the raw character sequence of the file — Unicode code points are preserved,
+      but byte-order marks and newline conventions are not adjusted.
+    </p>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk strings reverse</span>
+      <span class="opt"> --in-file</span> <span class="val">input.txt</span>
+      <span class="opt"> --out-file</span> <span class="val">reversed.txt</span>
+    </div>
+
+    <div class="diagram-wrap">
+      <div class="mermaid">
+flowchart LR
+    A["input.txt\n\"Hello, world!\""] --> R["Reverse\ncharacter sequence"]
+    R --> B["reversed.txt\n\"!dlrow ,olleH\""]
+      </div>
+    </div>
+
+    <table>
+      <thead><tr><th>Option</th><th>Required</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--in-file</code></td><td>Yes</td><td>Path to the input file to reverse</td></tr>
+        <tr><td><code>--out-file</code></td><td>Yes</td><td>Path to write the reversed content</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- LEVENSHTEIN -->
+  <section id="levenshtein">
+    <h2>levenshtein-distance</h2>
+    <p>
+      Computes the Levenshtein (edit) distance between two strings: the minimum number of single-character
+      insertions, deletions, or substitutions required to transform one string into the other.
+      Each argument can be a literal string value or a file path — if a path resolves to an existing file
+      its contents are used as the string.
+    </p>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk strings levenshtein-distance</span>
+      <span class="opt"> --string1</span> <span class="val">"kitten"</span>
+      <span class="opt"> --string2</span> <span class="val">"sitting"</span>
+    </div>
+
+    <div class="diagram-wrap">
+      <div class="mermaid">
+flowchart LR
+    S1["--string1\n(literal or file path)"] --> CALC["Dynamic programming\nmatrix O(m × n)"]
+    S2["--string2\n(literal or file path)"] --> CALC
+    CALC --> OUT(["stdout: distance"])
+      </div>
+    </div>
+
+    <h3>Algorithm</h3>
+    <p>
+      The implementation uses the standard dynamic-programming approach. A matrix of size
+      <code>(m+1) × (n+1)</code> is built where each cell <code>[i][j]</code> stores the edit distance
+      between the first <code>i</code> characters of string 1 and the first <code>j</code> characters of string 2.
+    </p>
+    <div class="math-block">cost = 0 if s1[i] == s2[j], else 1
+matrix[i][j] = min(
+  matrix[i-1][j]   + 1,      // deletion
+  matrix[i][j-1]   + 1,      // insertion
+  matrix[i-1][j-1] + cost    // substitution
+)</div>
+
+    <table>
+      <thead><tr><th>Option</th><th>Required</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--string1</code></td><td>Yes</td><td>First string or path to a file whose contents are used</td></tr>
+        <tr><td><code>--string2</code></td><td>Yes</td><td>Second string or path to a file whose contents are used</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ABJADIFY -->
+  <section id="abjadify">
+    <h2>abjadify</h2>
+    <p>
+      Strips English vowels (<code>a e i o u</code>, upper and lower case) from every word in a file,
+      mimicking the consonant-heavy style of abjad writing systems used in Arabic, Hebrew, and related scripts.
+      Single-vowel words (<code>a</code> and <code>i</code>) are preserved intact because they would become
+      empty strings otherwise, losing meaning.
+    </p>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk strings abjadify</span>
+      <span class="opt"> --in-file</span> <span class="val">text.txt</span>
+      <span class="opt"> --out-file</span> <span class="val">abjadified.txt</span>
+    </div>
+
+    <div class="diagram-wrap">
+      <div class="mermaid">
+flowchart LR
+    IN["input.txt\n\"I like a quiet place\""] --> SPLIT["Split on\nnon-letter boundaries"]
+    SPLIT --> CHECK{"Single-vowel\nword?"}
+    CHECK -- Yes --> KEEP["Preserve as-is\n'I', 'a'"]
+    CHECK -- No --> STRIP["Remove vowels\n'like' → 'lk'\n'quiet' → 'qt'\n'place' → 'plc'"]
+    KEEP --> JOIN["Reassemble"]
+    STRIP --> JOIN
+    JOIN --> OUT["output.txt\n\"I lk a qt plc\""]
+      </div>
+    </div>
+
+    <div class="info-box">
+      Whitespace, punctuation, and non-letter characters are passed through unchanged, so the output
+      preserves the original document structure.
+    </div>
+
+    <table>
+      <thead><tr><th>Option</th><th>Required</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--in-file</code></td><td>Yes</td><td>Path to the input plain-text file</td></tr>
+        <tr><td><code>--out-file</code></td><td>Yes</td><td>Path to write the abjadified output</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- FLESCH -->
+  <section id="flesch">
+    <h2>flesch-reading-ease</h2>
+    <p>
+      Analyses a plain-text file and produces a Flesch Reading Ease score — a well-established formula
+      that estimates how easy a passage is to read based on sentence length and word complexity (syllable count).
+      Higher scores indicate easier text; lower scores indicate more complex writing.
+    </p>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk strings flesch-reading-ease</span>
+      <span class="opt"> --in-file</span> <span class="val">document.txt</span>
+    </div>
+
+    <h3>Formula</h3>
+    <div class="math-block">score = 206.835 − (1.015 × words/sentences) − (84.6 × syllables/words)</div>
+    <p>
+      The raw score is clamped to the range [0, 100]. Syllables are counted using a vowel-group heuristic:
+      each contiguous run of vowel characters (a e i o u y) counts as one syllable, with a correction for
+      silent trailing <code>-e</code>. Every word is counted as having at least one syllable.
+    </p>
+
+    <h3>Readability Bands</h3>
+    <div class="score-grid">
+      <div class="score-card">
+        <div class="range">90 – 100</div>
+        <div class="band">Very easy</div>
+        <p>Easily understood by an average 11-year-old.</p>
+      </div>
+      <div class="score-card">
+        <div class="range">80 – 89</div>
+        <div class="band">Easy</div>
+        <p>Conversational English.</p>
+      </div>
+      <div class="score-card">
+        <div class="range">70 – 79</div>
+        <div class="band">Fairly easy</div>
+        <p>Aimed at 13-year-old readers.</p>
+      </div>
+      <div class="score-card">
+        <div class="range">60 – 69</div>
+        <div class="band">Standard</div>
+        <p>Plain English, easily understood.</p>
+      </div>
+      <div class="score-card">
+        <div class="range">50 – 59</div>
+        <div class="band">Fairly difficult</div>
+        <p>Suited to high school or college level.</p>
+      </div>
+      <div class="score-card">
+        <div class="range">30 – 49</div>
+        <div class="band">Difficult</div>
+        <p>Best understood by college graduates.</p>
+      </div>
+      <div class="score-card">
+        <div class="range">0 – 29</div>
+        <div class="band">Very confusing</div>
+        <p>Best understood by university graduates.</p>
+      </div>
+    </div>
+
+    <h3>Output</h3>
+    <p>Five values are printed to stdout:</p>
+    <div class="cmd-block">
+Flesch Reading Ease: 65.34
+Readability: Standard
+Sentences: 12
+Words: 198
+Syllables: 301
+    </div>
+
+    <table>
+      <thead><tr><th>Option</th><th>Required</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--in-file</code></td><td>Yes</td><td>Path to the plain-text file to analyse</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- COMMAND REFERENCE -->
+  <section id="command-ref">
+    <h2>Command Reference</h2>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Command</th>
+          <th>Required options</th>
+          <th>Optional options</th>
+          <th>Output</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>strings reverse</code></td>
+          <td><code>--in-file</code> <code>--out-file</code></td>
+          <td>&mdash;</td>
+          <td>Reversed content written to <code>--out-file</code></td>
+        </tr>
+        <tr>
+          <td><code>strings levenshtein-distance</code></td>
+          <td><code>--string1</code> <code>--string2</code></td>
+          <td>&mdash;</td>
+          <td>Integer distance printed to stdout</td>
+        </tr>
+        <tr>
+          <td><code>strings abjadify</code></td>
+          <td><code>--in-file</code> <code>--out-file</code></td>
+          <td>&mdash;</td>
+          <td>Vowel-stripped text written to <code>--out-file</code></td>
+        </tr>
+        <tr>
+          <td><code>strings flesch-reading-ease</code></td>
+          <td><code>--in-file</code></td>
+          <td>&mdash;</td>
+          <td>Score, readability band, and counts printed to stdout</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+</div>
+
+<footer>
+  Pixelbadger Toolkit &mdash; Strings Documentation
+</footer>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'dark',
+    themeVariables: {
+      background: '#0f172a',
+      primaryColor: '#1e3a5f',
+      primaryTextColor: '#e2e8f0',
+      primaryBorderColor: '#3b82f6',
+      lineColor: '#475569',
+      secondaryColor: '#1e293b',
+      tertiaryColor: '#0f172a',
+      edgeLabelBackground: '#1e293b',
+      clusterBkg: '#1e293b',
+      titleColor: '#f1f5f9',
+      nodeTextColor: '#e2e8f0',
+    }
+  });
+</script>
+</body>
+</html>

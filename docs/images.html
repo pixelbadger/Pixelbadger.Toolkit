@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pixelbadger Toolkit — Images</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      line-height: 1.6;
+    }
+
+    header {
+      background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+      border-bottom: 1px solid #334155;
+      padding: 2rem 2.5rem;
+    }
+
+    header h1 { font-size: 1.75rem; font-weight: 700; color: #f8fafc; }
+    header .subtitle { margin-top: 0.4rem; font-size: 1rem; color: #94a3b8; }
+    header .meta { margin-top: 0.5rem; font-size: 0.85rem; color: #64748b; }
+
+    .badge {
+      display: inline-block;
+      background: #1e40af;
+      color: #bfdbfe;
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 999px;
+      letter-spacing: 0.05em;
+      vertical-align: middle;
+      margin-left: 0.5rem;
+    }
+
+    nav {
+      background: #0f1117;
+      border-bottom: 1px solid #1e293b;
+      padding: 0.75rem 2.5rem;
+      display: flex;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+    }
+
+    nav a {
+      color: #60a5fa;
+      text-decoration: none;
+      font-size: 0.85rem;
+      font-weight: 500;
+    }
+
+    nav a:hover { color: #93c5fd; text-decoration: underline; }
+
+    .content { max-width: 1100px; margin: 0 auto; padding: 2rem 2.5rem; }
+
+    section { margin-bottom: 3rem; }
+
+    h2 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: #f1f5f9;
+      border-bottom: 1px solid #1e293b;
+      padding-bottom: 0.5rem;
+      margin-bottom: 1.25rem;
+    }
+
+    h3 {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: #cbd5e1;
+      margin: 1.5rem 0 0.75rem;
+    }
+
+    p { color: #94a3b8; margin-bottom: 0.75rem; }
+
+    .math-block {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-left: 3px solid #3b82f6;
+      border-radius: 4px;
+      padding: 1rem 1.25rem;
+      margin: 0.75rem 0;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9rem;
+      color: #93c5fd;
+      overflow-x: auto;
+    }
+
+    code {
+      background: #1e293b;
+      color: #7dd3fc;
+      font-family: 'Courier New', monospace;
+      font-size: 0.85em;
+      padding: 0.15em 0.4em;
+      border-radius: 3px;
+    }
+
+    .cmd-block {
+      background: #020617;
+      border: 1px solid #1e293b;
+      border-left: 3px solid #22d3ee;
+      border-radius: 4px;
+      padding: 0.75rem 1rem;
+      margin: 0.5rem 0;
+      font-family: 'Courier New', monospace;
+      font-size: 0.85rem;
+      color: #e2e8f0;
+      overflow-x: auto;
+    }
+
+    .cmd-block .prompt { color: #64748b; user-select: none; }
+    .cmd-block .cmd { color: #22d3ee; }
+    .cmd-block .opt { color: #a78bfa; }
+    .cmd-block .val { color: #86efac; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+      margin: 1rem 0;
+    }
+
+    th {
+      background: #1e293b;
+      color: #cbd5e1;
+      font-weight: 600;
+      text-align: left;
+      padding: 0.6rem 0.9rem;
+      border: 1px solid #334155;
+    }
+
+    td {
+      padding: 0.55rem 0.9rem;
+      border: 1px solid #1e293b;
+      color: #94a3b8;
+      vertical-align: top;
+    }
+
+    tr:nth-child(even) td { background: #0f172a; }
+    tr:nth-child(odd) td { background: #131b2e; }
+
+    td code { font-size: 0.8rem; }
+
+    .diagram-wrap {
+      background: #131b2e;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin: 1rem 0;
+      overflow-x: auto;
+    }
+
+    .diagram-wrap .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .key-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem;
+      margin: 1rem 0;
+    }
+
+    .key-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      padding: 1rem;
+    }
+
+    .key-card .label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #64748b;
+      margin-bottom: 0.25rem;
+    }
+
+    .key-card .name {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #60a5fa;
+      margin-bottom: 0.35rem;
+    }
+
+    .key-card p {
+      font-size: 0.82rem;
+      color: #64748b;
+      margin: 0;
+    }
+
+    .info-box {
+      background: #0c2340;
+      border: 1px solid #1d4ed8;
+      border-left: 3px solid #3b82f6;
+      border-radius: 4px;
+      padding: 0.9rem 1.1rem;
+      margin: 1rem 0;
+      font-size: 0.88rem;
+      color: #93c5fd;
+    }
+
+    .warning-box {
+      background: #1c1008;
+      border: 1px solid #92400e;
+      border-left: 3px solid #f59e0b;
+      border-radius: 4px;
+      padding: 0.9rem 1.1rem;
+      margin: 1rem 0;
+      font-size: 0.88rem;
+      color: #fcd34d;
+    }
+
+    footer {
+      border-top: 1px solid #1e293b;
+      padding: 1.5rem 2.5rem;
+      text-align: center;
+      font-size: 0.8rem;
+      color: #475569;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Images <span class="badge">images</span></h1>
+  <div class="subtitle">Image steganography — hide and recover secret messages in the least-significant bits of image pixels</div>
+  <div class="meta">Pixelbadger Toolkit &mdash; <code>pbtk images</code> &mdash; <a href="index.html" style="color:#60a5fa">&#8592; all topics</a></div>
+</header>
+
+<nav>
+  <a href="#overview">Overview</a>
+  <a href="#how-it-works">How It Works</a>
+  <a href="#encode">Encode</a>
+  <a href="#decode">Decode</a>
+  <a href="#command-ref">Command Reference</a>
+</nav>
+
+<div class="content">
+
+  <!-- OVERVIEW -->
+  <section id="overview">
+    <h2>Overview</h2>
+    <p>
+      The <code>steganography</code> command lets you hide a text message inside an image file and later
+      recover it. The message is stored in the least-significant bits of the R, G, and B channels of
+      each pixel in scan order, so the visual change to the image is imperceptible to the human eye.
+    </p>
+
+    <div class="key-grid">
+      <div class="key-card">
+        <div class="label">Method</div>
+        <div class="name">LSB Steganography</div>
+        <p>One bit stored per colour channel. Three bits per pixel.</p>
+      </div>
+      <div class="key-card">
+        <div class="label">Encoding</div>
+        <div class="name">UTF-8</div>
+        <p>Message is converted to UTF-8 bytes before bit-packing.</p>
+      </div>
+      <div class="key-card">
+        <div class="label">Terminator</div>
+        <div class="name">&lt;&lt;END&gt;&gt;</div>
+        <p>Appended to the message so decoding knows where to stop.</p>
+      </div>
+      <div class="key-card">
+        <div class="label">Library</div>
+        <div class="name">ImageSharp</div>
+        <p>SixLabors.ImageSharp handles pixel-level access for all supported formats.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section id="how-it-works">
+    <h2>How It Works</h2>
+
+    <h3>Encoding</h3>
+    <p>
+      The message is appended with the sentinel string <code>&lt;&lt;END&gt;&gt;</code>, converted to UTF-8 bytes,
+      then expanded to a bit array. The bits are written into the least-significant bit of each colour
+      channel (R, G, B) in left-to-right, top-to-bottom pixel order.
+    </p>
+    <div class="math-block">pixel.R = (pixel.R &amp; 0xFE) | messageBits[i]
+pixel.G = (pixel.G &amp; 0xFE) | messageBits[i+1]
+pixel.B = (pixel.B &amp; 0xFE) | messageBits[i+2]</div>
+
+    <h3>Decoding</h3>
+    <p>
+      The LSBs of R, G, and B are read from each pixel in the same scan order, accumulated into bytes,
+      and converted back to a UTF-8 string until the <code>&lt;&lt;END&gt;&gt;</code> sentinel is found.
+      Everything before the sentinel is the recovered message.
+    </p>
+
+    <div class="diagram-wrap">
+      <div class="mermaid">
+flowchart TD
+    MSG["Plaintext message"] --> UTF8["UTF-8 encode + append &lt;&lt;END&gt;&gt;"]
+    UTF8 --> BITS["Expand to bit array\n8 bits per byte"]
+    BITS --> PACK["Write one bit into LSB\nof each R, G, B channel\nper pixel (scan order)"]
+    IMG["Input image"] --> PACK
+    PACK --> OUT["Output image\n(visually identical)"]
+      </div>
+    </div>
+
+    <div class="info-box">
+      The message capacity of an image is <strong>floor(width × height × 3 / 8)</strong> bytes
+      (minus the 7-byte terminator). A 100 × 100 image holds roughly 3,750 bytes of message text.
+    </div>
+
+    <div class="warning-box">
+      <strong>Output format matters:</strong> save the encoded image as a lossless format (PNG, BMP).
+      Saving as JPEG re-compresses the pixel data and will corrupt the hidden bits, making the message
+      unrecoverable.
+    </div>
+  </section>
+
+  <!-- ENCODE -->
+  <section id="encode">
+    <h2>Encode</h2>
+    <p>Hide a message inside an image. The output file is a new image with the message bits written
+    into the least-significant channel bits.</p>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk images steganography</span>
+      <span class="opt"> --mode</span> <span class="val">encode</span>
+      <span class="opt"> --image</span> <span class="val">cover.png</span>
+      <span class="opt"> --message</span> <span class="val">"Secret payload"</span>
+      <span class="opt"> --output</span> <span class="val">stego.png</span>
+    </div>
+
+    <table>
+      <thead><tr><th>Option</th><th>Required</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--mode</code></td><td>Yes</td><td>Must be <code>encode</code></td></tr>
+        <tr><td><code>--image</code></td><td>Yes</td><td>Path to the input cover image</td></tr>
+        <tr><td><code>--message</code></td><td>Yes (encode)</td><td>The plaintext message to hide</td></tr>
+        <tr><td><code>--output</code></td><td>Yes (encode)</td><td>Path to write the output stego image</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- DECODE -->
+  <section id="decode">
+    <h2>Decode</h2>
+    <p>Recover a previously hidden message from a stego image. The image must have been produced
+    by the encode mode of this same command.</p>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk images steganography</span>
+      <span class="opt"> --mode</span> <span class="val">decode</span>
+      <span class="opt"> --image</span> <span class="val">stego.png</span>
+    </div>
+
+    <table>
+      <thead><tr><th>Option</th><th>Required</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--mode</code></td><td>Yes</td><td>Must be <code>decode</code></td></tr>
+        <tr><td><code>--image</code></td><td>Yes</td><td>Path to the stego image containing a hidden message</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- COMMAND REFERENCE -->
+  <section id="command-ref">
+    <h2>Command Reference</h2>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Command</th>
+          <th>Required options</th>
+          <th>Optional options</th>
+          <th>Output</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>images steganography --mode encode</code></td>
+          <td><code>--image</code> <code>--message</code> <code>--output</code></td>
+          <td>&mdash;</td>
+          <td>Stego image written to <code>--output</code></td>
+        </tr>
+        <tr>
+          <td><code>images steganography --mode decode</code></td>
+          <td><code>--image</code></td>
+          <td>&mdash;</td>
+          <td>Recovered message printed to stdout</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Constraints and Limits</h3>
+    <table>
+      <thead><tr><th>Constraint</th><th>Value</th><th>Reason</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Bits per pixel</td>
+          <td>3 (one per R/G/B channel)</td>
+          <td>LSB of alpha channel is left untouched to avoid transparency artefacts</td>
+        </tr>
+        <tr>
+          <td>Message terminator</td>
+          <td><code>&lt;&lt;END&gt;&gt;</code> (7 bytes)</td>
+          <td>Required for the decoder to know when the message ends</td>
+        </tr>
+        <tr>
+          <td>Output format</td>
+          <td>Lossless (PNG, BMP recommended)</td>
+          <td>Lossy compression (JPEG) destroys the hidden bits</td>
+        </tr>
+        <tr>
+          <td>Message encoding</td>
+          <td>UTF-8</td>
+          <td>Full Unicode supported; multi-byte characters consume more capacity</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+</div>
+
+<footer>
+  Pixelbadger Toolkit &mdash; Images Documentation
+</footer>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'dark',
+    themeVariables: {
+      background: '#0f172a',
+      primaryColor: '#1e3a5f',
+      primaryTextColor: '#e2e8f0',
+      primaryBorderColor: '#3b82f6',
+      lineColor: '#475569',
+      secondaryColor: '#1e293b',
+      tertiaryColor: '#0f172a',
+      edgeLabelBackground: '#1e293b',
+      clusterBkg: '#1e293b',
+      titleColor: '#f1f5f9',
+      nodeTextColor: '#e2e8f0',
+    }
+  });
+</script>
+</body>
+</html>
