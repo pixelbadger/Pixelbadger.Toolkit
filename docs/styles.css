@@ -1,0 +1,531 @@
+/* ── Pixelbadger Toolkit docs — shared stylesheet ─────────────────────────
+   Aesthetic: editorial serifs, muted earthy pastels, Anthropic-inspired.
+   Mode: dark by default; respects prefers-color-scheme: light.
+   ──────────────────────────────────────────────────────────────────────── */
+
+/* ── colour tokens ───────────────────────────────────────────────────────── */
+:root {
+  --bg:          #15120e;
+  --surface:     #1f1a14;
+  --surface2:    #2a2218;
+  --surface3:    #352c20;
+  --border:      #3d3328;
+  --border2:     #2a2218;
+  --text:        #ede5d8;
+  --text2:       #b0a090;
+  --text3:       #7a6e60;
+  --accent:      #c8785a;
+  --accent2:     #e09a70;
+  --link:        #c09878;
+  --link-hover:  #e0b890;
+  --heading:     #f5ede0;
+
+  /* code / command tokens */
+  --code-bg:     #2a2218;
+  --code-text:   #e0b888;
+  --cmd-bg:      #0e0c09;
+  --cmd-border:  #c8785a;
+  --cmd-prompt:  #7a6e60;
+  --cmd-cmd:     #c8785a;
+  --cmd-opt:     #a888c0;
+  --cmd-val:     #7db87a;
+
+  /* tables */
+  --th-bg:       #1f1a14;
+  --td-even:     #0e0c09;
+  --td-odd:      #181410;
+
+  /* callout boxes */
+  --info-bg:     #141c2a;
+  --info-border: #2d4868;
+  --info-text:   #90b0d8;
+  --warn-bg:     #28180c;
+  --warn-border: #7a4818;
+  --warn-text:   #d09048;
+
+  /* badge variants */
+  --badge-bg:      #2a2218;
+  --badge-text:    #e0b888;
+  --badge-green-bg:   #142814;
+  --badge-green-text: #90d890;
+  --badge-purple-bg:  #200a38;
+  --badge-purple-text:#d090f0;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg:          #faf5ee;
+    --surface:     #f2e8dc;
+    --surface2:    #e8ddd0;
+    --surface3:    #ddd0c0;
+    --border:      #d0c0ae;
+    --border2:     #e0d4c4;
+    --text:        #1a1410;
+    --text2:       #5a4e42;
+    --text3:       #90807a;
+    --accent:      #a04028;
+    --accent2:     #c05838;
+    --link:        #8a3820;
+    --link-hover:  #c05838;
+    --heading:     #100c08;
+
+    --code-bg:     #ece3d6;
+    --code-text:   #7a3010;
+    --cmd-bg:      #faf5ee;
+    --cmd-border:  #a04028;
+    --cmd-prompt:  #a09080;
+    --cmd-cmd:     #a04028;
+    --cmd-opt:     #6040a0;
+    --cmd-val:     #205810;
+
+    --th-bg:       #e8ddd0;
+    --td-even:     #faf5ee;
+    --td-odd:      #f4ede2;
+
+    --info-bg:     #e8f0f8;
+    --info-border: #6888b8;
+    --info-text:   #284878;
+    --warn-bg:     #fdf0e0;
+    --warn-border: #b07828;
+    --warn-text:   #704810;
+
+    --badge-bg:      #e8ddd0;
+    --badge-text:    #7a3010;
+    --badge-green-bg:   #d8f0d8;
+    --badge-green-text: #185818;
+    --badge-purple-bg:  #ece0f8;
+    --badge-purple-text:#481888;
+  }
+}
+
+/* ── reset ───────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* ── base ────────────────────────────────────────────────────────────────── */
+body {
+  font-family: Georgia, 'Palatino Linotype', Palatino, 'Times New Roman', serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.7;
+}
+
+/* ── header ──────────────────────────────────────────────────────────────── */
+header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 2rem 2.5rem;
+}
+
+header h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--heading);
+  letter-spacing: -0.01em;
+}
+
+header .subtitle { margin-top: 0.4rem; font-size: 1rem; color: var(--text2); }
+header .meta     { margin-top: 0.5rem; font-size: 0.85rem; color: var(--text3); font-style: italic; }
+
+/* ── badge ───────────────────────────────────────────────────────────────── */
+.badge {
+  display: inline-block;
+  background: var(--badge-bg);
+  color: var(--badge-text);
+  font-size: 0.7rem;
+  font-weight: 600;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  padding: 2px 8px;
+  border-radius: 999px;
+  letter-spacing: 0.05em;
+  vertical-align: middle;
+  margin-left: 0.5rem;
+}
+
+.badge.green  { background: var(--badge-green-bg);  color: var(--badge-green-text); }
+.badge.purple { background: var(--badge-purple-bg); color: var(--badge-purple-text); }
+
+/* ── navigation ──────────────────────────────────────────────────────────── */
+nav {
+  background: var(--bg);
+  border-bottom: 1px solid var(--border2);
+  padding: 0.75rem 2.5rem;
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+nav a {
+  color: var(--link);
+  text-decoration: none;
+  font-size: 0.85rem;
+  font-weight: 500;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+nav a:hover { color: var(--link-hover); text-decoration: underline; }
+
+/* ── content layout ──────────────────────────────────────────────────────── */
+.content { max-width: 1100px; margin: 0 auto; padding: 2rem 2.5rem; }
+section  { margin-bottom: 3rem; }
+
+/* ── headings ────────────────────────────────────────────────────────────── */
+h2 {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--heading);
+  border-bottom: 1px solid var(--border2);
+  padding-bottom: 0.5rem;
+  margin-bottom: 1.25rem;
+  letter-spacing: -0.01em;
+}
+
+h3 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text);
+  margin: 1.5rem 0 0.75rem;
+}
+
+/* ── body text ───────────────────────────────────────────────────────────── */
+p { color: var(--text2); margin-bottom: 0.75rem; }
+
+/* ── inline code ─────────────────────────────────────────────────────────── */
+code {
+  background: var(--code-bg);
+  color: var(--code-text);
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.85em;
+  padding: 0.15em 0.4em;
+  border-radius: 3px;
+}
+
+/* ── command blocks ──────────────────────────────────────────────────────── */
+.cmd-block {
+  background: var(--cmd-bg);
+  border: 1px solid var(--border2);
+  border-left: 3px solid var(--cmd-border);
+  border-radius: 4px;
+  padding: 0.75rem 1rem;
+  margin: 0.5rem 0;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.85rem;
+  color: var(--text);
+  overflow-x: auto;
+}
+
+.cmd-block .prompt { color: var(--cmd-prompt); user-select: none; }
+.cmd-block .cmd    { color: var(--cmd-cmd); }
+.cmd-block .opt    { color: var(--cmd-opt); }
+.cmd-block .val    { color: var(--cmd-val); }
+
+/* ── tables ──────────────────────────────────────────────────────────────── */
+table { width: 100%; border-collapse: collapse; font-size: 0.875rem; margin: 1rem 0; }
+
+th {
+  background: var(--th-bg);
+  color: var(--text);
+  font-weight: 600;
+  text-align: left;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--border);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+td {
+  padding: 0.55rem 0.9rem;
+  border: 1px solid var(--border2);
+  color: var(--text2);
+  vertical-align: top;
+}
+
+tr:nth-child(even) td { background: var(--td-even); }
+tr:nth-child(odd)  td { background: var(--td-odd); }
+td code { font-size: 0.8rem; }
+
+/* ── diagram wrapper ─────────────────────────────────────────────────────── */
+.diagram-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin: 1rem 0;
+  overflow-x: auto;
+}
+
+.diagram-wrap .mermaid { display: flex; justify-content: center; }
+
+/* ── generic card ────────────────────────────────────────────────────────── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.card h3 { margin-top: 0; color: var(--text); }
+.card p  { margin-bottom: 0.5rem; }
+
+/* ── callout boxes ───────────────────────────────────────────────────────── */
+.info-box {
+  background: var(--info-bg);
+  border: 1px solid var(--info-border);
+  border-left: 3px solid var(--info-border);
+  border-radius: 4px;
+  padding: 0.9rem 1.1rem;
+  margin: 1rem 0;
+  font-size: 0.88rem;
+  color: var(--info-text);
+}
+
+.warning-box {
+  background: var(--warn-bg);
+  border: 1px solid var(--warn-border);
+  border-left: 3px solid var(--warn-border);
+  border-radius: 4px;
+  padding: 0.9rem 1.1rem;
+  margin: 1rem 0;
+  font-size: 0.88rem;
+  color: var(--warn-text);
+}
+
+/* ── math / formula display ──────────────────────────────────────────────── */
+.math-block {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 4px;
+  padding: 1rem 1.25rem;
+  margin: 0.75rem 0;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.9rem;
+  color: var(--accent2);
+  overflow-x: auto;
+}
+
+/* ── topic grid (index page) ─────────────────────────────────────────────── */
+.topic-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.25rem;
+  margin-top: 1.5rem;
+}
+
+.topic-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.5rem;
+  text-decoration: none;
+  display: block;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.topic-card:hover {
+  border-color: var(--accent);
+  background: var(--surface2);
+}
+
+.topic-card .topic-name {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--accent);
+  font-family: 'Courier New', Courier, monospace;
+  margin-bottom: 0.4rem;
+}
+
+.topic-card .topic-desc {
+  font-size: 0.88rem;
+  color: var(--text2);
+  margin-bottom: 0.75rem;
+}
+
+.topic-card .actions { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+
+.action-tag {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--accent2);
+  font-size: 0.75rem;
+  font-family: 'Courier New', Courier, monospace;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+/* ── key grid (images, oauth, paillier) ──────────────────────────────────── */
+.key-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.key-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1rem;
+}
+
+.key-card .label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text3);
+  margin-bottom: 0.25rem;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.key-card .name {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--accent);
+  font-family: 'Courier New', Courier, monospace;
+  margin-bottom: 0.35rem;
+}
+
+.key-card p { font-size: 0.82rem; color: var(--text3); margin: 0; }
+
+/* ── operations grid (interpreters, paillier) ────────────────────────────── */
+.op-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+
+.op-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.9rem;
+}
+
+.op-card h4 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 0.5rem;
+}
+
+.op-card .symbol {
+  font-size: 1.3rem;
+  font-weight: 700;
+  font-family: 'Courier New', Courier, monospace;
+  color: var(--accent);
+  margin-bottom: 0.2rem;
+}
+
+.op-card .formula {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.82rem;
+  color: var(--accent2);
+  background: var(--surface2);
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  margin: 0.5rem 0;
+}
+
+.op-card p { font-size: 0.8rem; color: var(--text3); margin: 0.25rem 0 0; }
+
+/* ── ook grid (interpreters) ─────────────────────────────────────────────── */
+.ook-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+
+.ook-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.9rem 1rem;
+}
+
+.ook-card .ook-token {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.78rem;
+  color: var(--cmd-opt);
+  margin-bottom: 0.25rem;
+}
+
+.ook-card .bf-equiv {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.8rem;
+  color: var(--accent);
+  margin-bottom: 0.2rem;
+}
+
+.ook-card p { font-size: 0.8rem; color: var(--text3); margin: 0; }
+
+/* ── audience grid (openai) ──────────────────────────────────────────────── */
+.audience-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.6rem;
+  margin: 1rem 0;
+}
+
+.audience-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.7rem 0.9rem;
+}
+
+.audience-card .aud-name {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.8rem;
+  color: var(--cmd-val);
+  font-weight: 600;
+  margin-bottom: 0.2rem;
+}
+
+.audience-card p { font-size: 0.78rem; color: var(--text3); margin: 0; }
+
+/* ── score grid (strings) ────────────────────────────────────────────────── */
+.score-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+
+.score-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.9rem;
+}
+
+.score-card .range {
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-family: 'Courier New', Courier, monospace;
+  color: var(--accent);
+  margin-bottom: 0.2rem;
+}
+
+.score-card .band {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 0.2rem;
+}
+
+.score-card p { font-size: 0.8rem; color: var(--text3); margin: 0; }
+
+/* ── footer ──────────────────────────────────────────────────────────────── */
+footer {
+  border-top: 1px solid var(--border2);
+  padding: 1.5rem 2.5rem;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text3);
+  font-style: italic;
+}
