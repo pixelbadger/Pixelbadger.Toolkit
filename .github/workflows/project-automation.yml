@@ -1,0 +1,51 @@
+name: Project Automation
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [master]
+
+jobs:
+  close-linked-issues:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Label and close linked issues
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(grep -oP '(?<=<Version>)[^<]+' Pixelbadger.Toolkit/Pixelbadger.Toolkit.csproj)
+          RELEASE_LABEL="release/v${VERSION}"
+
+          gh label create "$RELEASE_LABEL" \
+            --color "#6f42c1" \
+            --description "Released in v${VERSION}" \
+            2>/dev/null || true
+
+          PR_BODY=$(gh pr view ${{ github.event.pull_request.number }} --json body -q '.body')
+
+          ISSUE_NUMBERS=$(echo "$PR_BODY" | grep -oiP '(?:closes|fixes|resolves)\s+#\K\d+' || true)
+
+          if [ -z "$ISSUE_NUMBERS" ]; then
+            echo "No linked issues found in PR body."
+            exit 0
+          fi
+
+          for ISSUE_NUM in $ISSUE_NUMBERS; do
+            echo "Processing issue #${ISSUE_NUM}"
+            gh issue edit "$ISSUE_NUM" \
+              --add-label "$RELEASE_LABEL" \
+              --add-label "status: done" \
+              --remove-label "status: in-progress" \
+              2>/dev/null || true
+            gh issue close "$ISSUE_NUM" \
+              --comment "Closed by PR #${{ github.event.pull_request.number }}. Released in v${VERSION}." \
+              2>/dev/null || true
+          done
