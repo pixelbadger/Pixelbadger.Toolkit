@@ -265,6 +265,53 @@ Available topics and actions:
 - **OPENAI_API_KEY**: Required for LLM functionality (openai, translate, ocaaar actions)
 - **NUGET_API_KEY**: Required for publishing packages to NuGet
 
+## Autonomous Ticket Workflow
+
+When asked to "work on the next ticket" (via `@claude` mention on a GitHub issue or PR comment), follow these steps:
+
+### GitHub Label Conventions
+- `status: to-do` — issue is ready to work on
+- `status: in-progress` — issue is being implemented
+- `status: done` — issue is complete (applied automatically on merge)
+- `release/vX.Y.Z` — applied automatically on merge to identify which release closed the issue
+
+### Steps
+
+1. **Find the next ticket**
+   ```bash
+   gh issue list --label "status: to-do" --state open --limit 1 --json number,title,body
+   ```
+
+2. **Claim it** (move to in-progress)
+   ```bash
+   gh issue edit <N> --remove-label "status: to-do" --add-label "status: in-progress"
+   ```
+
+3. **Implement** — follow the Feature Branch Process above. Branch name: `feature/<short-description>`
+
+4. **Raise a PR** — the body must link the issue so project automation can close it on merge:
+   ```bash
+   gh pr create --title "<title>" --body "$(cat <<'EOF'
+   Closes #<N>
+
+   ## Summary
+   <what changed and why>
+
+   ## Test plan
+   - [ ] Tests pass: `dotnet test`
+   - [ ] Version bumped in csproj
+   EOF
+   )"
+   ```
+
+5. **Iterate on review** — address all comments from the automated Haiku review and any `@claude` follow-up comments, then push new commits to the branch.
+
+6. **Merge when approved** — once CI passes and the PR is approved:
+   ```bash
+   gh pr merge <PR-number> --squash --delete-branch
+   ```
+   The `project-automation` workflow will automatically apply the release label and close the linked issue.
+
 ## Important Instructions
 
 Do what has been asked; nothing more, nothing less.

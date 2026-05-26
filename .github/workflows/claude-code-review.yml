@@ -37,18 +37,17 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
-            Please review this pull request and provide feedback on:
-            - Code quality and best practices
-            - Potential bugs or issues
-            - Performance considerations
-            - Security concerns
-            - Test coverage
-            
-            Use the repository's CLAUDE.md for guidance on style and conventions. Be constructive and helpful in your feedback.
+            Review this pull request against the following checklist only. Be concise — flag issues, don't praise. Post your findings as a single comment using `gh pr comment`.
 
-            Use `gh pr comment` with your Bash tool to leave your review as a comment on the PR.
-          
-          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
-          # or https://docs.anthropic.com/en/docs/claude-code/sdk#command-line for available options
-          claude_args: '--allowed-tools "Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*)"'
+            **1. Version bump** — If any `.cs` or `.csproj` files changed outside of `*.Tests/` or `*.Benchmarks/`, the `<Version>` element in `Pixelbadger.Toolkit/Pixelbadger.Toolkit.csproj` must be incremented. Flag if missing.
+
+            **2. Tests present** — Any new component class or command action must have a corresponding `*Tests.cs` file. Flag any new `Components/` or `Commands/` files without matching tests.
+
+            **3. Benchmarks updated** — If the diff touches `LevenshteinCalculator`, `BrainfuckInterpreter`, `OokInterpreter`, `AbjadifyComponent`, `ImageSteganography`, or `HomomorphicEncryptionComponent`, a corresponding benchmark file in `Pixelbadger.Toolkit.Benchmarks/` must also be updated. Flag if missing.
+
+            **4. Sanity check** — Flag obvious bugs, unhandled nulls in critical paths, prompt injection risks (user-controlled strings passed directly to LLMs), or path traversal in file operations.
+
+            If everything passes, post a brief "LGTM — all checks passed" comment.
+
+          claude_args: '--model claude-haiku-4-5-20251001 --allowed-tools "Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*)"'
 

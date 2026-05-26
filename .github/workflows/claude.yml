@@ -19,32 +19,27 @@ jobs:
       (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
     runs-on: ubuntu-latest
     permissions:
-      contents: read
-      pull-requests: read
-      issues: read
+      contents: write
+      pull-requests: write
+      issues: write
       id-token: write
-      actions: read # Required for Claude to read CI results on PRs
+      actions: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          fetch-depth: 0
 
       - name: Run Claude Code
         id: claude
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          
-          # This is an optional setting that allows Claude to read CI results on PRs
+
           additional_permissions: |
             actions: read
 
-          # Optional: Give a custom prompt to Claude. If this is not specified, Claude will perform the instructions specified in the comment that tagged it.
-          # prompt: 'Update the pull request description to include a summary of changes.'
-
-          # Optional: Add claude_args to customize behavior and configuration
-          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
-          # or https://docs.anthropic.com/en/docs/claude-code/sdk#command-line for available options
-          # claude_args: '--model claude-opus-4-1-20250805 --allowed-tools Bash(gh pr:*)'
+          claude_args: >-
+            --model claude-sonnet-4-6
+            --allowed-tools "Bash(git checkout *),Bash(git add *),Bash(git commit *),Bash(git push *),Bash(git branch *),Bash(git status),Bash(git diff *),Bash(git log *),Bash(gh issue list *),Bash(gh issue view *),Bash(gh issue edit *),Bash(gh issue close *),Bash(gh pr create *),Bash(gh pr view *),Bash(gh pr list *),Bash(gh pr merge *),Bash(gh pr comment *),Bash(gh pr diff *),Bash(gh pr checks *),Bash(gh label create *),Bash(gh search *),Bash(dotnet build *),Bash(dotnet test *),Bash(dotnet run *)"
 
