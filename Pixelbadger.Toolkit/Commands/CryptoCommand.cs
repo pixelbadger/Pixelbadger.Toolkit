@@ -13,16 +13,16 @@ public static class CryptoCommand
     {
         var command = new Command("crypto", "Homomorphic encryption utilities using the Paillier cryptosystem");
 
-        command.AddCommand(CreateGenerateKeyCommand());
-        command.AddCommand(CreateEncryptCommand());
-        command.AddCommand(CreateDecryptCommand());
-        command.AddCommand(CreateAddCommand());
-        command.AddCommand(CreateSubtractCommand());
-        command.AddCommand(CreateMultiplyCommand());
-        command.AddCommand(CreateEncryptStringCommand());
-        command.AddCommand(CreateDecryptStringCommand());
-        command.AddCommand(CreateReplaceCommand());
-        command.AddCommand(CreateSubstringCommand());
+        command.Add(CreateGenerateKeyCommand());
+        command.Add(CreateEncryptCommand());
+        command.Add(CreateDecryptCommand());
+        command.Add(CreateAddCommand());
+        command.Add(CreateSubtractCommand());
+        command.Add(CreateMultiplyCommand());
+        command.Add(CreateEncryptStringCommand());
+        command.Add(CreateDecryptStringCommand());
+        command.Add(CreateReplaceCommand());
+        command.Add(CreateSubstringCommand());
 
         return command;
     }
@@ -31,27 +31,19 @@ public static class CryptoCommand
     {
         var command = new Command("generate-key", "Generate a Paillier key pair and save public and private key files");
 
-        var publicKeyFileOption = new Option<string>(
-            aliases: ["--public-key-file"],
-            description: "Path to write the public key JSON file (contains N; safe to share)")
-        {
-            IsRequired = true
-        };
+        var publicKeyFileOption = new Option<string>("--public-key-file") { Description = "Path to write the public key JSON file (contains N; safe to share)", Required = true };
+        var privateKeyFileOption = new Option<string>("--private-key-file") { Description = "Path to write the private key JSON file (contains N, Lambda, Mu; keep secret)", Required = true };
 
-        var privateKeyFileOption = new Option<string>(
-            aliases: ["--private-key-file"],
-            description: "Path to write the private key JSON file (contains N, Lambda, Mu; keep secret)")
-        {
-            IsRequired = true
-        };
+        command.Add(publicKeyFileOption);
+        command.Add(privateKeyFileOption);
 
-        command.AddOption(publicKeyFileOption);
-        command.AddOption(privateKeyFileOption);
-
-        command.SetHandler(async (string publicKeyFile, string privateKeyFile) =>
+        command.SetAction(async (parseResult, cancellationToken) =>
         {
             try
             {
+                var publicKeyFile = parseResult.GetValue(publicKeyFileOption)!;
+                var privateKeyFile = parseResult.GetValue(privateKeyFileOption)!;
+
                 var component = new HomomorphicEncryptionComponent();
                 var keyPair = component.GenerateKey();
                 var publicKey = new PaillierPublicKey { N = keyPair.N };
@@ -67,7 +59,7 @@ public static class CryptoCommand
                 Console.WriteLine($"Error: {ex.Message}");
                 Environment.Exit(1);
             }
-        }, publicKeyFileOption, privateKeyFileOption);
+        });
 
         return command;
     }
@@ -76,35 +68,22 @@ public static class CryptoCommand
     {
         var command = new Command("encrypt", "Encrypt a number using a Paillier public key");
 
-        var numberOption = new Option<long>(
-            aliases: ["--number"],
-            description: "The non-negative integer to encrypt")
-        {
-            IsRequired = true
-        };
+        var numberOption = new Option<long>("--number") { Description = "The non-negative integer to encrypt", Required = true };
+        var publicKeyFileOption = new Option<string>("--public-key-file") { Description = "Path to the public key JSON file", Required = true };
+        var outFileOption = new Option<string>("--out-file") { Description = "Path to write the encrypted number JSON file", Required = true };
 
-        var publicKeyFileOption = new Option<string>(
-            aliases: ["--public-key-file"],
-            description: "Path to the public key JSON file")
-        {
-            IsRequired = true
-        };
+        command.Add(numberOption);
+        command.Add(publicKeyFileOption);
+        command.Add(outFileOption);
 
-        var outFileOption = new Option<string>(
-            aliases: ["--out-file"],
-            description: "Path to write the encrypted number JSON file")
-        {
-            IsRequired = true
-        };
-
-        command.AddOption(numberOption);
-        command.AddOption(publicKeyFileOption);
-        command.AddOption(outFileOption);
-
-        command.SetHandler(async (long number, string publicKeyFile, string outFile) =>
+        command.SetAction(async (parseResult, cancellationToken) =>
         {
             try
             {
+                var number = parseResult.GetValue(numberOption);
+                var publicKeyFile = parseResult.GetValue(publicKeyFileOption)!;
+                var outFile = parseResult.GetValue(outFileOption)!;
+
                 var keyJson = await File.ReadAllTextAsync(publicKeyFile);
                 var publicKey = JsonSerializer.Deserialize<PaillierPublicKey>(keyJson)
                     ?? throw new InvalidOperationException("Failed to deserialize public key.");
@@ -121,7 +100,7 @@ public static class CryptoCommand
                 Console.WriteLine($"Error: {ex.Message}");
                 Environment.Exit(1);
             }
-        }, numberOption, publicKeyFileOption, outFileOption);
+        });
 
         return command;
     }
@@ -130,27 +109,19 @@ public static class CryptoCommand
     {
         var command = new Command("decrypt", "Decrypt an encrypted number using a Paillier private key");
 
-        var inFileOption = new Option<string>(
-            aliases: ["--in-file"],
-            description: "Path to the encrypted number JSON file")
-        {
-            IsRequired = true
-        };
+        var inFileOption = new Option<string>("--in-file") { Description = "Path to the encrypted number JSON file", Required = true };
+        var privateKeyFileOption = new Option<string>("--private-key-file") { Description = "Path to the private key JSON file", Required = true };
 
-        var privateKeyFileOption = new Option<string>(
-            aliases: ["--private-key-file"],
-            description: "Path to the private key JSON file")
-        {
-            IsRequired = true
-        };
+        command.Add(inFileOption);
+        command.Add(privateKeyFileOption);
 
-        command.AddOption(inFileOption);
-        command.AddOption(privateKeyFileOption);
-
-        command.SetHandler(async (string inFile, string privateKeyFile) =>
+        command.SetAction(async (parseResult, cancellationToken) =>
         {
             try
             {
+                var inFile = parseResult.GetValue(inFileOption)!;
+                var privateKeyFile = parseResult.GetValue(privateKeyFileOption)!;
+
                 var encryptedJson = await File.ReadAllTextAsync(inFile);
                 var encrypted = JsonSerializer.Deserialize<EncryptedNumber>(encryptedJson)
                     ?? throw new InvalidOperationException("Failed to deserialize encrypted number.");
@@ -168,7 +139,7 @@ public static class CryptoCommand
                 Console.WriteLine($"Error: {ex.Message}");
                 Environment.Exit(1);
             }
-        }, inFileOption, privateKeyFileOption);
+        });
 
         return command;
     }
@@ -177,35 +148,22 @@ public static class CryptoCommand
     {
         var command = new Command("add", "Homomorphically add two encrypted numbers without decrypting them");
 
-        var inFile1Option = new Option<string>(
-            aliases: ["--in-file1"],
-            description: "Path to the first encrypted number JSON file")
-        {
-            IsRequired = true
-        };
+        var inFile1Option = new Option<string>("--in-file1") { Description = "Path to the first encrypted number JSON file", Required = true };
+        var inFile2Option = new Option<string>("--in-file2") { Description = "Path to the second encrypted number JSON file", Required = true };
+        var outFileOption = new Option<string>("--out-file") { Description = "Path to write the encrypted sum JSON file", Required = true };
 
-        var inFile2Option = new Option<string>(
-            aliases: ["--in-file2"],
-            description: "Path to the second encrypted number JSON file")
-        {
-            IsRequired = true
-        };
+        command.Add(inFile1Option);
+        command.Add(inFile2Option);
+        command.Add(outFileOption);
 
-        var outFileOption = new Option<string>(
-            aliases: ["--out-file"],
-            description: "Path to write the encrypted sum JSON file")
-        {
-            IsRequired = true
-        };
-
-        command.AddOption(inFile1Option);
-        command.AddOption(inFile2Option);
-        command.AddOption(outFileOption);
-
-        command.SetHandler(async (string inFile1, string inFile2, string outFile) =>
+        command.SetAction(async (parseResult, cancellationToken) =>
         {
             try
             {
+                var inFile1 = parseResult.GetValue(inFile1Option)!;
+                var inFile2 = parseResult.GetValue(inFile2Option)!;
+                var outFile = parseResult.GetValue(outFileOption)!;
+
                 var enc1Json = await File.ReadAllTextAsync(inFile1);
                 var encrypted1 = JsonSerializer.Deserialize<EncryptedNumber>(enc1Json)
                     ?? throw new InvalidOperationException("Failed to deserialize first encrypted number.");
@@ -226,7 +184,7 @@ public static class CryptoCommand
                 Console.WriteLine($"Error: {ex.Message}");
                 Environment.Exit(1);
             }
-        }, inFile1Option, inFile2Option, outFileOption);
+        });
 
         return command;
     }
@@ -235,35 +193,22 @@ public static class CryptoCommand
     {
         var command = new Command("subtract", "Homomorphically subtract two encrypted numbers without decrypting them");
 
-        var inFile1Option = new Option<string>(
-            aliases: ["--in-file1"],
-            description: "Path to the first encrypted number JSON file (minuend)")
-        {
-            IsRequired = true
-        };
+        var inFile1Option = new Option<string>("--in-file1") { Description = "Path to the first encrypted number JSON file (minuend)", Required = true };
+        var inFile2Option = new Option<string>("--in-file2") { Description = "Path to the second encrypted number JSON file (subtrahend)", Required = true };
+        var outFileOption = new Option<string>("--out-file") { Description = "Path to write the encrypted difference JSON file", Required = true };
 
-        var inFile2Option = new Option<string>(
-            aliases: ["--in-file2"],
-            description: "Path to the second encrypted number JSON file (subtrahend)")
-        {
-            IsRequired = true
-        };
+        command.Add(inFile1Option);
+        command.Add(inFile2Option);
+        command.Add(outFileOption);
 
-        var outFileOption = new Option<string>(
-            aliases: ["--out-file"],
-            description: "Path to write the encrypted difference JSON file")
-        {
-            IsRequired = true
-        };
-
-        command.AddOption(inFile1Option);
-        command.AddOption(inFile2Option);
-        command.AddOption(outFileOption);
-
-        command.SetHandler(async (string inFile1, string inFile2, string outFile) =>
+        command.SetAction(async (parseResult, cancellationToken) =>
         {
             try
             {
+                var inFile1 = parseResult.GetValue(inFile1Option)!;
+                var inFile2 = parseResult.GetValue(inFile2Option)!;
+                var outFile = parseResult.GetValue(outFileOption)!;
+
                 var enc1Json = await File.ReadAllTextAsync(inFile1);
                 var encrypted1 = JsonSerializer.Deserialize<EncryptedNumber>(enc1Json)
                     ?? throw new InvalidOperationException("Failed to deserialize first encrypted number.");
@@ -284,7 +229,7 @@ public static class CryptoCommand
                 Console.WriteLine($"Error: {ex.Message}");
                 Environment.Exit(1);
             }
-        }, inFile1Option, inFile2Option, outFileOption);
+        });
 
         return command;
     }
@@ -293,35 +238,22 @@ public static class CryptoCommand
     {
         var command = new Command("multiply", "Homomorphically multiply an encrypted number by a plaintext scalar without decrypting it");
 
-        var inFileOption = new Option<string>(
-            aliases: ["--in-file"],
-            description: "Path to the encrypted number JSON file")
-        {
-            IsRequired = true
-        };
+        var inFileOption = new Option<string>("--in-file") { Description = "Path to the encrypted number JSON file", Required = true };
+        var scalarOption = new Option<long>("--scalar") { Description = "The non-negative plaintext integer to multiply by", Required = true };
+        var outFileOption = new Option<string>("--out-file") { Description = "Path to write the encrypted product JSON file", Required = true };
 
-        var scalarOption = new Option<long>(
-            aliases: ["--scalar"],
-            description: "The non-negative plaintext integer to multiply by")
-        {
-            IsRequired = true
-        };
+        command.Add(inFileOption);
+        command.Add(scalarOption);
+        command.Add(outFileOption);
 
-        var outFileOption = new Option<string>(
-            aliases: ["--out-file"],
-            description: "Path to write the encrypted product JSON file")
-        {
-            IsRequired = true
-        };
-
-        command.AddOption(inFileOption);
-        command.AddOption(scalarOption);
-        command.AddOption(outFileOption);
-
-        command.SetHandler(async (string inFile, long scalar, string outFile) =>
+        command.SetAction(async (parseResult, cancellationToken) =>
         {
             try
             {
+                var inFile = parseResult.GetValue(inFileOption)!;
+                var scalar = parseResult.GetValue(scalarOption);
+                var outFile = parseResult.GetValue(outFileOption)!;
+
                 var encJson = await File.ReadAllTextAsync(inFile);
                 var encrypted = JsonSerializer.Deserialize<EncryptedNumber>(encJson)
                     ?? throw new InvalidOperationException("Failed to deserialize encrypted number.");
@@ -338,7 +270,7 @@ public static class CryptoCommand
                 Console.WriteLine($"Error: {ex.Message}");
                 Environment.Exit(1);
             }
-        }, inFileOption, scalarOption, outFileOption);
+        });
 
         return command;
     }
@@ -347,35 +279,22 @@ public static class CryptoCommand
     {
         var command = new Command("encrypt-string", "Encrypt a UTF-8 string (max 100 characters) as an array of homomorphically encrypted code points");
 
-        var stringOption = new Option<string>(
-            aliases: ["--string"],
-            description: "The plaintext string to encrypt (max 100 characters)")
-        {
-            IsRequired = true
-        };
+        var stringOption = new Option<string>("--string") { Description = "The plaintext string to encrypt (max 100 characters)", Required = true };
+        var publicKeyFileOption = new Option<string>("--public-key-file") { Description = "Path to the public key JSON file", Required = true };
+        var outFileOption = new Option<string>("--out-file") { Description = "Path to write the encrypted string JSON file", Required = true };
 
-        var publicKeyFileOption = new Option<string>(
-            aliases: ["--public-key-file"],
-            description: "Path to the public key JSON file")
-        {
-            IsRequired = true
-        };
+        command.Add(stringOption);
+        command.Add(publicKeyFileOption);
+        command.Add(outFileOption);
 
-        var outFileOption = new Option<string>(
-            aliases: ["--out-file"],
-            description: "Path to write the encrypted string JSON file")
-        {
-            IsRequired = true
-        };
-
-        command.AddOption(stringOption);
-        command.AddOption(publicKeyFileOption);
-        command.AddOption(outFileOption);
-
-        command.SetHandler(async (string str, string publicKeyFile, string outFile) =>
+        command.SetAction(async (parseResult, cancellationToken) =>
         {
             try
             {
+                var str = parseResult.GetValue(stringOption)!;
+                var publicKeyFile = parseResult.GetValue(publicKeyFileOption)!;
+                var outFile = parseResult.GetValue(outFileOption)!;
+
                 var keyJson = await File.ReadAllTextAsync(publicKeyFile);
                 var publicKey = JsonSerializer.Deserialize<PaillierPublicKey>(keyJson)
                     ?? throw new InvalidOperationException("Failed to deserialize public key.");
@@ -391,7 +310,7 @@ public static class CryptoCommand
                 Console.WriteLine($"Error: {ex.Message}");
                 Environment.Exit(1);
             }
-        }, stringOption, publicKeyFileOption, outFileOption);
+        });
 
         return command;
     }
@@ -400,27 +319,19 @@ public static class CryptoCommand
     {
         var command = new Command("decrypt-string", "Decrypt a homomorphically encrypted string and print the plaintext");
 
-        var inFileOption = new Option<string>(
-            aliases: ["--in-file"],
-            description: "Path to the encrypted string JSON file")
-        {
-            IsRequired = true
-        };
+        var inFileOption = new Option<string>("--in-file") { Description = "Path to the encrypted string JSON file", Required = true };
+        var privateKeyFileOption = new Option<string>("--private-key-file") { Description = "Path to the private key JSON file", Required = true };
 
-        var privateKeyFileOption = new Option<string>(
-            aliases: ["--private-key-file"],
-            description: "Path to the private key JSON file")
-        {
-            IsRequired = true
-        };
+        command.Add(inFileOption);
+        command.Add(privateKeyFileOption);
 
-        command.AddOption(inFileOption);
-        command.AddOption(privateKeyFileOption);
-
-        command.SetHandler(async (string inFile, string privateKeyFile) =>
+        command.SetAction(async (parseResult, cancellationToken) =>
         {
             try
             {
+                var inFile = parseResult.GetValue(inFileOption)!;
+                var privateKeyFile = parseResult.GetValue(privateKeyFileOption)!;
+
                 var encJson = await File.ReadAllTextAsync(inFile);
                 var encrypted = JsonSerializer.Deserialize<EncryptedString>(encJson)
                     ?? throw new InvalidOperationException("Failed to deserialize encrypted string.");
@@ -437,7 +348,7 @@ public static class CryptoCommand
                 Console.WriteLine($"Error: {ex.Message}");
                 Environment.Exit(1);
             }
-        }, inFileOption, privateKeyFileOption);
+        });
 
         return command;
     }
@@ -446,43 +357,25 @@ public static class CryptoCommand
     {
         var command = new Command("replace", "Replace characters at a known position in an encrypted string without decrypting it");
 
-        var inFileOption = new Option<string>(
-            aliases: ["--in-file"],
-            description: "Path to the encrypted string JSON file")
-        {
-            IsRequired = true
-        };
+        var inFileOption = new Option<string>("--in-file") { Description = "Path to the encrypted string JSON file", Required = true };
+        var startOption = new Option<int>("--start") { Description = "Zero-based index of the first character to replace", Required = true };
+        var replacementOption = new Option<string>("--replacement") { Description = "Plaintext replacement characters", Required = true };
+        var outFileOption = new Option<string>("--out-file") { Description = "Path to write the updated encrypted string JSON file", Required = true };
 
-        var startOption = new Option<int>(
-            aliases: ["--start"],
-            description: "Zero-based index of the first character to replace")
-        {
-            IsRequired = true
-        };
+        command.Add(inFileOption);
+        command.Add(startOption);
+        command.Add(replacementOption);
+        command.Add(outFileOption);
 
-        var replacementOption = new Option<string>(
-            aliases: ["--replacement"],
-            description: "Plaintext replacement characters")
-        {
-            IsRequired = true
-        };
-
-        var outFileOption = new Option<string>(
-            aliases: ["--out-file"],
-            description: "Path to write the updated encrypted string JSON file")
-        {
-            IsRequired = true
-        };
-
-        command.AddOption(inFileOption);
-        command.AddOption(startOption);
-        command.AddOption(replacementOption);
-        command.AddOption(outFileOption);
-
-        command.SetHandler(async (string inFile, int start, string replacement, string outFile) =>
+        command.SetAction(async (parseResult, cancellationToken) =>
         {
             try
             {
+                var inFile = parseResult.GetValue(inFileOption)!;
+                var start = parseResult.GetValue(startOption);
+                var replacement = parseResult.GetValue(replacementOption)!;
+                var outFile = parseResult.GetValue(outFileOption)!;
+
                 var encJson = await File.ReadAllTextAsync(inFile);
                 var encrypted = JsonSerializer.Deserialize<EncryptedString>(encJson)
                     ?? throw new InvalidOperationException("Failed to deserialize encrypted string.");
@@ -498,7 +391,7 @@ public static class CryptoCommand
                 Console.WriteLine($"Error: {ex.Message}");
                 Environment.Exit(1);
             }
-        }, inFileOption, startOption, replacementOption, outFileOption);
+        });
 
         return command;
     }
@@ -507,40 +400,25 @@ public static class CryptoCommand
     {
         var command = new Command("substring", "Extract a slice of an encrypted string by position without decrypting it");
 
-        var inFileOption = new Option<string>(
-            aliases: ["--in-file"],
-            description: "Path to the encrypted string JSON file")
-        {
-            IsRequired = true
-        };
+        var inFileOption = new Option<string>("--in-file") { Description = "Path to the encrypted string JSON file", Required = true };
+        var startOption = new Option<int>("--start") { Description = "Zero-based index of the first character to include", Required = true };
+        var lengthOption = new Option<int?>("--length") { Description = "Number of characters to include (defaults to remainder of string)" };
+        var outFileOption = new Option<string>("--out-file") { Description = "Path to write the encrypted substring JSON file", Required = true };
 
-        var startOption = new Option<int>(
-            aliases: ["--start"],
-            description: "Zero-based index of the first character to include")
-        {
-            IsRequired = true
-        };
+        command.Add(inFileOption);
+        command.Add(startOption);
+        command.Add(lengthOption);
+        command.Add(outFileOption);
 
-        var lengthOption = new Option<int?>(
-            aliases: ["--length"],
-            description: "Number of characters to include (defaults to remainder of string)");
-
-        var outFileOption = new Option<string>(
-            aliases: ["--out-file"],
-            description: "Path to write the encrypted substring JSON file")
-        {
-            IsRequired = true
-        };
-
-        command.AddOption(inFileOption);
-        command.AddOption(startOption);
-        command.AddOption(lengthOption);
-        command.AddOption(outFileOption);
-
-        command.SetHandler(async (string inFile, int start, int? length, string outFile) =>
+        command.SetAction(async (parseResult, cancellationToken) =>
         {
             try
             {
+                var inFile = parseResult.GetValue(inFileOption)!;
+                var start = parseResult.GetValue(startOption);
+                var length = parseResult.GetValue(lengthOption);
+                var outFile = parseResult.GetValue(outFileOption)!;
+
                 var encJson = await File.ReadAllTextAsync(inFile);
                 var encrypted = JsonSerializer.Deserialize<EncryptedString>(encJson)
                     ?? throw new InvalidOperationException("Failed to deserialize encrypted string.");
@@ -556,7 +434,7 @@ public static class CryptoCommand
                 Console.WriteLine($"Error: {ex.Message}");
                 Environment.Exit(1);
             }
-        }, inFileOption, startOption, lengthOption, outFileOption);
+        });
 
         return command;
     }

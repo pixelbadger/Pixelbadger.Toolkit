@@ -9,9 +9,9 @@ public static class InterpretersCommand
     {
         var command = new Command("interpreters", "Esoteric programming language interpreters");
 
-        command.AddCommand(CreateBrainfuckCommand());
-        command.AddCommand(CreateOokCommand());
-        command.AddCommand(CreateBfToOokCommand());
+        command.Add(CreateBrainfuckCommand());
+        command.Add(CreateOokCommand());
+        command.Add(CreateBfToOokCommand());
 
         return command;
     }
@@ -20,19 +20,15 @@ public static class InterpretersCommand
     {
         var command = new Command("brainfuck", "Executes a Brainfuck program from a file");
 
-        var fileOption = new Option<string>(
-            aliases: ["--file"],
-            description: "Path to the Brainfuck program file")
-        {
-            IsRequired = true
-        };
+        var fileOption = new Option<string>("--file") { Description = "Path to the Brainfuck program file", Required = true };
 
-        command.AddOption(fileOption);
+        command.Add(fileOption);
 
-        command.SetHandler(async (string file) =>
+        command.SetAction(async (parseResult, cancellationToken) =>
         {
             try
             {
+                var file = parseResult.GetValue(fileOption)!;
                 var interpreter = new BrainfuckInterpreter();
                 var result = await interpreter.ExecuteAsync(file);
                 Console.Write(result);
@@ -42,7 +38,7 @@ public static class InterpretersCommand
                 Console.WriteLine($"Error: {ex.Message}");
                 Environment.Exit(1);
             }
-        }, fileOption);
+        });
 
         return command;
     }
@@ -51,19 +47,15 @@ public static class InterpretersCommand
     {
         var command = new Command("ook", "Executes an Ook program from a file");
 
-        var fileOption = new Option<string>(
-            aliases: ["--file"],
-            description: "Path to the Ook program file")
-        {
-            IsRequired = true
-        };
+        var fileOption = new Option<string>("--file") { Description = "Path to the Ook program file", Required = true };
 
-        command.AddOption(fileOption);
+        command.Add(fileOption);
 
-        command.SetHandler(async (string file) =>
+        command.SetAction(async (parseResult, cancellationToken) =>
         {
             try
             {
+                var file = parseResult.GetValue(fileOption)!;
                 var interpreter = new OokInterpreter();
                 var result = await interpreter.ExecuteAsync(file);
                 Console.Write(result);
@@ -73,7 +65,7 @@ public static class InterpretersCommand
                 Console.WriteLine($"Error: {ex.Message}");
                 Environment.Exit(1);
             }
-        }, fileOption);
+        });
 
         return command;
     }
@@ -82,27 +74,18 @@ public static class InterpretersCommand
     {
         var command = new Command("bf-to-ook", "Converts a Brainfuck program to Ook language");
 
-        var sourceOption = new Option<string>(
-            aliases: ["--source"],
-            description: "Path to the source Brainfuck program file")
-        {
-            IsRequired = true
-        };
+        var sourceOption = new Option<string>("--source") { Description = "Path to the source Brainfuck program file", Required = true };
+        var outputOption = new Option<string>("--output") { Description = "Path to the output Ook program file", Required = true };
 
-        var outputOption = new Option<string>(
-            aliases: ["--output"],
-            description: "Path to the output Ook program file")
-        {
-            IsRequired = true
-        };
+        command.Add(sourceOption);
+        command.Add(outputOption);
 
-        command.AddOption(sourceOption);
-        command.AddOption(outputOption);
-
-        command.SetHandler(async (string source, string output) =>
+        command.SetAction(async (parseResult, cancellationToken) =>
         {
             try
             {
+                var source = parseResult.GetValue(sourceOption)!;
+                var output = parseResult.GetValue(outputOption)!;
                 var component = new BfToOokComponent();
                 await component.TranslateFileAsync(source, output);
                 Console.WriteLine($"Successfully converted {source} to Ook language and saved to {output}");
@@ -112,9 +95,8 @@ public static class InterpretersCommand
                 Console.WriteLine($"Error: {ex.Message}");
                 Environment.Exit(1);
             }
-        }, sourceOption, outputOption);
+        });
 
         return command;
     }
-
 }
