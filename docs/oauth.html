@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pixelbadger Toolkit — OAuth</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      line-height: 1.6;
+    }
+
+    header {
+      background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+      border-bottom: 1px solid #334155;
+      padding: 2rem 2.5rem;
+    }
+
+    header h1 { font-size: 1.75rem; font-weight: 700; color: #f8fafc; }
+    header .subtitle { margin-top: 0.4rem; font-size: 1rem; color: #94a3b8; }
+    header .meta { margin-top: 0.5rem; font-size: 0.85rem; color: #64748b; }
+
+    .badge {
+      display: inline-block;
+      background: #1e40af;
+      color: #bfdbfe;
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 999px;
+      letter-spacing: 0.05em;
+      vertical-align: middle;
+      margin-left: 0.5rem;
+    }
+
+    nav {
+      background: #0f1117;
+      border-bottom: 1px solid #1e293b;
+      padding: 0.75rem 2.5rem;
+      display: flex;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+    }
+
+    nav a {
+      color: #60a5fa;
+      text-decoration: none;
+      font-size: 0.85rem;
+      font-weight: 500;
+    }
+
+    nav a:hover { color: #93c5fd; text-decoration: underline; }
+
+    .content { max-width: 1100px; margin: 0 auto; padding: 2rem 2.5rem; }
+
+    section { margin-bottom: 3rem; }
+
+    h2 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: #f1f5f9;
+      border-bottom: 1px solid #1e293b;
+      padding-bottom: 0.5rem;
+      margin-bottom: 1.25rem;
+    }
+
+    h3 {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: #cbd5e1;
+      margin: 1.5rem 0 0.75rem;
+    }
+
+    p { color: #94a3b8; margin-bottom: 0.75rem; }
+
+    code {
+      background: #1e293b;
+      color: #7dd3fc;
+      font-family: 'Courier New', monospace;
+      font-size: 0.85em;
+      padding: 0.15em 0.4em;
+      border-radius: 3px;
+    }
+
+    .cmd-block {
+      background: #020617;
+      border: 1px solid #1e293b;
+      border-left: 3px solid #22d3ee;
+      border-radius: 4px;
+      padding: 0.75rem 1rem;
+      margin: 0.5rem 0;
+      font-family: 'Courier New', monospace;
+      font-size: 0.85rem;
+      color: #e2e8f0;
+      overflow-x: auto;
+    }
+
+    .cmd-block .prompt { color: #64748b; user-select: none; }
+    .cmd-block .cmd { color: #22d3ee; }
+    .cmd-block .opt { color: #a78bfa; }
+    .cmd-block .val { color: #86efac; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+      margin: 1rem 0;
+    }
+
+    th {
+      background: #1e293b;
+      color: #cbd5e1;
+      font-weight: 600;
+      text-align: left;
+      padding: 0.6rem 0.9rem;
+      border: 1px solid #334155;
+    }
+
+    td {
+      padding: 0.55rem 0.9rem;
+      border: 1px solid #1e293b;
+      color: #94a3b8;
+      vertical-align: top;
+    }
+
+    tr:nth-child(even) td { background: #0f172a; }
+    tr:nth-child(odd) td { background: #131b2e; }
+
+    td code { font-size: 0.8rem; }
+
+    .diagram-wrap {
+      background: #131b2e;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin: 1rem 0;
+      overflow-x: auto;
+    }
+
+    .diagram-wrap .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .key-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem;
+      margin: 1rem 0;
+    }
+
+    .key-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      padding: 1rem;
+    }
+
+    .key-card .label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #64748b;
+      margin-bottom: 0.25rem;
+    }
+
+    .key-card .name {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #60a5fa;
+      margin-bottom: 0.35rem;
+    }
+
+    .key-card p {
+      font-size: 0.82rem;
+      color: #64748b;
+      margin: 0;
+    }
+
+    .info-box {
+      background: #0c2340;
+      border: 1px solid #1d4ed8;
+      border-left: 3px solid #3b82f6;
+      border-radius: 4px;
+      padding: 0.9rem 1.1rem;
+      margin: 1rem 0;
+      font-size: 0.88rem;
+      color: #93c5fd;
+    }
+
+    .warning-box {
+      background: #1c1008;
+      border: 1px solid #92400e;
+      border-left: 3px solid #f59e0b;
+      border-radius: 4px;
+      padding: 0.9rem 1.1rem;
+      margin: 1rem 0;
+      font-size: 0.88rem;
+      color: #fcd34d;
+    }
+
+    footer {
+      border-top: 1px solid #1e293b;
+      padding: 1.5rem 2.5rem;
+      text-align: center;
+      font-size: 0.8rem;
+      color: #475569;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>OAuth <span class="badge">oauth</span></h1>
+  <div class="subtitle">OAuth utilities — acquire access tokens and manage named connection profiles</div>
+  <div class="meta">Pixelbadger Toolkit &mdash; <code>pbtk oauth</code> &mdash; <a href="index.html" style="color:#60a5fa">&#8592; all topics</a></div>
+</header>
+
+<nav>
+  <a href="#overview">Overview</a>
+  <a href="#token">token</a>
+  <a href="#profile">profile</a>
+  <a href="#command-ref">Command Reference</a>
+</nav>
+
+<div class="content">
+
+  <!-- OVERVIEW -->
+  <section id="overview">
+    <h2>Overview</h2>
+    <p>
+      The <code>oauth</code> topic provides two capabilities: acquiring an OAuth 2.0 access token using
+      the Resource Owner Password Credentials (ROPC) grant, and managing the named profiles that store
+      the connection settings for each OAuth endpoint.
+    </p>
+    <p>
+      Profiles are stored locally and referenced by name when acquiring tokens. This avoids repeating
+      authority URLs and client credentials on every invocation.
+    </p>
+
+    <div class="key-grid">
+      <div class="key-card">
+        <div class="label">Grant type</div>
+        <div class="name">ROPC</div>
+        <p>Resource Owner Password Credentials. Username and password are supplied interactively at runtime.</p>
+      </div>
+      <div class="key-card">
+        <div class="label">Profile storage</div>
+        <div class="name">Local file</div>
+        <p>Profiles are persisted in a local configuration file managed by the toolkit.</p>
+      </div>
+      <div class="key-card">
+        <div class="label">Secrets</div>
+        <div class="name">Secure input</div>
+        <p>Passwords and client secrets are read with echo suppressed so they do not appear in the terminal.</p>
+      </div>
+      <div class="key-card">
+        <div class="label">Output</div>
+        <div class="name">stdout token</div>
+        <p>The raw access token is printed to stdout, suitable for scripting with <code>$()</code> substitution.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- TOKEN -->
+  <section id="token">
+    <h2>token</h2>
+    <p>
+      Acquires an OAuth access token for the specified profile using the Resource Owner Password Credentials
+      grant. Username is prompted on stdout; password is read silently (no echo). The access token is
+      printed to stdout on success.
+    </p>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk oauth token</span>
+      <span class="opt"> --profile</span> <span class="val">my-api</span>
+    </div>
+
+    <div class="diagram-wrap">
+      <div class="mermaid">
+flowchart TD
+    CLI["pbtk oauth token\n--profile my-api"] --> LOAD["Load profile\n(authority, client-id, scope)"]
+    LOAD --> UNAME["Prompt: Username"]
+    UNAME --> PASS["Prompt: Password\n(silent input)"]
+    PASS --> HTTP["POST /token\ngrant_type=password\nusername + password\nclient credentials"]
+    HTTP --> OUT(["stdout: access_token"])
+      </div>
+    </div>
+
+    <div class="warning-box">
+      <strong>ROPC is a legacy grant.</strong> Many modern identity providers disable it by default.
+      It requires that the application handles user credentials directly — use it only with providers
+      and clients explicitly configured to allow it.
+    </div>
+
+    <table>
+      <thead><tr><th>Option</th><th>Required</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--profile</code></td><td>Yes</td><td>Name of the saved OAuth profile to use for the token request</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- PROFILE -->
+  <section id="profile">
+    <h2>profile</h2>
+    <p>
+      Manages the named OAuth profiles used by the <code>token</code> command. Three sub-actions are
+      available: <code>add</code>, <code>update</code>, and <code>delete</code>.
+    </p>
+
+    <h3>profile add</h3>
+    <p>Creates a new named profile. The client secret is read silently if not supplied via the option.</p>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk oauth profile add</span>
+      <span class="opt"> --name</span> <span class="val">my-api</span>
+      <span class="opt"> --authority</span> <span class="val">https://login.microsoftonline.com/tenant-id</span>
+      <span class="opt"> --client-id</span> <span class="val">xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx</span>
+      <span class="opt"> --scope</span> <span class="val">api://my-api/.default</span>
+    </div>
+
+    <table>
+      <thead><tr><th>Option</th><th>Required</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--name</code></td><td>Yes</td><td>Unique profile name used when running <code>token</code></td></tr>
+        <tr><td><code>--authority</code></td><td>Yes</td><td>OAuth authority base URI (token endpoint is derived from this)</td></tr>
+        <tr><td><code>--client-id</code></td><td>Yes</td><td>OAuth application (client) ID</td></tr>
+        <tr><td><code>--client-secret</code></td><td>No</td><td>Client secret; prompted securely if omitted</td></tr>
+        <tr><td><code>--scope</code></td><td>No</td><td>OAuth scope(s) to request; omit for providers that use a fixed scope</td></tr>
+      </tbody>
+    </table>
+
+    <h3>profile update</h3>
+    <p>Updates one or more fields of an existing profile. Only the options supplied are changed; omitted options retain their current values.</p>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk oauth profile update</span>
+      <span class="opt"> --name</span> <span class="val">my-api</span>
+      <span class="opt"> --scope</span> <span class="val">api://my-api/read</span>
+    </div>
+
+    <table>
+      <thead><tr><th>Option</th><th>Required</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--name</code></td><td>Yes</td><td>Name of the profile to update</td></tr>
+        <tr><td><code>--authority</code></td><td>No</td><td>New authority URI</td></tr>
+        <tr><td><code>--client-id</code></td><td>No</td><td>New client ID</td></tr>
+        <tr><td><code>--client-secret</code></td><td>No</td><td>New client secret; prompted securely if omitted and the flag is present</td></tr>
+        <tr><td><code>--scope</code></td><td>No</td><td>New scope</td></tr>
+      </tbody>
+    </table>
+
+    <h3>profile delete</h3>
+    <p>Removes a saved profile by name.</p>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk oauth profile delete</span>
+      <span class="opt"> --name</span> <span class="val">my-api</span>
+    </div>
+
+    <table>
+      <thead><tr><th>Option</th><th>Required</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--name</code></td><td>Yes</td><td>Name of the profile to delete</td></tr>
+      </tbody>
+    </table>
+
+    <div class="info-box">
+      Profile names are case-sensitive. Deleting a profile that does not exist will return an error.
+    </div>
+  </section>
+
+  <!-- COMMAND REFERENCE -->
+  <section id="command-ref">
+    <h2>Command Reference</h2>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Command</th>
+          <th>Required options</th>
+          <th>Optional options</th>
+          <th>Output</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>oauth token</code></td>
+          <td><code>--profile</code></td>
+          <td>&mdash;</td>
+          <td>Access token printed to stdout</td>
+        </tr>
+        <tr>
+          <td><code>oauth profile add</code></td>
+          <td><code>--name</code> <code>--authority</code> <code>--client-id</code></td>
+          <td><code>--client-secret</code> <code>--scope</code></td>
+          <td>Confirmation message to stdout</td>
+        </tr>
+        <tr>
+          <td><code>oauth profile update</code></td>
+          <td><code>--name</code></td>
+          <td><code>--authority</code> <code>--client-id</code> <code>--client-secret</code> <code>--scope</code></td>
+          <td>Confirmation message to stdout</td>
+        </tr>
+        <tr>
+          <td><code>oauth profile delete</code></td>
+          <td><code>--name</code></td>
+          <td>&mdash;</td>
+          <td>Confirmation message to stdout</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+</div>
+
+<footer>
+  Pixelbadger Toolkit &mdash; OAuth Documentation
+</footer>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'dark',
+    themeVariables: {
+      background: '#0f172a',
+      primaryColor: '#1e3a5f',
+      primaryTextColor: '#e2e8f0',
+      primaryBorderColor: '#3b82f6',
+      lineColor: '#475569',
+      secondaryColor: '#1e293b',
+      tertiaryColor: '#0f172a',
+      edgeLabelBackground: '#1e293b',
+      clusterBkg: '#1e293b',
+      titleColor: '#f1f5f9',
+      nodeTextColor: '#e2e8f0',
+    }
+  });
+</script>
+</body>
+</html>
