@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SmolDLC — Pixelbadger Toolkit Delivery Lifecycle</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    /* ── pipeline diagram ─────────────────────────────────────────────────── */
+    .pipeline {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      margin: 1.5rem 0;
+    }
+
+    .pipeline-row {
+      display: flex;
+      align-items: stretch;
+      gap: 0;
+    }
+
+    .pipeline-row.parallel {
+      gap: 1rem;
+      align-items: flex-start;
+      margin: 0;
+    }
+
+    .stage {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.1rem 1.3rem;
+      position: relative;
+    }
+
+    .stage.human {
+      border-color: var(--accent);
+      background: color-mix(in srgb, var(--surface) 85%, var(--accent) 15%);
+    }
+
+    .stage.claude-agent {
+      border-color: #5a8fd0;
+      background: color-mix(in srgb, var(--surface) 85%, #2d4868 15%);
+    }
+
+    .stage.automation {
+      border-color: var(--border);
+      background: var(--surface2);
+    }
+
+    .stage-label {
+      font-size: 0.67rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      margin-bottom: 0.35rem;
+    }
+
+    .stage.human      .stage-label { color: var(--accent); }
+    .stage.claude-agent .stage-label { color: #90b8e8; }
+    .stage.automation .stage-label { color: var(--text3); }
+
+    .stage h3 {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--heading);
+      margin: 0 0 0.4rem;
+    }
+
+    .stage p {
+      font-size: 0.82rem;
+      color: var(--text2);
+      margin: 0;
+      line-height: 1.5;
+    }
+
+    .stage .tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.3rem;
+      margin-top: 0.5rem;
+    }
+
+    .stage .tag {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 0.72rem;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text3);
+      padding: 1px 6px;
+      border-radius: 3px;
+    }
+
+    /* connector arrows between rows */
+    .arrow-down {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 2.5rem;
+      color: var(--text3);
+      font-size: 1.4rem;
+      user-select: none;
+    }
+
+    .arrow-down.split {
+      justify-content: space-around;
+      padding: 0 4rem;
+    }
+
+    .parallel-label {
+      text-align: center;
+      font-size: 0.75rem;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: var(--text3);
+      letter-spacing: 0.05em;
+      margin-bottom: 0.5rem;
+    }
+
+    /* ── workflow table ────────────────────────────────────────────────────── */
+    .wf-actor {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      padding: 2px 7px;
+      border-radius: 3px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      white-space: nowrap;
+    }
+
+    .wf-actor.human-tag    { background: color-mix(in srgb, var(--bg) 60%, var(--accent) 40%); color: var(--accent2); }
+    .wf-actor.claude-tag   { background: var(--info-bg); color: var(--info-text); }
+    .wf-actor.actions-tag  { background: var(--surface2); color: var(--text2); }
+    .wf-actor.nuget-tag    { background: var(--badge-purple-bg); color: var(--badge-purple-text); }
+
+    /* ── install box ───────────────────────────────────────────────────────── */
+    .install-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--accent);
+      border-radius: 6px;
+      padding: 1.25rem 1.5rem;
+      margin: 1rem 0;
+    }
+
+    .install-box .install-title {
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text3);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      margin-bottom: 0.6rem;
+    }
+
+    /* ── prompt counter ────────────────────────────────────────────────────── */
+    .prompt-count {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      background: var(--surface);
+      border: 1px solid var(--accent);
+      border-radius: 8px;
+      padding: 1.25rem 1.5rem;
+      margin: 1.25rem 0;
+    }
+
+    .prompt-number {
+      font-size: 3rem;
+      font-weight: 700;
+      color: var(--accent);
+      font-family: Georgia, serif;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+
+    .prompt-detail h4 {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--heading);
+      margin: 0 0 0.3rem;
+    }
+
+    .prompt-detail p {
+      font-size: 0.85rem;
+      color: var(--text2);
+      margin: 0;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>SmolDLC</h1>
+  <div class="subtitle">The Pixelbadger Toolkit software delivery lifecycle</div>
+  <div class="meta">Two human prompts. One globally-installed CLI tool.</div>
+</header>
+
+<nav>
+  <a href="index.html">← Documentation index</a>
+  <a href="https://github.com/PixelbadgerDev/Pixelbadger.Toolkit">GitHub</a>
+  <a href="https://www.nuget.org/packages/Pixelbadger.Toolkit">NuGet</a>
+</nav>
+
+<div class="content">
+
+  <section>
+    <h2>What is SmolDLC?</h2>
+    <p>
+      SmolDLC is the informal name for the minimal software delivery lifecycle running in this
+      repository. It is small by design: most of the loop is automated, and the two moments that
+      require a human are both just prose — a ticket description and a trigger comment.
+    </p>
+    <p>
+      The chain runs from a GitHub issue all the way to a published NuGet package that anyone can
+      install with a single command. Between those two ends, an AI agent does the implementation,
+      a second AI agent reviews it, deterministic CI checks the hygiene, and project automation
+      handles the bookkeeping. No human ever touches a file or a release button.
+    </p>
+    <div class="info-box">
+      This page describes the as-built system as of May 2026. The workflows are in
+      <code>.github/workflows/</code>; the autonomous agent instructions live in
+      <code>CLAUDE.md</code>.
+    </div>
+  </section>
+
+  <section>
+    <h2>The two human prompts</h2>
+    <p>
+      Everything else in this lifecycle is automated. These are the only two moments a person
+      needs to act.
+    </p>
+
+    <div class="prompt-count">
+      <div class="prompt-number">1</div>
+      <div class="prompt-detail">
+        <h4>Write a GitHub issue</h4>
+        <p>
+          Describe the feature or bug in plain language. Label it
+          <code>status: to-do</code>. That's it — the issue sits on the kanban board
+          ready to be picked up.
+        </p>
+      </div>
+    </div>
+
+    <div class="prompt-count">
+      <div class="prompt-number">2</div>
+      <div class="prompt-detail">
+        <h4>Trigger Claude with <code>@claude</code></h4>
+        <p>
+          Post a comment anywhere on an issue or PR containing <code>@claude</code>.
+          The canonical prompt is <em>"work on the next ticket"</em> — Claude finds the
+          oldest <code>status: to-do</code> issue, claims it, implements it, and opens a PR.
+          From here the rest of the loop runs without further human input.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>The full pipeline</h2>
+    <p>Each stage below is labelled by who owns it.</p>
+
+    <div class="pipeline">
+
+      <!-- Stage 1: Issue -->
+      <div class="pipeline-row">
+        <div class="stage human">
+          <div class="stage-label">Human</div>
+          <h3>Write an issue</h3>
+          <p>
+            Create a GitHub issue describing the desired feature or bug fix.
+            Apply the <code>status: to-do</code> label to mark it as ready.
+          </p>
+          <div class="tag-row">
+            <span class="tag">GitHub Issues</span>
+            <span class="tag">status: to-do</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="arrow-down">↓</div>
+
+      <!-- Stage 2: @claude trigger -->
+      <div class="pipeline-row">
+        <div class="stage human">
+          <div class="stage-label">Human</div>
+          <h3>Comment <code>@claude work on the next ticket</code></h3>
+          <p>
+            A single comment on any issue or PR. The <code>claude.yml</code> workflow
+            triggers on the mention and hands control to the Claude Code agent.
+          </p>
+          <div class="tag-row">
+            <span class="tag">claude.yml</span>
+            <span class="tag">issue_comment trigger</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="arrow-down">↓</div>
+
+      <!-- Stage 3: Claude implements -->
+      <div class="pipeline-row">
+        <div class="stage claude-agent">
+          <div class="stage-label">Claude (Sonnet) — autonomous agent</div>
+          <h3>Claim, branch, implement, and open a PR</h3>
+          <p>
+            Claude reads the issue, relabels it <code>status: in-progress</code>, creates a
+            <code>feature/</code> branch, writes the code and tests, bumps the version,
+            updates the README, and opens a PR with <code>Closes #N</code> in the body.
+            All via the <code>gh</code> CLI and <code>dotnet</code> — no human file edits.
+          </p>
+          <div class="tag-row">
+            <span class="tag">claude-code-action@v1</span>
+            <span class="tag">claude-sonnet-4-6</span>
+            <span class="tag">gh pr create</span>
+            <span class="tag">dotnet build / test</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="arrow-down split">↓ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ↓ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ↓</div>
+      <div class="parallel-label">Three workflows fire in parallel on PR open / push</div>
+
+      <!-- Stage 4: parallel checks -->
+      <div class="pipeline-row parallel">
+
+        <div class="stage automation">
+          <div class="stage-label">GitHub Actions — free bash</div>
+          <h3>Mechanical checks</h3>
+          <p>
+            Pure bash — no API cost. Enforces three invariants:
+          </p>
+          <ul style="font-size:0.82rem; color:var(--text2); margin: 0.5rem 0 0 1.2rem; line-height:1.7;">
+            <li>Version bumped if production code changed</li>
+            <li>Test file exists for every new component</li>
+            <li>Benchmark updated for every watched algorithm</li>
+          </ul>
+          <div class="tag-row" style="margin-top:0.6rem;">
+            <span class="tag">pr-mechanical-checks.yml</span>
+          </div>
+        </div>
+
+        <div class="stage claude-agent">
+          <div class="stage-label">Claude (Haiku) — AI reviewer</div>
+          <h3>Sanity review</h3>
+          <p>
+            Haiku reads the diff and checks for:
+          </p>
+          <ul style="font-size:0.82rem; color:var(--text2); margin: 0.5rem 0 0 1.2rem; line-height:1.7;">
+            <li>Obvious bugs and logic errors</li>
+            <li>Unhandled nulls in critical paths</li>
+            <li>Prompt injection (user input → LLM calls)</li>
+            <li>Path traversal (user input → file ops)</li>
+          </ul>
+          <p style="margin-top:0.5rem;">
+            Approves or requests changes via a formal GitHub review. Concise — flags
+            issues only, no praise.
+          </p>
+          <div class="tag-row">
+            <span class="tag">claude-code-review.yml</span>
+            <span class="tag">claude-haiku-4-5</span>
+            <span class="tag">gh pr review</span>
+          </div>
+        </div>
+
+        <div class="stage automation">
+          <div class="stage-label">GitHub Actions — .NET CI</div>
+          <h3>Build, test &amp; pack</h3>
+          <p>
+            Installs .NET 9, restores, builds in Release, runs the full test suite, and
+            dry-runs a <code>dotnet pack</code> to confirm the package is well-formed.
+            Also verifies the version is strictly higher than what is already on NuGet.
+          </p>
+          <div class="tag-row">
+            <span class="tag">pr-validation.yml</span>
+            <span class="tag">dotnet test</span>
+            <span class="tag">dotnet pack</span>
+            <span class="tag">check-version-increment.ps1</span>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="arrow-down">↓ all three must pass</div>
+
+      <!-- Stage 5: iterate -->
+      <div class="pipeline-row">
+        <div class="stage claude-agent">
+          <div class="stage-label">Claude (Sonnet) — iterates on review feedback</div>
+          <h3>Fix &amp; push</h3>
+          <p>
+            If Haiku requests changes, or a human posts a follow-up <code>@claude</code>
+            comment on the PR, the agent re-activates, addresses the feedback, and pushes
+            a new commit — which re-triggers all three parallel checks above.
+          </p>
+          <div class="tag-row">
+            <span class="tag">claude.yml</span>
+            <span class="tag">pull_request_review trigger</span>
+            <span class="tag">pr_review_comment trigger</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="arrow-down">↓</div>
+
+      <!-- Stage 6: merge -->
+      <div class="pipeline-row">
+        <div class="stage automation">
+          <div class="stage-label">Human or agent — merge gate</div>
+          <h3>Squash merge to master</h3>
+          <p>
+            Once all checks pass and the Haiku review approves, the PR is merged with
+            <code>gh pr merge --squash --delete-branch</code>. The feature branch is
+            deleted automatically.
+          </p>
+          <div class="tag-row">
+            <span class="tag">gh pr merge</span>
+            <span class="tag">squash</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="arrow-down split">↓ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ↓</div>
+      <div class="parallel-label">Two post-merge workflows fire</div>
+
+      <div class="pipeline-row parallel">
+
+        <!-- Stage 7a: project automation -->
+        <div class="stage automation">
+          <div class="stage-label">GitHub Actions — project automation</div>
+          <h3>Close issues &amp; apply release label</h3>
+          <p>
+            Reads the version from the <code>.csproj</code>, creates a
+            <code>release/vX.Y.Z</code> label if it does not exist, then parses the PR
+            body for <code>Closes #N</code> references. Each linked issue gets:
+          </p>
+          <ul style="font-size:0.82rem; color:var(--text2); margin: 0.5rem 0 0 1.2rem; line-height:1.7;">
+            <li>Label <code>status: done</code> added</li>
+            <li>Label <code>status: in-progress</code> removed</li>
+            <li>Release label <code>release/vX.Y.Z</code> added</li>
+            <li>Issue closed with a comment</li>
+          </ul>
+          <div class="tag-row" style="margin-top:0.5rem;">
+            <span class="tag">project-automation.yml</span>
+            <span class="tag">on: pull_request closed</span>
+          </div>
+        </div>
+
+        <!-- Stage 7b: publish -->
+        <div class="stage automation">
+          <div class="stage-label">GitHub Actions — continuous delivery</div>
+          <h3>Build, pack, publish &amp; release</h3>
+          <p>
+            Triggered by the merge push to master (only when production files changed).
+            Runs a clean Release build and test, then:
+          </p>
+          <ul style="font-size:0.82rem; color:var(--text2); margin: 0.5rem 0 0 1.2rem; line-height:1.7;">
+            <li>Packs the NuGet package</li>
+            <li>Pushes to <code>nuget.org</code> with <code>--skip-duplicate</code></li>
+            <li>Tags the commit <code>vX.Y.Z</code> on GitHub</li>
+            <li>Creates a GitHub Release with auto-generated notes</li>
+          </ul>
+          <div class="tag-row" style="margin-top:0.5rem;">
+            <span class="tag">publish-to-nuget.yml</span>
+            <span class="tag">dotnet nuget push</span>
+            <span class="tag">gh release create</span>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="arrow-down">↓</div>
+
+      <!-- Stage 8: install -->
+      <div class="pipeline-row">
+        <div class="stage human">
+          <div class="stage-label">Anyone, anywhere</div>
+          <h3>Install the tool</h3>
+          <p>
+            The package is live on NuGet within minutes of the merge. No action required
+            from the repository owner.
+          </p>
+          <div class="cmd-block" style="margin-top:0.75rem;">
+            <span class="prompt">$ </span><span class="cmd">dotnet tool install</span>
+            <span class="opt"> --global</span>
+            <span class="val"> Pixelbadger.Toolkit</span>
+          </div>
+          <div class="cmd-block">
+            <span class="prompt">$ </span><span class="cmd">pbtk</span>
+            <span class="val"> &lt;topic&gt;</span>
+            <span class="val"> &lt;action&gt;</span>
+            <span class="opt"> [options]</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <section>
+    <h2>Workflow reference</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Workflow file</th>
+          <th>Trigger</th>
+          <th>Actor</th>
+          <th>What it does</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>claude.yml</code></td>
+          <td>Issue / PR / review comment containing <code>@claude</code></td>
+          <td><span class="wf-actor claude-tag">Claude Sonnet</span></td>
+          <td>General-purpose autonomous agent. Implements tickets, iterates on review feedback, answers questions.</td>
+        </tr>
+        <tr>
+          <td><code>claude-code-review.yml</code></td>
+          <td>PR opened or synchronised</td>
+          <td><span class="wf-actor claude-tag">Claude Haiku</span></td>
+          <td>Focused security and correctness sanity check. Approves or requests changes via a formal GitHub review. Cancels in-progress runs when a new commit arrives.</td>
+        </tr>
+        <tr>
+          <td><code>pr-mechanical-checks.yml</code></td>
+          <td>PR opened or synchronised</td>
+          <td><span class="wf-actor actions-tag">GitHub Actions (bash)</span></td>
+          <td>Deterministic, zero-cost checks: version bump present, test file paired with every new component, benchmark updated for watched algorithms.</td>
+        </tr>
+        <tr>
+          <td><code>pr-validation.yml</code></td>
+          <td>PR targeting master (production paths only)</td>
+          <td><span class="wf-actor actions-tag">GitHub Actions (.NET)</span></td>
+          <td>Restore → build → test → pack. Also verifies the branch version is strictly greater than the published NuGet version.</td>
+        </tr>
+        <tr>
+          <td><code>project-automation.yml</code></td>
+          <td>PR merged to master</td>
+          <td><span class="wf-actor actions-tag">GitHub Actions (bash)</span></td>
+          <td>Parses <code>Closes #N</code> from the PR body. Closes linked issues, applies <code>status: done</code>, removes <code>status: in-progress</code>, and tags with the release version.</td>
+        </tr>
+        <tr>
+          <td><code>publish-to-nuget.yml</code></td>
+          <td>Push to master (production paths only)</td>
+          <td><span class="wf-actor nuget-tag">NuGet CD</span></td>
+          <td>Clean Release build → <code>dotnet nuget push</code> → git tag → GitHub Release with auto-generated release notes.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Kanban labels</h2>
+    <p>Issue state is tracked entirely through GitHub labels. No external project management tool is needed.</p>
+    <table>
+      <thead>
+        <tr><th>Label</th><th>Meaning</th><th>Applied by</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>status: to-do</code></td>
+          <td>Issue is ready to be picked up</td>
+          <td>Human (when writing the issue)</td>
+        </tr>
+        <tr>
+          <td><code>status: in-progress</code></td>
+          <td>Claude is actively working on this</td>
+          <td>Claude agent (on claim)</td>
+        </tr>
+        <tr>
+          <td><code>status: done</code></td>
+          <td>Issue resolved and merged</td>
+          <td><code>project-automation.yml</code> (on merge)</td>
+        </tr>
+        <tr>
+          <td><code>release/vX.Y.Z</code></td>
+          <td>Identifies which package version shipped this work</td>
+          <td><code>project-automation.yml</code> (on merge)</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Cost model</h2>
+    <p>
+      The split between bash and AI is intentional. Mechanical invariants that can be
+      expressed deterministically — version bump presence, test file pairing, benchmark
+      coverage — are enforced in free bash. Only the review step that genuinely requires
+      language understanding uses an AI model, and it uses Haiku rather than Sonnet to
+      keep per-PR costs low. Sonnet is reserved for the creative work: writing code.
+    </p>
+    <div class="info-box">
+      The concurrency setting on <code>claude-code-review.yml</code> cancels an in-flight
+      Haiku review when a new commit arrives, so a fast iteration cycle does not stack up
+      multiple simultaneous review jobs.
+    </div>
+  </section>
+
+  <section>
+    <h2>Install</h2>
+    <p>
+      Once any feature branch merges to master the new version is available on NuGet
+      within a few minutes. Install or upgrade with:
+    </p>
+
+    <div class="install-box">
+      <div class="install-title">First install</div>
+      <div class="cmd-block">
+        <span class="prompt">$ </span><span class="cmd">dotnet tool install</span>
+        <span class="opt"> --global</span>
+        <span class="val"> Pixelbadger.Toolkit</span>
+      </div>
+    </div>
+
+    <div class="install-box">
+      <div class="install-title">Upgrade to latest</div>
+      <div class="cmd-block">
+        <span class="prompt">$ </span><span class="cmd">dotnet tool update</span>
+        <span class="opt"> --global</span>
+        <span class="val"> Pixelbadger.Toolkit</span>
+      </div>
+    </div>
+
+    <div class="install-box">
+      <div class="install-title">Verify</div>
+      <div class="cmd-block">
+        <span class="prompt">$ </span><span class="cmd">pbtk</span>
+        <span class="opt"> --help</span>
+      </div>
+    </div>
+
+    <p>
+      Requires the <a href="https://dotnet.microsoft.com/en-us/download">.NET 9 SDK or Runtime</a>.
+    </p>
+  </section>
+
+</div>
+
+<footer>
+  Pixelbadger Toolkit &mdash; SmolDLC documentation &mdash; 2026
+</footer>
+
+</body>
+</html>
