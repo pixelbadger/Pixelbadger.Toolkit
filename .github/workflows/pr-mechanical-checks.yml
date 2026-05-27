@@ -1,0 +1,120 @@
+name: PR Mechanical Checks
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  mechanical-checks:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check version bump
+        id: version-bump
+        run: |
+          FAILED=false
+
+          # Files changed vs master, excluding tests and benchmarks
+          PROD_CHANGES=$(git diff origin/master...HEAD --name-only | grep -E '\.(cs|csproj)$' | grep -vE '^Pixelbadger\.Toolkit\.(Tests|Benchmarks)/' || true)
+
+          if [ -n "$PROD_CHANGES" ]; then
+            # csproj must appear in the diff
+            CSPROJ_IN_DIFF=$(git diff origin/master...HEAD --name-only | grep 'Pixelbadger\.Toolkit/Pixelbadger\.Toolkit\.csproj' || true)
+            if [ -z "$CSPROJ_IN_DIFF" ]; then
+              echo "::error::Version bump required: production .cs/.csproj files changed but Pixelbadger.Toolkit.csproj is not in the diff."
+              FAILED=true
+            else
+              # Compare version on this branch vs master
+              BRANCH_VERSION=$(grep -oP '(?<=<Version>)[^<]+' Pixelbadger.Toolkit/Pixelbadger.Toolkit.csproj)
+              MASTER_VERSION=$(git show origin/master:Pixelbadger.Toolkit/Pixelbadger.Toolkit.csproj | grep -oP '(?<=<Version>)[^<]+')
+              HIGHER=$(printf '%s\n%s\n' "$MASTER_VERSION" "$BRANCH_VERSION" | sort -V | tail -1)
+              if [ "$HIGHER" = "$MASTER_VERSION" ] || [ "$BRANCH_VERSION" = "$MASTER_VERSION" ]; then
+                echo "::error::Version bump required: branch version ($BRANCH_VERSION) is not strictly higher than master ($MASTER_VERSION)."
+                FAILED=true
+              else
+                echo "Version bump OK: $MASTER_VERSION -> $BRANCH_VERSION"
+              fi
+            fi
+          else
+            echo "No production code changes — version bump not required."
+          fi
+
+          echo "failed=$FAILED" >> "$GITHUB_OUTPUT"
+
+      - name: Check tests present
+        id: tests-present
+        run: |
+          FAILED=false
+
+          # Newly added files under Components/ or Commands/
+          NEW_IMPL=$(git diff origin/master...HEAD --diff-filter=A --name-only | grep -E '^Pixelbadger\.Toolkit/(Components|Commands)/[^/]+\.cs$' || true)
+
+          for FILE in $NEW_IMPL; do
+            BASENAME=$(basename "$FILE" .cs)
+            EXPECTED="${BASENAME}Tests.cs"
+            MATCH=$(find Pixelbadger.Toolkit.Tests -name "$EXPECTED" 2>/dev/null || true)
+            if [ -z "$MATCH" ]; then
+              echo "::error::Missing test file: no $EXPECTED found under Pixelbadger.Toolkit.Tests/ for new file $FILE."
+              FAILED=true
+            else
+              echo "Test coverage OK: $EXPECTED exists for $FILE"
+            fi
+          done
+
+          if [ -z "$NEW_IMPL" ]; then
+            echo "No new Components/ or Commands/ files — test presence check skipped."
+          fi
+
+          echo "failed=$FAILED" >> "$GITHUB_OUTPUT"
+
+      - name: Check benchmarks updated
+        id: benchmarks-updated
+        run: |
+          FAILED=false
+
+          WATCHLIST=(
+            "LevenshteinCalculator"
+            "BrainfuckInterpreter"
+            "OokInterpreter"
+            "AbjadifyComponent"
+            "ImageSteganography"
+            "HomomorphicEncryptionComponent"
+          )
+
+          CHANGED_BASENAMES=$(git diff origin/master...HEAD --name-only | xargs -I{} basename {} .cs)
+
+          for ENTRY in "${WATCHLIST[@]}"; do
+            if echo "$CHANGED_BASENAMES" | grep -qx "$ENTRY"; then
+              # Check if any benchmark file referencing this entry is also in the diff
+              BENCHMARK_REFS=$(git diff origin/master...HEAD --name-only | grep -E '^Pixelbadger\.Toolkit\.Benchmarks/' || true)
+              FOUND=false
+              for BF in $BENCHMARK_REFS; do
+                if grep -q "$ENTRY" "$BF" 2>/dev/null; then
+                  FOUND=true
+                  break
+                fi
+              done
+              if [ "$FOUND" = false ]; then
+                echo "::error::Benchmark update required: $ENTRY was changed but no benchmark file under Pixelbadger.Toolkit.Benchmarks/ referencing it appears in the diff."
+                FAILED=true
+              else
+                echo "Benchmark OK: $ENTRY has a corresponding benchmark update."
+              fi
+            fi
+          done
+
+          echo "failed=$FAILED" >> "$GITHUB_OUTPUT"
+
+      - name: Fail if any check failed
+        if: steps.version-bump.outputs.failed == 'true' || steps.tests-present.outputs.failed == 'true' || steps.benchmarks-updated.outputs.failed == 'true'
+        run: |
+          echo "One or more mechanical checks failed. See ::error:: annotations above."
+          exit 1

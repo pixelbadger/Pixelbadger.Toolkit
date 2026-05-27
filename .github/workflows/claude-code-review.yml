@@ -3,28 +3,20 @@ name: Claude Code Review
 on:
   pull_request:
     types: [opened, synchronize]
-    # Optional: Only run on specific file changes
-    # paths:
-    #   - "src/**/*.ts"
-    #   - "src/**/*.tsx"
-    #   - "src/**/*.js"
-    #   - "src/**/*.jsx"
+
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
   claude-review:
-    # Optional: Filter by PR author
-    # if: |
-    #   github.event.pull_request.user.login == 'external-contributor' ||
-    #   github.event.pull_request.user.login == 'new-developer' ||
-    #   github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR'
-    
     runs-on: ubuntu-latest
     permissions:
       contents: read
       pull-requests: write
       issues: read
       id-token: write
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -37,19 +29,17 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
-            Review this pull request against the following checklist only. Be concise — flag issues, don't praise.
+            Review this pull request for the following only. Be concise — flag issues, don't praise.
 
-            **1. Version bump** — If any `.cs` or `.csproj` files changed outside of `*.Tests/` or `*.Benchmarks/`, the `<Version>` element in `Pixelbadger.Toolkit/Pixelbadger.Toolkit.csproj` must be incremented. Flag if missing.
-
-            **2. Tests present** — Any new component class or command action must have a corresponding `*Tests.cs` file. Flag any new `Components/` or `Commands/` files without matching tests.
-
-            **3. Benchmarks updated** — If the diff touches `LevenshteinCalculator`, `BrainfuckInterpreter`, `OokInterpreter`, `AbjadifyComponent`, `ImageSteganography`, or `HomomorphicEncryptionComponent`, a corresponding benchmark file in `Pixelbadger.Toolkit.Benchmarks/` must also be updated. Flag if missing.
-
-            **4. Sanity check** — Flag obvious bugs, unhandled nulls in critical paths, prompt injection risks (user-controlled strings passed directly to LLMs), or path traversal in file operations.
+            **Sanity check** — Flag:
+            - Obvious bugs or logic errors
+            - Unhandled nulls in critical paths
+            - Prompt injection risk: user-controlled strings passed directly into LLM calls without sanitisation
+            - Path traversal: user-supplied file paths used in file operations without validation
 
             Once you have completed the review, submit a formal GitHub review using `gh pr review`:
-            - If all checks pass: `gh pr review <PR_NUMBER> --approve --body "LGTM — all checks passed."`
-            - If any check fails: `gh pr review <PR_NUMBER> --request-changes --body "<summary of issues found>"`
+            - If no issues found: `gh pr review <PR_NUMBER> --approve --body "LGTM — no sanity-check issues found."`
+            - If issues found: `gh pr review <PR_NUMBER> --request-changes --body "<summary of issues found>"`
 
-          claude_args: '--model claude-haiku-4-5-20251001 --allowed-tools "Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*),Bash(gh pr review:*)"'
+          claude_args: '--model claude-haiku-4-5-20251001 --max-turns 15 --allowed-tools "Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*),Bash(gh pr review:*)"'
 
