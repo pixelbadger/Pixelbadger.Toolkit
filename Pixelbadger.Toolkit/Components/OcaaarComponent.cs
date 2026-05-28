@@ -6,10 +6,12 @@ namespace Pixelbadger.Toolkit.Components;
 public class OcaaarComponent
 {
     private readonly IOpenAiClientService _openAiClientService;
+    private readonly IHistoryService _historyService;
 
-    public OcaaarComponent(IOpenAiClientService openAiClientService)
+    public OcaaarComponent(IOpenAiClientService openAiClientService, IHistoryService historyService)
     {
         _openAiClientService = openAiClientService;
+        _historyService = historyService;
     }
 
     public async Task<string> OcaaarAsync(string imagePath)
@@ -32,7 +34,15 @@ public class OcaaarComponent
             )
         };
 
-        return await _openAiClientService.CompleteChatAsync(messages);
+        var chatResult = await _openAiClientService.CompleteChatAsync(messages);
+
+        var sessionId = await _historyService.CreateSessionAsync("ocaaar");
+        await _historyService.AddMessageAsync(sessionId, "system", systemPrompt);
+        await _historyService.AddMessageAsync(sessionId, "user", $"[image: {imagePath}]");
+        await _historyService.AddMessageAsync(sessionId, "assistant", chatResult.Content);
+        await _historyService.UpdateTokenUsageAsync(sessionId, chatResult.PromptTokens, chatResult.CompletionTokens);
+
+        return chatResult.Content;
     }
 
     private static string GetImageMediaType(string imagePath)

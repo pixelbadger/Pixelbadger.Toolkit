@@ -3,9 +3,11 @@ using OpenAI.Chat;
 
 namespace Pixelbadger.Toolkit.Services;
 
+public record ChatResult(string Content, int PromptTokens, int CompletionTokens);
+
 public interface IOpenAiClientService
 {
-    Task<string> CompleteChatAsync(IEnumerable<ChatMessage> messages);
+    Task<ChatResult> CompleteChatAsync(IEnumerable<ChatMessage> messages);
     string EscapeXml(string input);
 }
 
@@ -21,11 +23,15 @@ public class OpenAiClientService : IOpenAiClientService
         _model = model;
     }
 
-    public async Task<string> CompleteChatAsync(IEnumerable<ChatMessage> messages)
+    public async Task<ChatResult> CompleteChatAsync(IEnumerable<ChatMessage> messages)
     {
         var chatClient = new OpenAIClient(_apiKey).GetChatClient(_model);
         var response = await chatClient.CompleteChatAsync(messages);
-        return response.Value.Content[0].Text;
+        var usage = response.Value.Usage;
+        return new ChatResult(
+            response.Value.Content[0].Text,
+            usage.InputTokenCount,
+            usage.OutputTokenCount);
     }
 
     public string EscapeXml(string input)

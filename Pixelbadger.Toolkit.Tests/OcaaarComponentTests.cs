@@ -10,6 +10,7 @@ public class OcaaarComponentTests : IDisposable
 {
     private readonly string _testDirectory;
     private readonly Mock<IOpenAiClientService> _mockOpenAiService;
+    private readonly Mock<IHistoryService> _mockHistoryService;
     private readonly OcaaarComponent _ocaaarComponent;
 
     public OcaaarComponentTests()
@@ -18,7 +19,9 @@ public class OcaaarComponentTests : IDisposable
         Directory.CreateDirectory(_testDirectory);
 
         _mockOpenAiService = new Mock<IOpenAiClientService>();
-        _ocaaarComponent = new OcaaarComponent(_mockOpenAiService.Object);
+        _mockHistoryService = new Mock<IHistoryService>();
+        _mockHistoryService.Setup(x => x.CreateSessionAsync("ocaaar")).ReturnsAsync(1L);
+        _ocaaarComponent = new OcaaarComponent(_mockOpenAiService.Object, _mockHistoryService.Object);
     }
 
     public void Dispose()
@@ -40,7 +43,7 @@ public class OcaaarComponentTests : IDisposable
         var expectedPirateText = "Ahoy matey! This here be some fine text, ye scurvy dog!";
 
         _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
-            .ReturnsAsync(expectedPirateText);
+            .ReturnsAsync(new ChatResult(expectedPirateText, 100, 20));
 
         // Act
         var result = await _ocaaarComponent.OcaaarAsync(imagePath);
@@ -75,7 +78,7 @@ public class OcaaarComponentTests : IDisposable
 
         _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
             .Callback<IEnumerable<ChatMessage>>(messages => capturedMessages = messages.ToList())
-            .ReturnsAsync(expectedPirateText);
+            .ReturnsAsync(new ChatResult(expectedPirateText, 80, 15));
 
         // Act
         await _ocaaarComponent.OcaaarAsync(imagePath);
@@ -84,16 +87,35 @@ public class OcaaarComponentTests : IDisposable
         capturedMessages.Should().NotBeNull();
         capturedMessages.Should().HaveCount(2);
 
-        // Verify system message
         capturedMessages![0].ToString().Should().Contain("System");
         capturedMessages[0].Content[0].Text.Should().Contain("pirate");
         capturedMessages[0].Content[0].Text.Should().Contain("extract the text");
         capturedMessages[0].Content[0].Text.Should().Contain("bucaneering dialect");
 
-        // Verify user message contains image
         capturedMessages[1].ToString().Should().Contain("User");
         capturedMessages[1].Content.Should().HaveCount(1);
         capturedMessages[1].Content[0].Kind.Should().Be(ChatMessageContentPartKind.Image);
+    }
+
+    [Fact]
+    public async Task OcaaarAsync_ShouldStoreHistoryAfterSuccessfulCall()
+    {
+        // Arrange
+        var imagePath = Path.Combine(_testDirectory, "test.jpg");
+        await File.WriteAllBytesAsync(imagePath, new byte[] { 0xFF, 0xD8, 0xFF, 0xE0 });
+
+        _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
+            .ReturnsAsync(new ChatResult("Arrr!", 90, 5));
+
+        // Act
+        await _ocaaarComponent.OcaaarAsync(imagePath);
+
+        // Assert
+        _mockHistoryService.Verify(x => x.CreateSessionAsync("ocaaar"), Times.Once);
+        _mockHistoryService.Verify(x => x.AddMessageAsync(1L, "system", It.IsAny<string>()), Times.Once);
+        _mockHistoryService.Verify(x => x.AddMessageAsync(1L, "user", It.Is<string>(s => s.Contains("[image:"))), Times.Once);
+        _mockHistoryService.Verify(x => x.AddMessageAsync(1L, "assistant", "Arrr!"), Times.Once);
+        _mockHistoryService.Verify(x => x.UpdateTokenUsageAsync(1L, 90, 5), Times.Once);
     }
 
     [Theory]
@@ -115,7 +137,7 @@ public class OcaaarComponentTests : IDisposable
 
         _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
             .Callback<IEnumerable<ChatMessage>>(messages => capturedMessages = messages.ToList())
-            .ReturnsAsync(expectedPirateText);
+            .ReturnsAsync(new ChatResult(expectedPirateText, 50, 10));
 
         // Act
         await _ocaaarComponent.OcaaarAsync(imagePath);
@@ -125,7 +147,6 @@ public class OcaaarComponentTests : IDisposable
         var imageMessage = capturedMessages![1];
         var imagePart = imageMessage.Content[0];
 
-        // Verify the image was processed by checking it's an image part
         imagePart.Kind.Should().Be(ChatMessageContentPartKind.Image);
     }
 
@@ -135,7 +156,6 @@ public class OcaaarComponentTests : IDisposable
         // Arrange
         var imagePath = Path.Combine(_testDirectory, "large.jpg");
         var largeImageBytes = new byte[1024 * 1024]; // 1MB
-        // Fill with some pattern
         for (int i = 0; i < largeImageBytes.Length; i++)
         {
             largeImageBytes[i] = (byte)(i % 256);
@@ -145,7 +165,7 @@ public class OcaaarComponentTests : IDisposable
         var expectedPirateText = "Shiver me timbers, that be a mighty large image!";
 
         _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
-            .ReturnsAsync(expectedPirateText);
+            .ReturnsAsync(new ChatResult(expectedPirateText, 500, 20));
 
         // Act
         var result = await _ocaaarComponent.OcaaarAsync(imagePath);
@@ -164,7 +184,7 @@ public class OcaaarComponentTests : IDisposable
         var expectedPirateText = "Arrr, this image be as empty as Davy Jones' locker!";
 
         _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
-            .ReturnsAsync(expectedPirateText);
+            .ReturnsAsync(new ChatResult(expectedPirateText, 80, 15));
 
         // Act
         var result = await _ocaaarComponent.OcaaarAsync(imagePath);
@@ -186,7 +206,7 @@ public class OcaaarComponentTests : IDisposable
 
         _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
             .Callback<IEnumerable<ChatMessage>>(messages => capturedMessages = messages.ToList())
-            .ReturnsAsync(expectedPirateText);
+            .ReturnsAsync(new ChatResult(expectedPirateText, 90, 12));
 
         // Act
         await _ocaaarComponent.OcaaarAsync(imagePath);
@@ -195,7 +215,6 @@ public class OcaaarComponentTests : IDisposable
         capturedMessages.Should().NotBeNull();
         var systemMessage = capturedMessages![0].Content[0].Text;
 
-        // Verify pirate-specific instructions
         systemMessage.Should().Contain("pirate");
         systemMessage.Should().Contain("extract the text");
         systemMessage.Should().Contain("translate");
@@ -216,7 +235,7 @@ public class OcaaarComponentTests : IDisposable
         var expectedPirateText = "Ahoy there, ye landlubber!";
 
         _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
-            .ReturnsAsync(expectedPirateText);
+            .ReturnsAsync(new ChatResult(expectedPirateText, 70, 10));
 
         // Act
         var result = await _ocaaarComponent.OcaaarAsync(imagePath);
@@ -236,7 +255,7 @@ public class OcaaarComponentTests : IDisposable
         var expectedPirateText = "Batten down the hatches, matey!";
 
         _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
-            .ReturnsAsync(expectedPirateText);
+            .ReturnsAsync(new ChatResult(expectedPirateText, 65, 10));
 
         // Act
         var result = await _ocaaarComponent.OcaaarAsync(imagePath);
@@ -256,7 +275,7 @@ public class OcaaarComponentTests : IDisposable
         var expectedPirateText = "Splice the mainbrace!";
 
         _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
-            .ReturnsAsync(expectedPirateText);
+            .ReturnsAsync(new ChatResult(expectedPirateText, 75, 8));
 
         // Act
         var result = await _ocaaarComponent.OcaaarAsync(imagePath);

@@ -10,6 +10,7 @@ public class CorpospeakComponentTests : IDisposable
 {
     private readonly string _testDirectory;
     private readonly Mock<IOpenAiClientService> _mockOpenAiService;
+    private readonly Mock<IHistoryService> _mockHistoryService;
     private readonly CorpospeakComponent _corpospeakComponent;
 
     public CorpospeakComponentTests()
@@ -18,7 +19,9 @@ public class CorpospeakComponentTests : IDisposable
         Directory.CreateDirectory(_testDirectory);
 
         _mockOpenAiService = new Mock<IOpenAiClientService>();
-        _corpospeakComponent = new CorpospeakComponent(_mockOpenAiService.Object);
+        _mockHistoryService = new Mock<IHistoryService>();
+        _mockHistoryService.Setup(x => x.CreateSessionAsync("corpospeak")).ReturnsAsync(1L);
+        _corpospeakComponent = new CorpospeakComponent(_mockOpenAiService.Object, _mockHistoryService.Object);
     }
 
     public void Dispose()
@@ -39,7 +42,7 @@ public class CorpospeakComponentTests : IDisposable
         var expectedResult = "Our API infrastructure delivers exceptional performance metrics, driving significant operational efficiency and competitive advantage.";
 
         _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
-            .ReturnsAsync(expectedResult);
+            .ReturnsAsync(new ChatResult(expectedResult, 50, 30));
 
         // Act
         var result = await _corpospeakComponent.CorpospeakAsync(source, audience, userMessages);
@@ -90,7 +93,7 @@ public class CorpospeakComponentTests : IDisposable
         var expectedResult = "Rewritten test message";
 
         _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
-            .ReturnsAsync(expectedResult);
+            .ReturnsAsync(new ChatResult(expectedResult, 30, 15));
 
         // Act
         var result = await _corpospeakComponent.CorpospeakAsync(source, audience, userMessages);
@@ -123,7 +126,7 @@ public class CorpospeakComponentTests : IDisposable
         var expectedResult = "Executive-level rewritten message";
 
         _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
-            .ReturnsAsync(expectedResult);
+            .ReturnsAsync(new ChatResult(expectedResult, 40, 20));
 
         // Act
         var result = await _corpospeakComponent.CorpospeakAsync(source, audience, userMessages);
@@ -142,7 +145,7 @@ public class CorpospeakComponentTests : IDisposable
         var expectedResult = "Technical rewritten message";
 
         _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
-            .ReturnsAsync(expectedResult);
+            .ReturnsAsync(new ChatResult(expectedResult, 35, 18));
 
         // Act
         var result = await _corpospeakComponent.CorpospeakAsync(source, audience, userMessages);
@@ -164,7 +167,7 @@ public class CorpospeakComponentTests : IDisposable
         var expectedResult = "Technical version of file content";
 
         _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
-            .ReturnsAsync(expectedResult);
+            .ReturnsAsync(new ChatResult(expectedResult, 45, 22));
 
         // Act
         var result = await _corpospeakComponent.CorpospeakAsync(sourceFilePath, audience, userMessages);
@@ -183,7 +186,7 @@ public class CorpospeakComponentTests : IDisposable
         var expectedResult = "Marketing-friendly rewritten text";
 
         _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
-            .ReturnsAsync(expectedResult);
+            .ReturnsAsync(new ChatResult(expectedResult, 40, 20));
 
         // Act
         var result = await _corpospeakComponent.CorpospeakAsync(source, audience, userMessages);
@@ -207,7 +210,7 @@ public class CorpospeakComponentTests : IDisposable
         var expectedResult = "Sales-optimized message";
 
         _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
-            .ReturnsAsync(expectedResult);
+            .ReturnsAsync(new ChatResult(expectedResult, 60, 25));
 
         // Act
         var result = await _corpospeakComponent.CorpospeakAsync(source, audience, userMessages);
@@ -226,7 +229,7 @@ public class CorpospeakComponentTests : IDisposable
         var expectedResult = "Product-focused message";
 
         _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
-            .ReturnsAsync(expectedResult);
+            .ReturnsAsync(new ChatResult(expectedResult, 55, 22));
 
         // Act
         var result = await _corpospeakComponent.CorpospeakAsync(source, audience, userMessages);
@@ -247,7 +250,7 @@ public class CorpospeakComponentTests : IDisposable
 
         _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
             .Callback<IEnumerable<ChatMessage>>(messages => capturedMessages = messages.ToList())
-            .ReturnsAsync(expectedResult);
+            .ReturnsAsync(new ChatResult(expectedResult, 50, 20));
 
         // Act
         await _corpospeakComponent.CorpospeakAsync(source, audience, userMessages);
@@ -272,7 +275,7 @@ public class CorpospeakComponentTests : IDisposable
 
         _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
             .Callback<IEnumerable<ChatMessage>>(messages => capturedMessages = messages.ToList())
-            .ReturnsAsync(expectedResult);
+            .ReturnsAsync(new ChatResult(expectedResult, 70, 30));
 
         // Act
         await _corpospeakComponent.CorpospeakAsync(source, audience, userMessages);
@@ -281,7 +284,6 @@ public class CorpospeakComponentTests : IDisposable
         capturedMessages.Should().NotBeNull();
         capturedMessages.Should().HaveCount(5); // 2 user messages + 2 assistant responses + 1 final prompt
 
-        // Verify pattern: user, assistant, user, assistant, user (final prompt)
         capturedMessages![0].ToString().Should().Contain("User");
         capturedMessages[0].Content[0].Text.Should().Be("Hey team");
 
@@ -319,7 +321,7 @@ public class CorpospeakComponentTests : IDisposable
 
         _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
             .Callback<IEnumerable<ChatMessage>>(messages => capturedMessages = messages.ToList())
-            .ReturnsAsync(expectedResult);
+            .ReturnsAsync(new ChatResult(expectedResult, 45, 20));
 
         // Act
         await _corpospeakComponent.CorpospeakAsync(source, audience, userMessages);
@@ -345,7 +347,7 @@ public class CorpospeakComponentTests : IDisposable
 
         _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
             .Callback<IEnumerable<ChatMessage>>(messages => capturedMessages = messages.ToList())
-            .ReturnsAsync(expectedResult);
+            .ReturnsAsync(new ChatResult(expectedResult, 40, 18));
 
         // Act
         await _corpospeakComponent.CorpospeakAsync(source, audience, userMessages);
@@ -371,7 +373,7 @@ public class CorpospeakComponentTests : IDisposable
 
         _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
             .Callback<IEnumerable<ChatMessage>>(messages => capturedMessages = messages.ToList())
-            .ReturnsAsync(expectedResult);
+            .ReturnsAsync(new ChatResult(expectedResult, 35, 15));
 
         // Act
         await _corpospeakComponent.CorpospeakAsync(source, audience, userMessages);
@@ -395,7 +397,7 @@ public class CorpospeakComponentTests : IDisposable
         var expectedResult = "Product-focused announcement";
 
         _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
-            .ReturnsAsync(expectedResult);
+            .ReturnsAsync(new ChatResult(expectedResult, 55, 25));
 
         // Act
         var result = await _corpospeakComponent.CorpospeakAsync(source, audience, userMessages);
@@ -405,5 +407,26 @@ public class CorpospeakComponentTests : IDisposable
         _mockOpenAiService.Verify(x => x.CompleteChatAsync(
             It.Is<IEnumerable<ChatMessage>>(messages =>
                 messages.Count() == 3)), Times.Once); // user message + assistant + final prompt
+    }
+
+    [Fact]
+    public async Task CorpospeakAsync_ShouldStoreHistoryAfterSuccessfulCall()
+    {
+        // Arrange
+        var source = "Test message";
+        var audience = "engineering";
+        var userMessages = Array.Empty<string>();
+        var expectedResult = "Technical rewrite";
+
+        _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
+            .ReturnsAsync(new ChatResult(expectedResult, 40, 18));
+
+        // Act
+        await _corpospeakComponent.CorpospeakAsync(source, audience, userMessages);
+
+        // Assert
+        _mockHistoryService.Verify(x => x.CreateSessionAsync("corpospeak"), Times.Once);
+        _mockHistoryService.Verify(x => x.AddMessageAsync(1L, "assistant", expectedResult), Times.Once);
+        _mockHistoryService.Verify(x => x.UpdateTokenUsageAsync(1L, 40, 18), Times.Once);
     }
 }
