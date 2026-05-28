@@ -11,16 +11,19 @@
 
 <header>
   <h1>OpenAI <span class="badge">openai</span></h1>
-  <div class="subtitle">OpenAI-powered utilities — chat, translation, image OCR, and corpospeak rewriting</div>
+  <div class="subtitle">OpenAI-powered utilities — chat, translation, image OCR, corpospeak rewriting, and session history</div>
   <div class="meta">Pixelbadger Toolkit &mdash; <code>pbtk openai</code> &mdash; <a href="index.html" style="color:#60a5fa">&#8592; all topics</a></div>
 </header>
 
 <nav>
   <a href="#prerequisites">Prerequisites</a>
+  <a href="#history-overview">History</a>
   <a href="#chat">chat</a>
   <a href="#translate">translate</a>
   <a href="#ocaaar">ocaaar</a>
   <a href="#corpospeak">corpospeak</a>
+  <a href="#history-list">history list</a>
+  <a href="#history-delete">history delete</a>
   <a href="#command-ref">Command Reference</a>
 </nav>
 
@@ -42,12 +45,32 @@
     </p>
   </section>
 
+  <!-- HISTORY OVERVIEW -->
+  <section id="history-overview">
+    <h2>Session History</h2>
+    <p>
+      Every <code>openai</code> command automatically persists conversation history — including the system
+      prompt — to a shared SQLite database at <code>~/.pbtk/history.db</code>. Each invocation creates a
+      new <em>session</em> and stores the full message exchange along with token usage counts.
+    </p>
+    <p>
+      Sessions are identified by an integer ID that is consistent across all commands, making it possible
+      to inspect history from <code>chat</code>, <code>translate</code>, <code>ocaaar</code>, and
+      <code>corpospeak</code> in a single unified view.
+    </p>
+    <p>
+      Use <a href="#history-list"><code>openai history list</code></a> to see all sessions and
+      <a href="#history-delete"><code>openai history delete</code></a> to remove one.
+    </p>
+  </section>
+
   <!-- CHAT -->
   <section id="chat">
     <h2>chat</h2>
     <p>
-      Sends a message to the OpenAI chat completion API and prints the response. Conversation history
-      is persisted in a JSON file so that follow-up messages can reference earlier context.
+      Sends a message to the OpenAI chat completion API and prints the response. Every invocation is
+      recorded as a session in the history database. Ongoing conversations are resumed by passing the
+      session ID returned from a previous call.
     </p>
 
     <div class="cmd-block">
@@ -58,31 +81,38 @@
     <div class="cmd-block">
       <span class="prompt">$ </span><span class="cmd">pbtk openai chat</span>
       <span class="opt"> --message</span> <span class="val">"Continue our conversation"</span>
-      <span class="opt"> --chat-history</span> <span class="val">./chat.json</span>
+      <span class="opt"> --session-id</span> <span class="val">42</span>
       <span class="opt"> --model</span> <span class="val">gpt-4o-mini</span>
     </div>
 
     <div class="diagram-wrap">
       <div class="mermaid">
 flowchart LR
-    MSG["--message"] --> COMP["Append to history\nand send to\nOpenAI chat API"]
-    HIST["--chat-history\n(optional JSON file)"] --> COMP
+    MSG["--message"] --> COMP["Send to\nOpenAI chat API"]
+    SID["--session-id\n(optional)"] -->|"load prior\nmessages"| COMP
     COMP --> RESP(["stdout: assistant reply"])
-    COMP --> SAVE["Updated history\nwritten back to file"]
+    COMP --> HIST["Session stored\nin ~/.pbtk/history.db"]
+    COMP --> SID_OUT(["stderr: Session: &lt;id&gt;"])
       </div>
     </div>
 
     <p>
-      When <code>--chat-history</code> is provided, the file is read at startup to restore prior messages,
-      the new exchange is appended, and the file is rewritten. If the file does not exist it is created.
-      Omitting <code>--chat-history</code> starts a stateless single-turn conversation.
+      When <code>--session-id</code> is omitted a new session is created. When provided, all prior
+      messages from that session are loaded and prepended to the API request so the model has full
+      context. The session ID is always written to <strong>stderr</strong> after the call — capture it
+      to continue the conversation later.
     </p>
+
+    <div class="info-box">
+      Sessions created by other commands (e.g. <code>translate</code>) can be continued with
+      <code>chat --session-id</code> since all commands share the same history database.
+    </div>
 
     <table>
       <thead><tr><th>Option</th><th>Required</th><th>Default</th><th>Description</th></tr></thead>
       <tbody>
         <tr><td><code>--message</code></td><td>Yes</td><td>&mdash;</td><td>The user message to send</td></tr>
-        <tr><td><code>--chat-history</code></td><td>No</td><td>&mdash;</td><td>JSON file to read/write conversation history</td></tr>
+        <tr><td><code>--session-id</code></td><td>No</td><td>&mdash;</td><td>Session ID to continue a previous conversation</td></tr>
         <tr><td><code>--model</code></td><td>No</td><td><code>gpt-5-nano</code></td><td>OpenAI model to use</td></tr>
       </tbody>
     </table>
@@ -93,7 +123,7 @@ flowchart LR
     <h2>translate</h2>
     <p>
       Translates a given text into a specified target language using the OpenAI API. The output is
-      the translated text printed to stdout. No conversation history is maintained.
+      the translated text printed to stdout. Each invocation creates a new history session.
     </p>
 
     <div class="cmd-block">
@@ -108,6 +138,7 @@ flowchart LR
     T["--text"] --> CALL["OpenAI\nchat completion"]
     LANG["--target-language"] --> CALL
     CALL --> OUT(["stdout: translated text"])
+    CALL --> HIST["Session stored\nin ~/.pbtk/history.db"]
       </div>
     </div>
 
@@ -126,8 +157,8 @@ flowchart LR
     <h2>ocaaar</h2>
     <p>
       <strong>OCR as a Pirate.</strong> Sends an image file to the OpenAI vision API, extracts any text
-      found in the image, and returns it rewritten in pirate speak. Useful for testing vision models
-      and for amusement.
+      found in the image, and returns it rewritten in pirate speak. Each invocation creates a new history
+      session; the image is recorded as a reference path rather than binary data.
     </p>
 
     <div class="cmd-block">
@@ -141,6 +172,7 @@ flowchart LR
     IMG["--image-path\n(local image file)"] --> ENC["Base64 encode\nimage"]
     ENC --> CALL["OpenAI vision\nchat completion\n(extract text + pirate-speak prompt)"]
     CALL --> OUT(["stdout: pirate-speak text"])
+    CALL --> HIST["Session stored\nin ~/.pbtk/history.db"]
       </div>
     </div>
 
@@ -164,7 +196,7 @@ flowchart LR
     <p>
       Rewrites source text in the communication style appropriate for a chosen enterprise audience,
       optionally learning from example messages to match an individual's idiolect. Input can be a
-      literal string or a file path.
+      literal string or a file path. Each invocation creates a new history session.
     </p>
 
     <div class="cmd-block">
@@ -201,6 +233,7 @@ flowchart LR
     AUD["--audience"] --> CALL
     UM["--user-messages\n(optional idiolect examples)"] --> CALL
     CALL --> OUT(["stdout: rewritten text"])
+    CALL --> HIST["Session stored\nin ~/.pbtk/history.db"]
       </div>
     </div>
 
@@ -217,6 +250,52 @@ flowchart LR
         <tr><td><code>--audience</code></td><td>Yes</td><td>&mdash;</td><td>Target audience slug (see list above)</td></tr>
         <tr><td><code>--user-messages</code></td><td>No</td><td>&mdash;</td><td>Example messages to learn idiolect from (text or file paths, repeatable)</td></tr>
         <tr><td><code>--model</code></td><td>No</td><td><code>gpt-5-nano</code></td><td>OpenAI model to use</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- HISTORY LIST -->
+  <section id="history-list">
+    <h2>history list</h2>
+    <p>
+      Prints a tabular summary of all stored sessions in reverse chronological order, showing the
+      session ID, originating command, creation timestamp, and cumulative token usage.
+    </p>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk openai history list</span>
+    </div>
+
+    <p>Example output:</p>
+    <pre style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:1rem;overflow-x:auto;font-size:0.85rem;line-height:1.6;color:#e2e8f0;">ID     Command         Created (UTC)             Tokens (in/out)
+--------------------------------------------------------------------
+3      corpospeak      2026-05-28 14:30:00       200/90
+2      translate       2026-05-28 11:15:00       80/35
+1      chat            2026-05-28 09:00:00       350/120</pre>
+
+    <p>
+      The database file is at <code>~/.pbtk/history.db</code>. It is created automatically on first use
+      and shared by all <code>openai</code> commands.
+    </p>
+  </section>
+
+  <!-- HISTORY DELETE -->
+  <section id="history-delete">
+    <h2>history delete</h2>
+    <p>
+      Deletes a session and all of its stored messages from the history database. This operation
+      is permanent.
+    </p>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk openai history delete</span>
+      <span class="opt"> --session-id</span> <span class="val">42</span>
+    </div>
+
+    <table>
+      <thead><tr><th>Option</th><th>Required</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--session-id</code></td><td>Yes</td><td>&mdash;</td><td>ID of the session to delete</td></tr>
       </tbody>
     </table>
   </section>
@@ -238,8 +317,8 @@ flowchart LR
         <tr>
           <td><code>openai chat</code></td>
           <td><code>--message</code></td>
-          <td><code>--chat-history</code> <code>--model</code></td>
-          <td>Assistant reply to stdout</td>
+          <td><code>--session-id</code> <code>--model</code></td>
+          <td>Assistant reply to stdout; session ID to stderr</td>
         </tr>
         <tr>
           <td><code>openai translate</code></td>
@@ -258,6 +337,18 @@ flowchart LR
           <td><code>--source</code> <code>--audience</code></td>
           <td><code>--user-messages</code> <code>--model</code></td>
           <td>Rewritten text to stdout</td>
+        </tr>
+        <tr>
+          <td><code>openai history list</code></td>
+          <td>&mdash;</td>
+          <td>&mdash;</td>
+          <td>Session table to stdout</td>
+        </tr>
+        <tr>
+          <td><code>openai history delete</code></td>
+          <td><code>--session-id</code></td>
+          <td>&mdash;</td>
+          <td>Confirmation message to stdout</td>
         </tr>
       </tbody>
     </table>
