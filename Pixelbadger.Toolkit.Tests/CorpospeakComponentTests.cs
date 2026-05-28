@@ -19,6 +19,7 @@ public class CorpospeakComponentTests : IDisposable
         Directory.CreateDirectory(_testDirectory);
 
         _mockOpenAiService = new Mock<IOpenAiClientService>();
+        _mockOpenAiService.Setup(x => x.EscapeXml(It.IsAny<string>())).Returns<string>(s => s);
         _mockHistoryService = new Mock<IHistoryService>();
         _mockHistoryService.Setup(x => x.CreateSessionAsync("corpospeak")).ReturnsAsync(1L);
         _corpospeakComponent = new CorpospeakComponent(_mockOpenAiService.Object, _mockHistoryService.Object);
@@ -407,6 +408,56 @@ public class CorpospeakComponentTests : IDisposable
         _mockOpenAiService.Verify(x => x.CompleteChatAsync(
             It.Is<IEnumerable<ChatMessage>>(messages =>
                 messages.Count() == 3)), Times.Once); // user message + assistant + final prompt
+    }
+
+    [Fact]
+    public async Task CorpospeakAsync_ShouldWrapSourceInUserInputTags_ToPreventPromptInjection()
+    {
+        // Arrange
+        var source = "API performance is great";
+        var audience = "engineering";
+        var userMessages = Array.Empty<string>();
+        List<ChatMessage>? capturedMessages = null;
+
+        _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
+            .Callback<IEnumerable<ChatMessage>>(messages => capturedMessages = messages.ToList())
+            .ReturnsAsync(new ChatResult("Technical rewrite", 40, 18));
+
+        // Act
+        await _corpospeakComponent.CorpospeakAsync(source, audience, userMessages);
+
+        // Assert
+        capturedMessages.Should().NotBeNull();
+        var promptText = capturedMessages![0].Content[0].Text;
+        promptText.Should().Contain("<userinput>");
+        promptText.Should().Contain("</userinput>");
+        promptText.Should().Contain("prompt injection");
+        promptText.Should().Contain(source);
+    }
+
+    [Fact]
+    public async Task CorpospeakAsync_ShouldEscapeXmlInSource()
+    {
+        // Arrange
+        var source = "Performance is <great> & \"fast\"";
+        var escapedSource = "Performance is &lt;great&gt; &amp; &quot;fast&quot;";
+        var audience = "engineering";
+        var userMessages = Array.Empty<string>();
+        List<ChatMessage>? capturedMessages = null;
+
+        _mockOpenAiService.Setup(x => x.EscapeXml(source)).Returns(escapedSource);
+        _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
+            .Callback<IEnumerable<ChatMessage>>(messages => capturedMessages = messages.ToList())
+            .ReturnsAsync(new ChatResult("Technical rewrite", 40, 18));
+
+        // Act
+        await _corpospeakComponent.CorpospeakAsync(source, audience, userMessages);
+
+        // Assert
+        capturedMessages.Should().NotBeNull();
+        var promptText = capturedMessages![0].Content[0].Text;
+        promptText.Should().Contain(escapedSource);
+        promptText.Should().NotContain("<great>");
     }
 
     [Fact]

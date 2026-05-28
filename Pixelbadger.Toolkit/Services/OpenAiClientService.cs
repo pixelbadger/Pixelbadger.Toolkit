@@ -27,9 +27,12 @@ public class OpenAiClientService : IOpenAiClientService
     {
         var chatClient = new OpenAIClient(_apiKey).GetChatClient(_model);
         var response = await chatClient.CompleteChatAsync(messages);
+        var content = response.Value.Content;
+        if (content.Count == 0)
+            throw new InvalidOperationException("OpenAI returned an empty response.");
         var usage = response.Value.Usage;
         return new ChatResult(
-            response.Value.Content[0].Text,
+            content[0].Text,
             usage.InputTokenCount,
             usage.OutputTokenCount);
     }
