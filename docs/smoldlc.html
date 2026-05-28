@@ -212,13 +212,13 @@
     <p>
       SmolDLC is the informal name for the minimal software delivery lifecycle running in this
       repository. It is small by design: most of the loop is automated, and the two moments that
-      require a human are both just prose — a ticket description and a trigger comment.
+      require a human are both just prose — a ticket description and an instruction to Claude Code.
     </p>
     <p>
       The chain runs from a GitHub issue all the way to a published NuGet package that anyone can
       install with a single command. Between those two ends, an AI agent does the implementation,
       a second AI agent reviews it, deterministic CI checks the hygiene, and project automation
-      handles the bookkeeping. No human ever touches a file or a release button.
+      handles the bookkeeping. No human ever edits a file.
     </p>
     <div class="info-box">
       This page describes the as-built system as of May 2026. The workflows are in
@@ -249,12 +249,12 @@
     <div class="prompt-count">
       <div class="prompt-number">2</div>
       <div class="prompt-detail">
-        <h4>Trigger Claude with <code>@claude</code></h4>
+        <h4>Invoke Claude Code</h4>
         <p>
-          Post a comment anywhere on an issue or PR containing <code>@claude</code>.
-          The canonical prompt is <em>"work on the next ticket"</em> — Claude finds the
-          oldest <code>status: to-do</code> issue, claims it, implements it, and opens a PR.
-          From here the rest of the loop runs without further human input.
+          An engineer opens Claude Code (CLI or IDE) and says <em>"work on the next
+          ticket"</em>. Claude finds the oldest <code>status: to-do</code> issue, claims
+          it, implements it, and opens a PR. Automated CI then runs; the engineer directs
+          any further iteration and merges when the checks pass.
         </p>
       </div>
     </div>
@@ -284,18 +284,17 @@
 
       <div class="arrow-down">↓</div>
 
-      <!-- Stage 2: @claude trigger -->
+      <!-- Stage 2: engineer invokes Claude -->
       <div class="pipeline-row">
         <div class="stage human">
-          <div class="stage-label">Human</div>
-          <h3>Comment <code>@claude work on the next ticket</code></h3>
+          <div class="stage-label">Engineer</div>
+          <h3>Invoke Claude Code</h3>
           <p>
-            A single comment on any issue or PR. The <code>claude.yml</code> workflow
-            triggers on the mention and hands control to the Claude Code agent.
+            The engineer opens Claude Code (CLI or IDE) and tells it to work on the next
+            ticket. Claude takes it from here.
           </p>
           <div class="tag-row">
-            <span class="tag">claude.yml</span>
-            <span class="tag">issue_comment trigger</span>
+            <span class="tag">Claude Code CLI / IDE</span>
           </div>
         </div>
       </div>
@@ -314,7 +313,6 @@
             All via the <code>gh</code> CLI and <code>dotnet</code> — no human file edits.
           </p>
           <div class="tag-row">
-            <span class="tag">claude-code-action@v1</span>
             <span class="tag">claude-sonnet-4-6</span>
             <span class="tag">gh pr create</span>
             <span class="tag">dotnet build / test</span>
@@ -390,17 +388,16 @@
       <!-- Stage 5: iterate -->
       <div class="pipeline-row">
         <div class="stage claude-agent">
-          <div class="stage-label">Claude (Sonnet) — iterates on review feedback</div>
+          <div class="stage-label">Engineer + Claude (Sonnet) — iterate on feedback</div>
           <h3>Fix &amp; push</h3>
           <p>
-            If Haiku requests changes, or a human posts a follow-up <code>@claude</code>
-            comment on the PR, the agent re-activates, addresses the feedback, and pushes
-            a new commit — which re-triggers all three parallel checks above.
+            If Haiku requests changes, the engineer reviews the feedback and re-invokes
+            Claude Code to address it. Claude pushes a new commit, which re-triggers all
+            three parallel checks above.
           </p>
           <div class="tag-row">
-            <span class="tag">claude.yml</span>
-            <span class="tag">pull_request_review trigger</span>
-            <span class="tag">pr_review_comment trigger</span>
+            <span class="tag">Claude Code CLI / IDE</span>
+            <span class="tag">claude-sonnet-4-6</span>
           </div>
         </div>
       </div>
@@ -410,7 +407,7 @@
       <!-- Stage 6: merge -->
       <div class="pipeline-row">
         <div class="stage automation">
-          <div class="stage-label">Human or agent — merge gate</div>
+          <div class="stage-label">Engineer — merge gate</div>
           <h3>Squash merge to master</h3>
           <p>
             Once all checks pass and the Haiku review approves, the PR is merged with
@@ -513,12 +510,6 @@
         </tr>
       </thead>
       <tbody>
-        <tr>
-          <td><code>claude.yml</code></td>
-          <td>Issue / PR / review comment containing <code>@claude</code></td>
-          <td><span class="wf-actor claude-tag">Claude Sonnet</span></td>
-          <td>General-purpose autonomous agent. Implements tickets, iterates on review feedback, answers questions.</td>
-        </tr>
         <tr>
           <td><code>claude-code-review.yml</code></td>
           <td>PR opened or synchronised</td>

@@ -267,7 +267,7 @@ Available topics and actions:
 
 ## Autonomous Ticket Workflow
 
-When asked to "work on the next ticket" (via `@claude` mention on a GitHub issue or PR comment), follow these steps:
+When an engineer invokes Claude Code and asks to "work on the next ticket", follow these steps:
 
 ### GitHub Label Conventions
 - `status: to-do` — issue is ready to work on
@@ -304,7 +304,7 @@ When asked to "work on the next ticket" (via `@claude` mention on a GitHub issue
    )"
    ```
 
-5. **Iterate on review** — address all comments from the automated Haiku review and any `@claude` follow-up comments, then push new commits to the branch.
+5. **Iterate on review** — address all comments from the automated Haiku review and any follow-up instructions from the engineer, then push new commits to the branch.
 
 6. **Merge when approved** — once CI passes and the PR is approved:
    ```bash
