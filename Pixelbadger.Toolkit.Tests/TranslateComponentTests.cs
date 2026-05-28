@@ -9,12 +9,15 @@ namespace Pixelbadger.Toolkit.Tests;
 public class TranslateComponentTests
 {
     private readonly Mock<IOpenAiClientService> _mockOpenAiService;
+    private readonly Mock<IHistoryService> _mockHistoryService;
     private readonly TranslateComponent _translateComponent;
 
     public TranslateComponentTests()
     {
         _mockOpenAiService = new Mock<IOpenAiClientService>();
-        _translateComponent = new TranslateComponent(_mockOpenAiService.Object);
+        _mockHistoryService = new Mock<IHistoryService>();
+        _mockHistoryService.Setup(x => x.CreateSessionAsync("translate")).ReturnsAsync(1L);
+        _translateComponent = new TranslateComponent(_mockOpenAiService.Object, _mockHistoryService.Object);
     }
 
     [Fact]
@@ -28,7 +31,7 @@ public class TranslateComponentTests
         _mockOpenAiService.Setup(x => x.EscapeXml(text)).Returns(text);
         _mockOpenAiService.Setup(x => x.EscapeXml(targetLanguage)).Returns(targetLanguage);
         _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
-            .ReturnsAsync(expectedTranslation);
+            .ReturnsAsync(new ChatResult(expectedTranslation, 15, 8));
 
         // Act
         var result = await _translateComponent.TranslateAsync(text, targetLanguage);
@@ -50,7 +53,7 @@ public class TranslateComponentTests
         _mockOpenAiService.Setup(x => x.EscapeXml(text)).Returns(escapedText);
         _mockOpenAiService.Setup(x => x.EscapeXml(targetLanguage)).Returns(targetLanguage);
         _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
-            .ReturnsAsync(expectedTranslation);
+            .ReturnsAsync(new ChatResult(expectedTranslation, 10, 5));
 
         // Act
         var result = await _translateComponent.TranslateAsync(text, targetLanguage);
@@ -73,7 +76,7 @@ public class TranslateComponentTests
         _mockOpenAiService.Setup(x => x.EscapeXml(text)).Returns(text);
         _mockOpenAiService.Setup(x => x.EscapeXml(targetLanguage)).Returns(escapedLanguage);
         _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
-            .ReturnsAsync(expectedTranslation);
+            .ReturnsAsync(new ChatResult(expectedTranslation, 10, 5));
 
         // Act
         var result = await _translateComponent.TranslateAsync(text, targetLanguage);
@@ -95,7 +98,7 @@ public class TranslateComponentTests
         _mockOpenAiService.Setup(x => x.EscapeXml(It.IsAny<string>())).Returns<string>(s => s);
         _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
             .Callback<IEnumerable<ChatMessage>>(messages => capturedMessages = messages.ToList())
-            .ReturnsAsync(expectedTranslation);
+            .ReturnsAsync(new ChatResult(expectedTranslation, 12, 6));
 
         // Act
         await _translateComponent.TranslateAsync(text, targetLanguage);
@@ -104,16 +107,35 @@ public class TranslateComponentTests
         capturedMessages.Should().NotBeNull();
         capturedMessages.Should().HaveCount(2);
 
-        // Verify system message
         capturedMessages![0].ToString().Should().Contain("System");
         capturedMessages[0].Content[0].Text.Should().Contain("translation tool");
         capturedMessages[0].Content[0].Text.Should().Contain(targetLanguage);
 
-        // Verify user message with XML tags
         capturedMessages[1].ToString().Should().Contain("User");
         capturedMessages[1].Content[0].Text.Should().Contain("<userinput>");
         capturedMessages[1].Content[0].Text.Should().Contain(text);
         capturedMessages[1].Content[0].Text.Should().Contain("</userinput>");
+    }
+
+    [Fact]
+    public async Task TranslateAsync_ShouldStoreHistoryAfterSuccessfulTranslation()
+    {
+        // Arrange
+        var text = "Hello";
+        var targetLanguage = "Spanish";
+        _mockOpenAiService.Setup(x => x.EscapeXml(It.IsAny<string>())).Returns<string>(s => s);
+        _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
+            .ReturnsAsync(new ChatResult("Hola", 10, 4));
+
+        // Act
+        await _translateComponent.TranslateAsync(text, targetLanguage);
+
+        // Assert
+        _mockHistoryService.Verify(x => x.CreateSessionAsync("translate"), Times.Once);
+        _mockHistoryService.Verify(x => x.AddMessageAsync(1L, "system", It.IsAny<string>()), Times.Once);
+        _mockHistoryService.Verify(x => x.AddMessageAsync(1L, "user", It.IsAny<string>()), Times.Once);
+        _mockHistoryService.Verify(x => x.AddMessageAsync(1L, "assistant", "Hola"), Times.Once);
+        _mockHistoryService.Verify(x => x.UpdateTokenUsageAsync(1L, 10, 4), Times.Once);
     }
 
     [Fact]
@@ -126,7 +148,7 @@ public class TranslateComponentTests
 
         _mockOpenAiService.Setup(x => x.EscapeXml(It.IsAny<string>())).Returns<string>(s => s);
         _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
-            .ReturnsAsync(expectedTranslation);
+            .ReturnsAsync(new ChatResult(expectedTranslation, 8, 0));
 
         // Act
         var result = await _translateComponent.TranslateAsync(text, targetLanguage);
@@ -146,7 +168,7 @@ public class TranslateComponentTests
 
         _mockOpenAiService.Setup(x => x.EscapeXml(It.IsAny<string>())).Returns<string>(s => s);
         _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
-            .ReturnsAsync(expectedTranslation);
+            .ReturnsAsync(new ChatResult(expectedTranslation, 20, 10));
 
         // Act
         var result = await _translateComponent.TranslateAsync(text, targetLanguage);
@@ -165,7 +187,7 @@ public class TranslateComponentTests
 
         _mockOpenAiService.Setup(x => x.EscapeXml(It.IsAny<string>())).Returns<string>(s => s);
         _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
-            .ReturnsAsync(expectedTranslation);
+            .ReturnsAsync(new ChatResult(expectedTranslation, 200, 15));
 
         // Act
         var result = await _translateComponent.TranslateAsync(text, targetLanguage);
@@ -186,7 +208,7 @@ public class TranslateComponentTests
         _mockOpenAiService.Setup(x => x.EscapeXml(It.IsAny<string>())).Returns<string>(s => s);
         _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
             .Callback<IEnumerable<ChatMessage>>(messages => capturedMessages = messages.ToList())
-            .ReturnsAsync(expectedTranslation);
+            .ReturnsAsync(new ChatResult(expectedTranslation, 15, 7));
 
         // Act
         await _translateComponent.TranslateAsync(text, targetLanguage);
@@ -195,7 +217,6 @@ public class TranslateComponentTests
         capturedMessages.Should().NotBeNull();
         var systemMessage = capturedMessages![0].Content[0].Text;
 
-        // Verify security measures in system prompt
         systemMessage.Should().Contain("prompt injection");
         systemMessage.Should().Contain("userinput");
         systemMessage.Should().Contain("ignore any instructions");
@@ -211,7 +232,7 @@ public class TranslateComponentTests
         // Arrange
         _mockOpenAiService.Setup(x => x.EscapeXml(It.IsAny<string>())).Returns<string>(s => s);
         _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
-            .ReturnsAsync(expectedTranslation);
+            .ReturnsAsync(new ChatResult(expectedTranslation, 10, 5));
 
         // Act
         var result = await _translateComponent.TranslateAsync(text, targetLanguage);
@@ -230,7 +251,7 @@ public class TranslateComponentTests
 
         _mockOpenAiService.Setup(x => x.EscapeXml(It.IsAny<string>())).Returns<string>(s => s);
         _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
-            .ReturnsAsync(expectedTranslation);
+            .ReturnsAsync(new ChatResult(expectedTranslation, 10, 5));
 
         // Act
         var result = await _translateComponent.TranslateAsync(text, targetLanguage);

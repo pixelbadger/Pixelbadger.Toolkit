@@ -14,6 +14,7 @@ public static class OpenAiCommand
         command.Add(CreateTranslateCommand());
         command.Add(CreateOcaaarCommand());
         command.Add(CreateCorpospeakCommand());
+        command.Add(CreateHistoryCommand());
 
         return command;
     }
@@ -23,11 +24,11 @@ public static class OpenAiCommand
         var command = new Command("chat", "Chat with OpenAI maintaining conversation history");
 
         var messageOption = new Option<string>("--message") { Description = "The message to send to the LLM", Required = true };
-        var chatHistoryOption = new Option<string?>("--chat-history") { Description = "Path to JSON file containing chat history (will be created if it doesn't exist)" };
+        var sessionIdOption = new Option<long?>("--session-id") { Description = "Session ID to continue a previous conversation (omit to start a new session)" };
         var modelOption = new Option<string>("--model") { Description = "The OpenAI model to use", DefaultValueFactory = _ => "gpt-5-nano" };
 
         command.Add(messageOption);
-        command.Add(chatHistoryOption);
+        command.Add(sessionIdOption);
         command.Add(modelOption);
 
         command.SetAction(async (parseResult, cancellationToken) =>
@@ -35,14 +36,16 @@ public static class OpenAiCommand
             try
             {
                 var message = parseResult.GetValue(messageOption)!;
-                var chatHistory = parseResult.GetValue(chatHistoryOption);
+                var sessionId = parseResult.GetValue(sessionIdOption);
                 var model = parseResult.GetValue(modelOption)!;
 
                 var openAiClientService = new OpenAiClientService(model);
-                var chatComponent = new ChatComponent(openAiClientService);
-                var response = await chatComponent.ChatAsync(message, chatHistory);
+                using var historyService = new HistoryService();
+                var chatComponent = new ChatComponent(openAiClientService, historyService);
+                var result = await chatComponent.ChatAsync(message, sessionId);
 
-                Console.WriteLine(response);
+                Console.WriteLine(result.Response);
+                Console.Error.WriteLine($"Session: {result.SessionId}");
             }
             catch (Exception ex)
             {
@@ -75,7 +78,8 @@ public static class OpenAiCommand
                 var model = parseResult.GetValue(modelOption)!;
 
                 var openAiClientService = new OpenAiClientService(model);
-                var translateComponent = new TranslateComponent(openAiClientService);
+                using var historyService = new HistoryService();
+                var translateComponent = new TranslateComponent(openAiClientService, historyService);
                 var translation = await translateComponent.TranslateAsync(text, targetLanguage);
 
                 Console.WriteLine(translation);
@@ -108,7 +112,8 @@ public static class OpenAiCommand
                 var model = parseResult.GetValue(modelOption)!;
 
                 var openAiClientService = new OpenAiClientService(model);
-                var ocaaarComponent = new OcaaarComponent(openAiClientService);
+                using var historyService = new HistoryService();
+                var ocaaarComponent = new OcaaarComponent(openAiClientService, historyService);
                 var response = await ocaaarComponent.OcaaarAsync(imagePath);
 
                 Console.WriteLine(response);
@@ -147,10 +152,73 @@ public static class OpenAiCommand
                 var model = parseResult.GetValue(modelOption)!;
 
                 var openAiClientService = new OpenAiClientService(model);
-                var corpospeakComponent = new CorpospeakComponent(openAiClientService);
+                using var historyService = new HistoryService();
+                var corpospeakComponent = new CorpospeakComponent(openAiClientService, historyService);
                 var result = await corpospeakComponent.CorpospeakAsync(source, audience, userMessages);
 
                 Console.WriteLine(result);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error: {ex.Message}");
+                Environment.Exit(1);
+            }
+        });
+
+        return command;
+    }
+
+    private static Command CreateHistoryCommand()
+    {
+        var command = new Command("history", "Manage OpenAI command history");
+
+        command.Add(CreateHistoryListCommand());
+        command.Add(CreateHistoryDeleteCommand());
+
+        return command;
+    }
+
+    private static Command CreateHistoryListCommand()
+    {
+        var command = new Command("list", "List all OpenAI command sessions");
+
+        command.SetAction(async (parseResult, cancellationToken) =>
+        {
+            try
+            {
+                using var historyService = new HistoryService();
+                var historyComponent = new OpenAiHistoryComponent(historyService);
+                var output = await historyComponent.ListAsync();
+                Console.WriteLine(output);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error: {ex.Message}");
+                Environment.Exit(1);
+            }
+        });
+
+        return command;
+    }
+
+    private static Command CreateHistoryDeleteCommand()
+    {
+        var command = new Command("delete", "Delete a session and all its messages");
+
+        var sessionIdOption = new Option<long>("--session-id") { Description = "ID of the session to delete", Required = true };
+        command.Add(sessionIdOption);
+
+        command.SetAction(async (parseResult, cancellationToken) =>
+        {
+            try
+            {
+                var sessionId = parseResult.GetValue(sessionIdOption);
+
+                using var historyService = new HistoryService();
+                var historyComponent = new OpenAiHistoryComponent(historyService);
+                await historyComponent.DeleteAsync(sessionId);
+
+                Console.WriteLine($"Session {sessionId} deleted.");
             }
             catch (Exception ex)
             {
