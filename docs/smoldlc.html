@@ -196,7 +196,7 @@
 <header>
   <h1>SmolDLC</h1>
   <div class="subtitle">The Pixelbadger Toolkit software delivery lifecycle</div>
-  <div class="meta">Two human prompts. One globally-installed CLI tool.</div>
+  <div class="meta">Two human prompts. One Android terminal.</div>
 </header>
 
 <nav>
@@ -228,6 +228,26 @@
   </section>
 
   <section>
+    <h2>The environment</h2>
+    <p>
+      Everything in this lifecycle that does not happen inside a GitHub Actions runner happens
+      on a single Android device — a Pixel 10 Pro XL running a terminal emulator. The full
+      local toolchain is installed directly on the phone:
+    </p>
+    <ul>
+      <li><strong>.NET 9 SDK</strong> — build, test, and pack the project locally</li>
+      <li><strong>gh CLI</strong> — manage issues, PRs, and labels from the terminal</li>
+      <li><strong>Claude Code</strong> — drive the AI agent interactively</li>
+    </ul>
+    <p>
+      Code generation, build and test iterations, the authoring of GitHub Actions workflows,
+      and NuGet deployment are all driven from that terminal. There is no laptop, no desktop,
+      and no cloud IDE. That is the "smol" in SmolDLC: not just a lean process, but a lean
+      machine.
+    </p>
+  </section>
+
+  <section>
     <h2>The two human prompts</h2>
     <p>
       Everything else in this lifecycle is automated. These are the only two moments a person
@@ -251,10 +271,10 @@
       <div class="prompt-detail">
         <h4>Invoke Claude Code</h4>
         <p>
-          An engineer opens Claude Code (CLI or IDE) and says <em>"work on the next
-          ticket"</em>. Claude finds the oldest <code>status: to-do</code> issue, claims
-          it, implements it, and opens a PR. Automated CI then runs; the engineer directs
-          any further iteration and merges when the checks pass.
+          The engineer opens Claude Code in the Android terminal and says <em>"work on
+          the next ticket"</em>. Claude finds the oldest <code>status: to-do</code> issue,
+          claims it, implements it, and opens a PR. Automated CI then runs; the engineer
+          directs any further iteration and merges when the checks pass.
         </p>
       </div>
     </div>
@@ -290,11 +310,12 @@
           <div class="stage-label">Engineer</div>
           <h3>Invoke Claude Code</h3>
           <p>
-            The engineer opens Claude Code (CLI or IDE) and tells it to work on the next
-            ticket. Claude takes it from here.
+            The engineer opens Claude Code in the Android terminal on a Pixel 10 Pro XL
+            and tells it to work on the next ticket. Claude takes it from here.
           </p>
           <div class="tag-row">
-            <span class="tag">Claude Code CLI / IDE</span>
+            <span class="tag">Claude Code CLI</span>
+            <span class="tag">Android terminal</span>
           </div>
         </div>
       </div>
@@ -391,12 +412,13 @@
           <div class="stage-label">Engineer + Claude (Sonnet) — iterate on feedback</div>
           <h3>Fix &amp; push</h3>
           <p>
-            If Haiku requests changes, the engineer reviews the feedback and re-invokes
-            Claude Code to address it. Claude pushes a new commit, which re-triggers all
-            three parallel checks above.
+            If Haiku requests changes, the engineer reviews the feedback from the Android
+            terminal and re-invokes Claude Code to address it. Claude pushes a new commit,
+            which re-triggers all three parallel checks above.
           </p>
           <div class="tag-row">
-            <span class="tag">Claude Code CLI / IDE</span>
+            <span class="tag">Claude Code CLI</span>
+            <span class="tag">Android terminal</span>
             <span class="tag">claude-sonnet-4-6</span>
           </div>
         </div>
