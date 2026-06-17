@@ -196,7 +196,7 @@
 <header>
   <h1>SmolDLC</h1>
   <div class="subtitle">The Pixelbadger Toolkit software delivery lifecycle</div>
-  <div class="meta">Two human prompts. One Android terminal.</div>
+  <div class="meta">One human prompt. Fully autonomous delivery.</div>
 </header>
 
 <nav>
@@ -211,14 +211,15 @@
     <h2>What is SmolDLC?</h2>
     <p>
       SmolDLC is the informal name for the minimal software delivery lifecycle running in this
-      repository. It is small by design: most of the loop is automated, and the two moments that
-      require a human are both just prose — a ticket description and an instruction to Claude Code.
+      repository. It is small by design: the entire loop is automated after a single human act —
+      writing a GitHub issue.
     </p>
     <p>
       The chain runs from a GitHub issue all the way to a published NuGet package that anyone can
-      install with a single command. Between those two ends, an AI agent does the implementation,
-      a second AI agent reviews it, deterministic CI checks the hygiene, and project automation
-      handles the bookkeeping. No human ever edits a file.
+      install with a single command. A GitHub Actions workflow detects the new ticket and invokes
+      a Claude Code agent to plan and implement it. A second agent performs a thorough code review.
+      Deterministic CI checks the hygiene. Project automation handles the bookkeeping. No human
+      ever edits a file or sits at a terminal waiting for a build.
     </p>
     <div class="info-box">
       This page describes the as-built system as of May 2026. The workflows are in
@@ -248,9 +249,9 @@
   </section>
 
   <section>
-    <h2>The two human prompts</h2>
+    <h2>The one human prompt</h2>
     <p>
-      Everything else in this lifecycle is automated. These are the only two moments a person
+      Everything else in this lifecycle is automated. This is the only moment a person
       needs to act.
     </p>
 
@@ -260,21 +261,10 @@
         <h4>Write a GitHub issue</h4>
         <p>
           Describe the feature or bug in plain language. Label it
-          <code>status: to-do</code>. That's it — the issue sits on the kanban board
-          ready to be picked up.
-        </p>
-      </div>
-    </div>
-
-    <div class="prompt-count">
-      <div class="prompt-number">2</div>
-      <div class="prompt-detail">
-        <h4>Invoke Claude Code</h4>
-        <p>
-          The engineer opens Claude Code in the Android terminal and says <em>"work on
-          the next ticket"</em>. Claude finds the oldest <code>status: to-do</code> issue,
-          claims it, implements it, and opens a PR. Automated CI then runs; the engineer
-          directs any further iteration and merges when the checks pass.
+          <code>status: to-do</code>. That's it — the pipeline takes over from here.
+          A GitHub Actions workflow detects the label, fires a Claude Code agent to plan
+          and implement the work, opens a PR, runs review and CI, and merges automatically
+          when everything passes.
         </p>
       </div>
     </div>
@@ -304,37 +294,47 @@
 
       <div class="arrow-down">↓</div>
 
-      <!-- Stage 2: engineer invokes Claude -->
+      <!-- Stage 2: agent build action triggered -->
       <div class="pipeline-row">
-        <div class="stage human">
-          <div class="stage-label">Engineer</div>
-          <h3>Invoke Claude Code</h3>
+        <div class="stage automation">
+          <div class="stage-label">GitHub Actions — agent build trigger</div>
+          <h3>Label event fires agent build</h3>
           <p>
-            The engineer opens Claude Code in the Android terminal on a Pixel 10 Pro XL
-            and tells it to work on the next ticket. Claude takes it from here.
+            Applying <code>status: to-do</code> to an issue triggers the
+            <code>agent-build.yml</code> workflow. It spins up a runner, installs the
+            toolchain, and invokes Claude Code as a headless agent. No terminal, no
+            human waiting.
           </p>
           <div class="tag-row">
+            <span class="tag">agent-build.yml</span>
+            <span class="tag">on: issues labeled</span>
             <span class="tag">Claude Code CLI</span>
-            <span class="tag">Android terminal</span>
           </div>
         </div>
       </div>
 
       <div class="arrow-down">↓</div>
 
-      <!-- Stage 3: Claude implements -->
+      <!-- Stage 3: Claude plans then implements -->
       <div class="pipeline-row">
         <div class="stage claude-agent">
           <div class="stage-label">Claude (Sonnet) — autonomous agent</div>
-          <h3>Claim, branch, implement, and open a PR</h3>
+          <h3>Plan (auto-accepted), then claim, branch, implement, and open a PR</h3>
           <p>
-            Claude reads the issue, relabels it <code>status: in-progress</code>, creates a
+            Claude reads the issue and first enters a <strong>plan phase</strong>: it
+            produces a structured implementation plan covering files to create or edit,
+            test strategy, and version bump rationale. The plan is auto-accepted — no
+            human approval gate — and Claude immediately executes it.
+          </p>
+          <p style="margin-top:0.5rem;">
+            Claude relabels the issue <code>status: in-progress</code>, creates a
             <code>feature/</code> branch, writes the code and tests, bumps the version,
             updates the README, and opens a PR with <code>Closes #N</code> in the body.
             All via the <code>gh</code> CLI and <code>dotnet</code> — no human file edits.
           </p>
           <div class="tag-row">
             <span class="tag">claude-sonnet-4-6</span>
+            <span class="tag">plan phase (auto-accepted)</span>
             <span class="tag">gh pr create</span>
             <span class="tag">dotnet build / test</span>
           </div>
@@ -364,24 +364,25 @@
         </div>
 
         <div class="stage claude-agent">
-          <div class="stage-label">Claude (Haiku) — AI reviewer</div>
-          <h3>Sanity review</h3>
+          <div class="stage-label">Claude (Sonnet) — AI reviewer</div>
+          <h3>Thorough code review</h3>
           <p>
-            Haiku reads the diff and checks for:
+            Sonnet reads the full diff — not just a cursory scan — and evaluates:
           </p>
           <ul style="font-size:0.82rem; color:var(--text2); margin: 0.5rem 0 0 1.2rem; line-height:1.7;">
-            <li>Obvious bugs and logic errors</li>
-            <li>Unhandled nulls in critical paths</li>
-            <li>Prompt injection (user input → LLM calls)</li>
-            <li>Path traversal (user input → file ops)</li>
+            <li>Correctness: logic errors, off-by-ones, edge cases</li>
+            <li>Test quality: coverage gaps, weak assertions, missing error paths</li>
+            <li>Architecture: adherence to component-per-command pattern, SRP</li>
+            <li>Security: prompt injection, path traversal, input validation</li>
+            <li>Consistency: naming, style, README accuracy vs. implementation</li>
           </ul>
           <p style="margin-top:0.5rem;">
-            Approves or requests changes via a formal GitHub review. Concise — flags
-            issues only, no praise.
+            Posts inline comments on specific lines, then approves or requests changes
+            via a formal GitHub review. Flags issues only — no praise.
           </p>
           <div class="tag-row">
             <span class="tag">claude-code-review.yml</span>
-            <span class="tag">claude-haiku-4-5</span>
+            <span class="tag">claude-sonnet-4-6</span>
             <span class="tag">gh pr review</span>
           </div>
         </div>
@@ -409,16 +410,17 @@
       <!-- Stage 5: iterate -->
       <div class="pipeline-row">
         <div class="stage claude-agent">
-          <div class="stage-label">Engineer + Claude (Sonnet) — iterate on feedback</div>
+          <div class="stage-label">Claude (Sonnet) — autonomous iteration</div>
           <h3>Fix &amp; push</h3>
           <p>
-            If Haiku requests changes, the engineer reviews the feedback from the Android
-            terminal and re-invokes Claude Code to address it. Claude pushes a new commit,
-            which re-triggers all three parallel checks above.
+            If the reviewer requests changes, the agent build workflow is re-triggered
+            automatically. Claude reads the review comments, addresses each one, and
+            pushes a new commit — no human in the loop. The new push re-triggers all
+            three parallel checks above.
           </p>
           <div class="tag-row">
-            <span class="tag">Claude Code CLI</span>
-            <span class="tag">Android terminal</span>
+            <span class="tag">agent-build.yml</span>
+            <span class="tag">on: pull_request review</span>
             <span class="tag">claude-sonnet-4-6</span>
           </div>
         </div>
@@ -429,14 +431,15 @@
       <!-- Stage 6: merge -->
       <div class="pipeline-row">
         <div class="stage automation">
-          <div class="stage-label">Engineer — merge gate</div>
+          <div class="stage-label">GitHub Actions — auto-merge</div>
           <h3>Squash merge to master</h3>
           <p>
-            Once all checks pass and the Haiku review approves, the PR is merged with
-            <code>gh pr merge --squash --delete-branch</code>. The feature branch is
-            deleted automatically.
+            Once all three parallel checks pass and the Sonnet review approves, the PR
+            is automatically squash-merged via <code>gh pr merge --squash --delete-branch</code>.
+            The feature branch is deleted. No human action required.
           </p>
           <div class="tag-row">
+            <span class="tag">auto-merge.yml</span>
             <span class="tag">gh pr merge</span>
             <span class="tag">squash</span>
           </div>
@@ -533,10 +536,16 @@
       </thead>
       <tbody>
         <tr>
+          <td><code>agent-build.yml</code></td>
+          <td>Issue labeled <code>status: to-do</code>; or PR review requesting changes</td>
+          <td><span class="wf-actor claude-tag">Claude Sonnet</span></td>
+          <td>Invokes Claude Code headlessly. Claude enters a plan phase (auto-accepted), then claims the ticket, creates a branch, implements the feature, and opens (or updates) a PR. Re-runs on review feedback to iterate autonomously.</td>
+        </tr>
+        <tr>
           <td><code>claude-code-review.yml</code></td>
           <td>PR opened or synchronised</td>
-          <td><span class="wf-actor claude-tag">Claude Haiku</span></td>
-          <td>Focused security and correctness sanity check. Approves or requests changes via a formal GitHub review. Cancels in-progress runs when a new commit arrives.</td>
+          <td><span class="wf-actor claude-tag">Claude Sonnet</span></td>
+          <td>Thorough review of the full diff: correctness, test quality, architecture, security, and README consistency. Posts inline comments and approves or requests changes via a formal GitHub review. Cancels in-progress runs when a new commit arrives.</td>
         </tr>
         <tr>
           <td><code>pr-mechanical-checks.yml</code></td>
@@ -549,6 +558,12 @@
           <td>PR targeting master (production paths only)</td>
           <td><span class="wf-actor actions-tag">GitHub Actions (.NET)</span></td>
           <td>Restore → build → test → pack. Also verifies the branch version is strictly greater than the published NuGet version.</td>
+        </tr>
+        <tr>
+          <td><code>auto-merge.yml</code></td>
+          <td>All required checks pass on a PR</td>
+          <td><span class="wf-actor actions-tag">GitHub Actions (bash)</span></td>
+          <td>Squash-merges the PR and deletes the feature branch automatically once the review approves and all three parallel checks are green.</td>
         </tr>
         <tr>
           <td><code>project-automation.yml</code></td>
@@ -603,14 +618,16 @@
     <p>
       The split between bash and AI is intentional. Mechanical invariants that can be
       expressed deterministically — version bump presence, test file pairing, benchmark
-      coverage — are enforced in free bash. Only the review step that genuinely requires
-      language understanding uses an AI model, and it uses Haiku rather than Sonnet to
-      keep per-PR costs low. Sonnet is reserved for the creative work: writing code.
+      coverage — are enforced in free bash. Both AI steps use Sonnet: the agent build
+      (where implementation quality matters most) and the code review (where a cursory
+      scan is not enough). Using the same capable model for both means the reviewer can
+      evaluate the same kinds of nuance the author intended.
     </p>
     <div class="info-box">
       The concurrency setting on <code>claude-code-review.yml</code> cancels an in-flight
-      Haiku review when a new commit arrives, so a fast iteration cycle does not stack up
-      multiple simultaneous review jobs.
+      review when a new commit arrives, so a fast iteration cycle does not stack up
+      multiple simultaneous review jobs. The agent build workflow uses the same concurrency
+      group per PR, so only one agent is ever acting on a branch at a time.
     </div>
   </section>
 
