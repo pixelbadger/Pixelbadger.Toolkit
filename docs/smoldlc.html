@@ -537,7 +537,7 @@
       <tbody>
         <tr>
           <td><code>agent-build.yml</code></td>
-          <td>Issue labeled <code>status: to-do</code>; or PR review requesting changes</td>
+          <td>Issue labeled <code>status: to-do</code>; or PR comment containing <code>&lt;!-- CHANGES_REQUESTED --&gt;</code></td>
           <td><span class="wf-actor claude-tag">Claude Sonnet</span></td>
           <td>Invokes Claude Code headlessly. Claude enters a plan phase (auto-accepted), then claims the ticket, creates a branch, implements the feature, and opens (or updates) a PR. Re-runs on review feedback to iterate autonomously.</td>
         </tr>
@@ -545,7 +545,7 @@
           <td><code>claude-code-review.yml</code></td>
           <td>PR opened or synchronised</td>
           <td><span class="wf-actor claude-tag">Claude Sonnet</span></td>
-          <td>Thorough review of the full diff: correctness, test quality, architecture, security, and README consistency. Posts inline comments and approves or requests changes via a formal GitHub review. Cancels in-progress runs when a new commit arrives.</td>
+          <td>Thorough review of the full diff: correctness, test quality, architecture, security, and README consistency. Posts inline comments, then posts a PR comment containing <code>&lt;!-- APPROVED --&gt;</code> or <code>&lt;!-- CHANGES_REQUESTED --&gt;</code> as the formal decision. Cancels in-progress runs when a new commit arrives.</td>
         </tr>
         <tr>
           <td><code>pr-mechanical-checks.yml</code></td>
@@ -561,9 +561,9 @@
         </tr>
         <tr>
           <td><code>auto-merge.yml</code></td>
-          <td>All required checks pass on a PR</td>
+          <td>PR comment containing <code>&lt;!-- APPROVED --&gt;</code>; or check suite completed</td>
           <td><span class="wf-actor actions-tag">GitHub Actions (bash)</span></td>
-          <td>Squash-merges the PR and deletes the feature branch automatically once the review approves and all three parallel checks are green.</td>
+          <td>Squash-merges the PR and deletes the feature branch automatically once an <code>&lt;!-- APPROVED --&gt;</code> comment exists and all three parallel checks are green.</td>
         </tr>
         <tr>
           <td><code>project-automation.yml</code></td>
@@ -626,8 +626,19 @@
     <div class="info-box">
       The concurrency setting on <code>claude-code-review.yml</code> cancels an in-flight
       review when a new commit arrives, so a fast iteration cycle does not stack up
-      multiple simultaneous review jobs. The agent build workflow uses the same concurrency
-      group per PR, so only one agent is ever acting on a branch at a time.
+      multiple simultaneous review jobs. The agent build workflow uses a per-PR concurrency
+      group on the review-iteration job, so only one agent is ever iterating on a branch at a time.
+    </div>
+    <div class="info-box">
+      <strong>GitHub self-review limitation.</strong> GitHub blocks an actor from submitting
+      a formal approval or change-request review on a PR they authored. Because both the
+      agent build and the code review share the same <code>CLAUDE_CODE_OAUTH_TOKEN</code>,
+      Claude cannot use <code>gh pr review --approve</code> or <code>--request-changes</code>
+      on its own PRs. The workaround: the reviewer posts a regular PR comment containing an
+      HTML comment marker (<code>&lt;!-- APPROVED --&gt;</code> or
+      <code>&lt;!-- CHANGES_REQUESTED --&gt;</code>) that the downstream workflows detect
+      via <code>issue_comment</code> events. This sidesteps the restriction entirely while
+      keeping the signal machine-readable.
     </div>
   </section>
 
