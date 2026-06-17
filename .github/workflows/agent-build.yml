@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   agent-build-issue:
-    if: github.event_name == 'issues' && github.event.label.name == 'status: to-do'
+    if: "github.event_name == 'issues' && github.event.label.name == 'status: to-do'"
     runs-on: ubuntu-latest
     permissions:
       contents: write
