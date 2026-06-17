@@ -3,8 +3,8 @@ name: Agent Build
 on:
   issues:
     types: [labeled]
-  issue_comment:
-    types: [created]
+  pull_request_review:
+    types: [submitted]
 
 jobs:
   agent-build-issue:
@@ -63,9 +63,9 @@ jobs:
           claude_args: '--model claude-sonnet-4-6 --max-turns 60 --dangerously-skip-permissions'
 
   agent-build-review:
-    if: "github.event_name == 'issue_comment' && github.event.issue.pull_request != null && contains(github.event.comment.body, '<!-- CHANGES_REQUESTED -->')"
+    if: "github.event_name == 'pull_request_review' && github.event.review.state == 'changes_requested'"
     concurrency:
-      group: agent-build-pr-${{ github.event.issue.number }}
+      group: agent-build-pr-${{ github.event.pull_request.number }}
       cancel-in-progress: true
     runs-on: ubuntu-latest
     permissions:
@@ -75,18 +75,11 @@ jobs:
       id-token: write
 
     steps:
-      - name: Checkout repository
+      - name: Checkout PR branch
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
-
-      - name: Checkout PR branch
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          PR_HEAD=$(gh pr view ${{ github.event.issue.number }} --json headRefName --jq '.headRefName')
-          git fetch origin "$PR_HEAD"
-          git checkout "$PR_HEAD"
 
 
 
@@ -101,10 +94,10 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           allowed_bots: '*'
           prompt: |
-            PR #${{ github.event.issue.number }} has received a review requesting changes.
+            PR #${{ github.event.pull_request.number }} has received a review requesting changes.
 
-            1. Read the review comments: `gh pr view ${{ github.event.issue.number }} --comments`
-            2. Read the full diff to understand context: `gh pr diff ${{ github.event.issue.number }}`
+            1. Read the review comments: `gh pr view ${{ github.event.pull_request.number }} --comments`
+            2. Read the full diff to understand context: `gh pr diff ${{ github.event.pull_request.number }}`
             3. Address every issue raised in the review — fix the code, tests, or documentation as needed
             4. Verify: `dotnet build && dotnet test`
             5. Stage and commit all changes with a clear message describing what was fixed
