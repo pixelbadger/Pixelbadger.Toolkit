@@ -1,0 +1,105 @@
+name: Agent Build
+
+on:
+  issues:
+    types: [labeled]
+  pull_request_review:
+    types: [submitted]
+
+concurrency:
+  group: agent-build-${{ github.event.issue.number || github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  agent-build-issue:
+    if: github.event_name == 'issues' && github.event.label.name == 'status: to-do'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Run Claude Code Agent (issue → implementation)
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            Work on GitHub issue #${{ github.event.issue.number }}.
+
+            Follow the autonomous ticket workflow exactly:
+
+            1. Read the issue: `gh issue view ${{ github.event.issue.number }}`
+            2. Claim it: `gh issue edit ${{ github.event.issue.number }} --remove-label "status: to-do" --add-label "status: in-progress"`
+            3. Derive a short branch name from the issue title and create the branch: `git checkout -b feature/<short-description>`
+            4. Enter plan mode (the plan is auto-accepted — do not wait for human approval, proceed immediately to implementation)
+            5. Implement the feature: write code, tests, bump the version in Pixelbadger.Toolkit/Pixelbadger.Toolkit.csproj, update README.md
+            6. Verify: `dotnet build && dotnet test`
+            7. Stage and commit all changes: `git add <files> && git commit -m "<message>"`
+            8. Push the branch: `git push -u origin HEAD`
+            9. Open a PR:
+            ```
+            gh pr create --title "<title>" --body "$(cat <<'EOF'
+            Closes #${{ github.event.issue.number }}
+
+            ## Summary
+            <what changed and why>
+
+            ## Test plan
+            - [ ] Tests pass: `dotnet test`
+            - [ ] Version bumped in csproj
+            EOF
+            )"
+            ```
+
+            Follow all instructions in CLAUDE.md. Do what has been asked; nothing more, nothing less.
+          claude_args: '--model claude-sonnet-4-6 --max-turns 60 --dangerously-skip-permissions'
+
+  agent-build-review:
+    if: github.event_name == 'pull_request_review' && github.event.review.state == 'changes_requested'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Run Claude Code Agent (review → iteration)
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            PR #${{ github.event.pull_request.number }} has received a review requesting changes.
+
+            1. Read the review comments: `gh pr view ${{ github.event.pull_request.number }} --comments`
+            2. Read the full diff to understand context: `gh pr diff ${{ github.event.pull_request.number }}`
+            3. Address every issue raised in the review — fix the code, tests, or documentation as needed
+            4. Verify: `dotnet build && dotnet test`
+            5. Stage and commit all changes with a clear message describing what was fixed
+            6. Push: `git push`
+
+            Do not open a new PR. Push to the existing branch only. Follow all instructions in CLAUDE.md.
+          claude_args: '--model claude-sonnet-4-6 --max-turns 40 --dangerously-skip-permissions'

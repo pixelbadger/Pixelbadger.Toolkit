@@ -29,17 +29,41 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
-            Review this pull request for the following only. Be concise — flag issues, don't praise.
+            Review this pull request thoroughly. Read the full diff. Be concise — flag issues only, don't praise.
 
-            **Sanity check** — Flag:
-            - Obvious bugs or logic errors
+            Evaluate across all five dimensions:
+
+            **Correctness** — Flag:
+            - Logic errors, off-by-ones, incorrect conditionals
+            - Edge cases that are unhandled or produce wrong results
             - Unhandled nulls in critical paths
-            - Prompt injection risk: user-controlled strings passed directly into LLM calls without sanitisation
+
+            **Test quality** — Flag:
+            - Coverage gaps: success paths, error conditions, or edge cases missing tests
+            - Weak assertions (testing the wrong thing, or asserting too little)
+            - Missing error-path tests
+
+            **Architecture** — Flag:
+            - Violations of the component-per-command pattern (each command action must have its own dedicated component class)
+            - Single Responsibility Principle violations
+            - Shared logic that should be extracted into a service with an interface
+
+            **Security** — Flag:
+            - Prompt injection: user-controlled strings passed directly into LLM calls without sanitisation
             - Path traversal: user-supplied file paths used in file operations without validation
+            - Any other OWASP top-10 risks
+
+            **Consistency** — Flag:
+            - Naming or style inconsistencies with the rest of the codebase
+            - README examples that don't match the actual implementation
+            - CLAUDE.md patterns that are violated
+
+            Where an issue is tied to a specific line, post an inline comment on that line using the GitHub REST API:
+            `gh api repos/{owner}/{repo}/pulls/{pull_number}/comments` with `path`, `line`, and `body`.
 
             Once you have completed the review, submit a formal GitHub review using `gh pr review`:
-            - If no issues found: `gh pr review <PR_NUMBER> --approve --body "LGTM — no sanity-check issues found."`
+            - If no issues found: `gh pr review <PR_NUMBER> --approve --body "LGTM."`
             - If issues found: `gh pr review <PR_NUMBER> --request-changes --body "<summary of issues found>"`
 
-          claude_args: '--model claude-haiku-4-5-20251001 --max-turns 15 --allowed-tools "Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*),Bash(gh pr review:*)"'
+          claude_args: '--model claude-sonnet-4-6 --max-turns 20 --allowed-tools "Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*),Bash(gh pr review:*),Bash(gh api:*)"'
 
