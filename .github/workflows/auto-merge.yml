@@ -1,8 +1,8 @@
 name: Auto Merge
 
 on:
-  issue_comment:
-    types: [created]
+  pull_request_review:
+    types: [submitted]
   check_suite:
     types: [completed]
 
@@ -19,18 +19,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Determine PR number from whichever event fired
-          if [ "${{ github.event_name }}" = "issue_comment" ]; then
-            # Only act on APPROVED comments on PRs
-            COMMENT_BODY="${{ github.event.comment.body }}"
-            if ! echo "$COMMENT_BODY" | grep -q '<!-- APPROVED -->'; then
-              echo "Comment does not contain APPROVED marker. Skipping."
-              exit 0
-            fi
-            PR_NUMBER="${{ github.event.issue.number }}"
-            HEAD_BRANCH=$(gh pr view "$PR_NUMBER" --json headRefName --jq '.headRefName')
-            BASE_BRANCH=$(gh pr view "$PR_NUMBER" --json baseRefName --jq '.baseRefName')
+          if [ "${{ github.event_name }}" = "pull_request_review" ]; then
+            PR_NUMBER="${{ github.event.pull_request.number }}"
+            HEAD_BRANCH="${{ github.event.pull_request.head.ref }}"
+            BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
           elif [ "${{ github.event_name }}" = "check_suite" ]; then
-            # Find the open PR associated with the head SHA
             PR_NUMBER=$(gh pr list --state open --json number,headRefName,baseRefName \
               --jq '.[] | select(.baseRefName == "master") | .number' | head -1)
             if [ -z "$PR_NUMBER" ]; then
@@ -51,10 +44,9 @@ jobs:
             exit 0
           fi
 
-          echo "Checking PR #$PR_NUMBER ($HEAD_BRANCH → $BASE_BRANCH)"
+          echo "Checking PR #$PR_NUMBER ($HEAD_BRANCH -> $BASE_BRANCH)"
 
-          # Check PR state and whether an APPROVED comment exists
-          PR_JSON=$(gh pr view "$PR_NUMBER" --json statusCheckRollup,state)
+          PR_JSON=$(gh pr view "$PR_NUMBER" --json reviewDecision,statusCheckRollup,state)
           STATE=$(echo "$PR_JSON" | jq -r '.state')
 
           if [ "$STATE" != "OPEN" ]; then
@@ -62,20 +54,21 @@ jobs:
             exit 0
           fi
 
-          APPROVED=$(gh pr view "$PR_NUMBER" --comments --json comments \
-            --jq '[.comments[].body | select(contains("<!-- APPROVED -->"))] | length')
-          if [ "$APPROVED" = "0" ]; then
-            echo "No APPROVED comment found on PR #$PR_NUMBER. Waiting."
+          REVIEW_DECISION=$(echo "$PR_JSON" | jq -r '.reviewDecision')
+          echo "Review decision: $REVIEW_DECISION"
+
+          if [ "$REVIEW_DECISION" != "APPROVED" ]; then
+            echo "PR is not approved yet. Waiting."
             exit 0
           fi
 
-          # Check that all status checks are passing (none pending or failing)
+          # Check that all status checks are passing
           CHECKS=$(echo "$PR_JSON" | jq -r '.statusCheckRollup[]? | .conclusion // .status')
           PENDING=$(echo "$CHECKS" | grep -E '^(PENDING|IN_PROGRESS|QUEUED|WAITING|null)$' || true)
           FAILING=$(echo "$CHECKS" | grep -E '^(FAILURE|ERROR|TIMED_OUT|ACTION_REQUIRED|CANCELLED|STARTUP_FAILURE)$' || true)
 
           if [ -n "$PENDING" ]; then
-            echo "Some checks are still pending. Waiting for them to complete."
+            echo "Some checks are still pending. Waiting."
             exit 0
           fi
 

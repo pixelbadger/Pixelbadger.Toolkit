@@ -23,8 +23,22 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Run Claude Code Review
-        id: claude-review
+      - name: Detect review type
+        id: review-type
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR=${{ github.event.pull_request.number }}
+          PRIOR=$(gh api repos/${{ github.repository }}/pulls/$PR/reviews \
+            --jq '[.[] | select(.state != "PENDING")] | length')
+          if [ "$PRIOR" -gt 0 ]; then
+            echo "type=followup" >> "$GITHUB_OUTPUT"
+          else
+            echo "type=primary" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Primary review (full diff)
+        if: steps.review-type.outputs.type == 'primary'
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -32,9 +46,9 @@ jobs:
           prompt: |
             Review this pull request thoroughly. Read the full diff. Be concise — flag issues only, don't praise.
 
-            FIRST: Check CI status with `gh pr checks <PR_NUMBER>`. If any required check is failing, that is an immediate blocker — include the failure in your findings and request changes regardless of code quality.
+            FIRST: Check CI status with `gh pr checks ${{ github.event.pull_request.number }}`. If any required check is failing, that is an immediate blocker — include the failure in your findings and request changes regardless of code quality.
 
-            Evaluate across all five dimensions:
+            Then evaluate the diff across all five dimensions:
 
             **Correctness** — Flag:
             - Logic errors, off-by-ones, incorrect conditionals
@@ -61,14 +75,36 @@ jobs:
             - README examples that don't match the actual implementation
             - CLAUDE.md patterns that are violated
 
-            Where an issue is tied to a specific line, post an inline comment on that line using the GitHub REST API:
-            `gh api repos/{owner}/{repo}/pulls/{pull_number}/comments` with `path`, `line`, and `body`.
+            Where an issue is tied to a specific line, post an inline comment using:
+            `gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments` with `path`, `line`, and `body`.
 
-            MANDATORY FINAL STEP — you MUST do this regardless of what else you do:
-            Post a PR comment containing a machine-readable decision tag. This is required — inline comments alone are not enough.
-            - If no issues found: `gh pr comment <PR_NUMBER> --body "<!-- APPROVED -->LGTM."`
-            - If issues found: `gh pr comment <PR_NUMBER> --body "<!-- CHANGES_REQUESTED --><summary of issues found>"`
+            MANDATORY FINAL STEP — you MUST do this:
+            - If no issues found: `gh pr review ${{ github.event.pull_request.number }} --approve --body "LGTM."`
+            - If issues found: `gh pr review ${{ github.event.pull_request.number }} --request-changes --body "<summary>"`
             Do not finish without running one of these two commands.
 
-          claude_args: '--model claude-sonnet-4-6 --max-turns 30 --allowed-tools "Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*),Bash(gh pr review:*),Bash(gh api:*)"'
+          claude_args: '--model claude-sonnet-4-6 --max-turns 30 --allowed-tools "Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*),Bash(gh pr review:*),Bash(gh pr checks:*),Bash(gh api:*)"'
 
+      - name: Follow-up review (latest commit only)
+        if: steps.review-type.outputs.type == 'followup'
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          allowed_bots: '*'
+          prompt: |
+            This is a follow-up review after the author addressed previous feedback.
+
+            FIRST: Check CI status with `gh pr checks ${{ github.event.pull_request.number }}`. Failing checks are an immediate blocker.
+
+            Then: read only the latest commit's changes with `gh pr diff ${{ github.event.pull_request.number }}` filtered to what changed since the last review. Focus solely on:
+            1. Whether the issues raised in prior review comments have been properly addressed
+            2. Any new bugs or regressions introduced by the fixes
+
+            Do not re-review code that was already approved. Be brief.
+
+            MANDATORY FINAL STEP — you MUST do this:
+            - If all prior issues resolved and no new problems: `gh pr review ${{ github.event.pull_request.number }} --approve --body "LGTM."`
+            - If issues remain or new problems found: `gh pr review ${{ github.event.pull_request.number }} --request-changes --body "<summary>"`
+            Do not finish without running one of these two commands.
+
+          claude_args: '--model claude-sonnet-4-6 --max-turns 20 --allowed-tools "Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*),Bash(gh pr review:*),Bash(gh pr checks:*),Bash(gh api:*)"'
