@@ -131,11 +131,12 @@ public class StringReportComponentTests : IDisposable
     }
 
     [Fact]
-    public void AnalyzeText_ShouldReturnPositiveReadingTime_WhenTextIsNotEmpty()
+    public void AnalyzeText_ShouldReturnCorrectReadingTime_WhenSixWordTextProvided()
     {
+        // 6 words / 238 wpm * 60s = 1.51… → ceiling = 2s
         var result = _component.AnalyzeText("The cat sat on the mat.");
 
-        result.EstimatedReadingTimeSeconds.Should().BeGreaterThan(0);
+        result.EstimatedReadingTimeSeconds.Should().Be(2);
     }
 
     [Fact]
@@ -210,21 +211,37 @@ public class StringReportComponentTests : IDisposable
     [Fact]
     public void AnalyzeText_ShouldPopulateAllFields_WhenMultiParagraphTextProvided()
     {
+        // "Hello world. How are you?\n\nI am fine. Thank you very much."
+        // 58 chars total, 46 non-whitespace, 12 words, 11 unique, 4 sentences, 2 paragraphs
+        // avg 3.0 words/sentence, 2.0 sentences/paragraph, 1 page
+        // 12/238*60 = 3.025 → ceiling = 4s reading time
+        // Flesch score > 100 → clamped to 100.0 "Very easy"
+        // longest word = "hello" (5 chars, first in order), most common = "you" (2 occurrences)
         var text = "Hello world. How are you?\n\nI am fine. Thank you very much.";
 
         var result = _component.AnalyzeText(text);
 
-        result.Characters.Should().BeGreaterThan(0);
-        result.CharactersNoSpaces.Should().BeGreaterThan(0);
-        result.Words.Should().BeGreaterThan(0);
-        result.UniqueWords.Should().BeGreaterThan(0);
+        result.Characters.Should().Be(58);
+        result.CharactersNoSpaces.Should().Be(46);
+        result.Words.Should().Be(12);
+        result.UniqueWords.Should().Be(11);
         result.Sentences.Should().Be(4);
         result.Paragraphs.Should().Be(2);
-        result.AverageWordsPerSentence.Should().BeGreaterThan(0);
-        result.AverageSentencesPerParagraph.Should().BeGreaterThan(0);
-        result.EstimatedPages.Should().BeGreaterThan(0);
-        result.EstimatedReadingTimeSeconds.Should().BeGreaterThan(0);
-        result.LongestWord.Should().NotBeEmpty();
-        result.MostCommonWord.Should().NotBeEmpty();
+        result.AverageWordsPerSentence.Should().Be(3.0);
+        result.AverageSentencesPerParagraph.Should().Be(2.0);
+        result.EstimatedPages.Should().Be(1);
+        result.EstimatedReadingTimeSeconds.Should().Be(4);
+        result.FleschReadingEase.Should().Be(100);
+        result.ReadabilityBand.Should().Be("Very easy");
+        result.LongestWord.Should().Be("hello");
+        result.MostCommonWord.Should().Be("you");
+    }
+
+    [Fact]
+    public void AnalyzeText_ShouldNotOvercountParagraphs_WhenTextHasTrailingBlankLines()
+    {
+        var result = _component.AnalyzeText("First paragraph.\n\nSecond paragraph.\n\n");
+
+        result.Paragraphs.Should().Be(2);
     }
 }

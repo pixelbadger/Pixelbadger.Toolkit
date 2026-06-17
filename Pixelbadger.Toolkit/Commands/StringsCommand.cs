@@ -207,7 +207,7 @@ public static class StringsCommand
         return command;
     }
 
-    private static string FormatReadingTime(int totalSeconds)
+    internal static string FormatReadingTime(int totalSeconds)
     {
         if (totalSeconds < 60)
             return $"{totalSeconds}s";

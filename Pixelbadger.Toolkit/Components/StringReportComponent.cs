@@ -5,14 +5,13 @@ namespace Pixelbadger.Toolkit.Components;
 public class StringReportComponent
 {
     private static readonly Regex WordRegex = new Regex(@"[A-Za-z]+(?:'[A-Za-z]+)?", RegexOptions.Compiled);
-    private static readonly Regex SentenceRegex = new Regex(@"[.!?]+", RegexOptions.Compiled);
     private static readonly Regex ParagraphRegex = new Regex(@"\n\s*\n", RegexOptions.Compiled);
 
-    private readonly FleschReadingEaseComponent _fleschComponent;
+    private readonly IFleschReadingEaseComponent _fleschComponent;
 
     public StringReportComponent() : this(new FleschReadingEaseComponent()) { }
 
-    public StringReportComponent(FleschReadingEaseComponent fleschComponent)
+    public StringReportComponent(IFleschReadingEaseComponent fleschComponent)
     {
         _fleschComponent = fleschComponent;
     }
@@ -58,19 +57,19 @@ public class StringReportComponent
         var wordCount = words.Count;
         var uniqueWordCount = words.Distinct().Count();
 
-        var sentenceCount = Math.Max(1, SentenceRegex.Matches(text).Count);
-        var paragraphCount = Math.Max(1, ParagraphRegex.Matches(text).Count + 1);
+        var flesch = _fleschComponent.AnalyzeText(text);
+        var sentenceCount = flesch.Sentences;
 
-        var averageWordsPerSentence = Math.Round((double)wordCount / sentenceCount, 1);
+        var paragraphCount = Math.Max(1, ParagraphRegex.Matches(text.Trim()).Count + 1);
+
+        var averageWordsPerSentence = sentenceCount > 0 ? Math.Round((double)wordCount / sentenceCount, 1) : 0;
         var averageSentencesPerParagraph = Math.Round((double)sentenceCount / paragraphCount, 1);
 
         var estimatedPageCount = (int)Math.Ceiling((double)wordCount / 250);
         var estimatedReadingTimeSeconds = (int)Math.Ceiling((double)wordCount / 238 * 60);
 
-        var flesch = _fleschComponent.AnalyzeText(text);
-
         var longestWord = wordMatches.Count > 0
-            ? wordMatches.OrderByDescending(m => m.Value.Length).First().Value
+            ? wordMatches.OrderByDescending(m => m.Value.Length).First().Value.ToLowerInvariant()
             : string.Empty;
 
         var mostCommonWord = words.Count > 0

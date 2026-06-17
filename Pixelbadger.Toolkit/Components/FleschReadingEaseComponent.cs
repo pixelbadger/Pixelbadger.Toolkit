@@ -2,7 +2,12 @@ using System.Text.RegularExpressions;
 
 namespace Pixelbadger.Toolkit.Components;
 
-public class FleschReadingEaseComponent
+public interface IFleschReadingEaseComponent
+{
+    FleschReadingEaseResult AnalyzeText(string text);
+}
+
+public class FleschReadingEaseComponent : IFleschReadingEaseComponent
 {
     private static readonly Regex WordRegex = new Regex("[A-Za-z]+(?:'[A-Za-z]+)?", RegexOptions.Compiled);
     private static readonly Regex SentenceRegex = new Regex("[.!?]+", RegexOptions.Compiled);
