@@ -23,6 +23,23 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Wait for other checks to complete
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR=${{ github.event.pull_request.number }}
+          echo "Waiting for CI checks to finish before reviewing..."
+          for i in $(seq 1 30); do
+            PENDING=$(gh pr checks "$PR" --json state \
+              --jq '[.[] | select(.state == "PENDING" or .state == "IN_PROGRESS")] | length' 2>/dev/null || echo "1")
+            if [ "$PENDING" = "0" ]; then
+              echo "All checks complete."
+              break
+            fi
+            echo "Attempt $i/30: $PENDING check(s) still running. Waiting 20s..."
+            sleep 20
+          done
+
       - name: Detect review type
         id: review-type
         env:
