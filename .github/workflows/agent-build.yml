@@ -6,10 +6,6 @@ on:
   pull_request_review:
     types: [submitted]
 
-concurrency:
-  group: agent-build-${{ github.event.issue.number || github.event.pull_request.number }}
-  cancel-in-progress: true
-
 jobs:
   agent-build-issue:
     if: "github.event_name == 'issues' && github.event.label.name == 'status: to-do'"
@@ -68,6 +64,9 @@ jobs:
 
   agent-build-review:
     if: github.event_name == 'pull_request_review' && github.event.review.state == 'changes_requested'
+    concurrency:
+      group: agent-build-pr-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
     runs-on: ubuntu-latest
     permissions:
       contents: write
