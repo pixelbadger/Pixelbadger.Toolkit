@@ -2,9 +2,14 @@ using System.Text.RegularExpressions;
 
 namespace Pixelbadger.Toolkit.Components;
 
-public class StringReportComponent
+public interface IStringReportComponent
 {
-    private static readonly Regex WordRegex = new Regex(@"[A-Za-z]+(?:'[A-Za-z]+)?", RegexOptions.Compiled);
+    Task<StringReportResult> AnalyzeFileAsync(string inputFilePath);
+    StringReportResult AnalyzeText(string text);
+}
+
+public class StringReportComponent : IStringReportComponent
+{
     private static readonly Regex ParagraphRegex = new Regex(@"\n\s*\n", RegexOptions.Compiled);
 
     private readonly IFleschReadingEaseComponent _fleschComponent;
@@ -52,7 +57,7 @@ public class StringReportComponent
         var characterCount = text.Length;
         var characterCountNoSpaces = text.Count(c => !char.IsWhiteSpace(c));
 
-        var wordMatches = WordRegex.Matches(text);
+        var wordMatches = StringTokenPatterns.WordRegex.Matches(text);
         var words = wordMatches.Select(m => m.Value.ToLowerInvariant()).ToList();
         var wordCount = words.Count;
         var uniqueWordCount = words.Distinct().Count();

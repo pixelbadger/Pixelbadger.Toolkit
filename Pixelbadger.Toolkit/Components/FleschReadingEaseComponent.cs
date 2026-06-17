@@ -9,7 +9,6 @@ public interface IFleschReadingEaseComponent
 
 public class FleschReadingEaseComponent : IFleschReadingEaseComponent
 {
-    private static readonly Regex WordRegex = new Regex("[A-Za-z]+(?:'[A-Za-z]+)?", RegexOptions.Compiled);
     private static readonly Regex SentenceRegex = new Regex("[.!?]+", RegexOptions.Compiled);
 
     public async Task<FleschReadingEaseResult> AnalyzeFileAsync(string inputFilePath)
@@ -35,7 +34,7 @@ public class FleschReadingEaseComponent : IFleschReadingEaseComponent
             return new FleschReadingEaseResult(0, 0, 0, 0, "N/A (empty input)");
         }
 
-        var words = WordRegex.Matches(text);
+        var words = StringTokenPatterns.WordRegex.Matches(text);
         var wordCount = words.Count;
 
         if (wordCount == 0)
@@ -128,3 +127,8 @@ public record FleschReadingEaseResult(
     int Words,
     int Syllables,
     string ReadabilityBand);
+
+internal static class StringTokenPatterns
+{
+    internal static readonly Regex WordRegex = new Regex("[A-Za-z]+(?:'[A-Za-z]+)?", RegexOptions.Compiled);
+}
