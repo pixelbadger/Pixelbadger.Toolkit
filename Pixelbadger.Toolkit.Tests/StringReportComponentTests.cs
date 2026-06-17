@@ -244,4 +244,25 @@ public class StringReportComponentTests : IDisposable
 
         result.Paragraphs.Should().Be(2);
     }
+
+    [Fact]
+    public void AnalyzeText_ShouldReturnZeroWordMetrics_WhenTextContainsNoAlphabeticCharacters()
+    {
+        var result = _component.AnalyzeText("123 456");
+
+        result.Characters.Should().Be(7);
+        result.CharactersNoSpaces.Should().Be(6);
+        result.Words.Should().Be(0);
+        result.UniqueWords.Should().Be(0);
+        result.Sentences.Should().Be(0);
+        result.Paragraphs.Should().Be(1);
+        result.AverageWordsPerSentence.Should().Be(0);
+        result.AverageSentencesPerParagraph.Should().Be(0);
+        result.EstimatedPages.Should().Be(0);
+        result.EstimatedReadingTimeSeconds.Should().Be(0);
+        result.FleschReadingEase.Should().Be(0);
+        result.ReadabilityBand.Should().Be("N/A (empty input)");
+        result.LongestWord.Should().BeEmpty();
+        result.MostCommonWord.Should().BeEmpty();
+    }
 }
