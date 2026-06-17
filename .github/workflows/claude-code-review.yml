@@ -32,6 +32,8 @@ jobs:
           prompt: |
             Review this pull request thoroughly. Read the full diff. Be concise — flag issues only, don't praise.
 
+            FIRST: Check CI status with `gh pr checks <PR_NUMBER>`. If any required check is failing, that is an immediate blocker — include the failure in your findings and request changes regardless of code quality.
+
             Evaluate across all five dimensions:
 
             **Correctness** — Flag:
