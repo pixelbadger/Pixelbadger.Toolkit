@@ -61,6 +61,17 @@ pbtk strings abjadify --in-file article.txt --out-file article-abjad.txt
 pbtk strings flesch-reading-ease --in-file article.txt
 ```
 
+#### report
+Performs a full text analysis including word count, sentence averages, page count, Flesch Reading Ease score, reading time, and more. Provide either a file path or a direct string.
+```
+--in-file <path>    Input file path (one of --in-file or --string required)
+--string <text>     Input text string (one of --in-file or --string required)
+```
+```bash
+pbtk strings report --in-file article.txt
+pbtk strings report --string "The quick brown fox jumps over the lazy dog."
+```
+
 ---
 
 ### interpreters
