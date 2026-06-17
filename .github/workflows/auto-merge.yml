@@ -1,8 +1,8 @@
 name: Auto Merge
 
 on:
-  pull_request_review:
-    types: [submitted]
+  issue_comment:
+    types: [created]
   check_suite:
     types: [completed]
 
@@ -19,10 +19,16 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Determine PR number from whichever event fired
-          if [ "${{ github.event_name }}" = "pull_request_review" ]; then
-            PR_NUMBER="${{ github.event.pull_request.number }}"
-            HEAD_BRANCH="${{ github.event.pull_request.head.ref }}"
-            BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
+          if [ "${{ github.event_name }}" = "issue_comment" ]; then
+            # Only act on APPROVED comments on PRs
+            COMMENT_BODY="${{ github.event.comment.body }}"
+            if ! echo "$COMMENT_BODY" | grep -q '<!-- APPROVED -->'; then
+              echo "Comment does not contain APPROVED marker. Skipping."
+              exit 0
+            fi
+            PR_NUMBER="${{ github.event.issue.number }}"
+            HEAD_BRANCH=$(gh pr view "$PR_NUMBER" --json headRefName --jq '.headRefName')
+            BASE_BRANCH=$(gh pr view "$PR_NUMBER" --json baseRefName --jq '.baseRefName')
           elif [ "${{ github.event_name }}" = "check_suite" ]; then
             # Find the open PR associated with the head SHA
             PR_NUMBER=$(gh pr list --state open --json number,headRefName,baseRefName \
@@ -47,8 +53,8 @@ jobs:
 
           echo "Checking PR #$PR_NUMBER ($HEAD_BRANCH → $BASE_BRANCH)"
 
-          # Read current review decision and status check rollup
-          PR_JSON=$(gh pr view "$PR_NUMBER" --json reviewDecision,statusCheckRollup,state)
+          # Check PR state and whether an APPROVED comment exists
+          PR_JSON=$(gh pr view "$PR_NUMBER" --json statusCheckRollup,state)
           STATE=$(echo "$PR_JSON" | jq -r '.state')
 
           if [ "$STATE" != "OPEN" ]; then
@@ -56,11 +62,10 @@ jobs:
             exit 0
           fi
 
-          REVIEW_DECISION=$(echo "$PR_JSON" | jq -r '.reviewDecision')
-          echo "Review decision: $REVIEW_DECISION"
-
-          if [ "$REVIEW_DECISION" != "APPROVED" ]; then
-            echo "PR is not approved yet. Waiting."
+          APPROVED=$(gh pr view "$PR_NUMBER" --comments --json comments \
+            --jq '[.comments[].body | select(contains("<!-- APPROVED -->"))] | length')
+          if [ "$APPROVED" = "0" ]; then
+            echo "No APPROVED comment found on PR #$PR_NUMBER. Waiting."
             exit 0
           fi
 
