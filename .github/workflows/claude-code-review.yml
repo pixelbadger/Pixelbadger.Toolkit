@@ -63,9 +63,9 @@ jobs:
             `gh api repos/{owner}/{repo}/pulls/{pull_number}/comments` with `path`, `line`, and `body`.
 
             MANDATORY FINAL STEP — you MUST do this regardless of what else you do:
-            Submit a formal GitHub review using `gh pr review`. This is required — inline comments alone are not enough.
-            - If no issues found: `gh pr review <PR_NUMBER> --approve --body "LGTM."`
-            - If issues found: `gh pr review <PR_NUMBER> --request-changes --body "<summary of issues found>"`
+            Post a PR comment containing a machine-readable decision tag. This is required — inline comments alone are not enough.
+            - If no issues found: `gh pr comment <PR_NUMBER> --body "<!-- APPROVED -->LGTM."`
+            - If issues found: `gh pr comment <PR_NUMBER> --body "<!-- CHANGES_REQUESTED --><summary of issues found>"`
             Do not finish without running one of these two commands.
 
           claude_args: '--model claude-sonnet-4-6 --max-turns 30 --allowed-tools "Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*),Bash(gh pr review:*),Bash(gh api:*)"'
