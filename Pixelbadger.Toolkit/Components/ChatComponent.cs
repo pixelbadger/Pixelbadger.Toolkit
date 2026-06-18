@@ -7,16 +7,16 @@ public record ChatSessionResult(string Response, long SessionId);
 
 public class ChatComponent
 {
-    private readonly IOpenAiClientService _openAiClientService;
+    private readonly ILlmClientService _llmClientService;
     private readonly IHistoryService _historyService;
 
-    public ChatComponent(IOpenAiClientService openAiClientService, IHistoryService historyService)
+    public ChatComponent(ILlmClientService llmClientService, IHistoryService historyService)
     {
-        _openAiClientService = openAiClientService;
+        _llmClientService = llmClientService;
         _historyService = historyService;
     }
 
-    public async Task<ChatSessionResult> ChatAsync(string question, long? sessionId)
+    public async Task<ChatSessionResult> ChatAsync(string question, long? sessionId, string? reasoningEffort = null)
     {
         var messages = new List<ChatMessage>();
 
@@ -36,7 +36,7 @@ public class ChatComponent
 
         messages.Add(ChatMessage.CreateUserMessage(question));
 
-        var result = await _openAiClientService.CompleteChatAsync(messages);
+        var result = await _llmClientService.CompleteChatAsync(messages, reasoningEffort);
 
         var activeSessionId = sessionId ?? await _historyService.CreateSessionAsync("chat");
         await _historyService.AddMessageAsync(activeSessionId, "user", question);

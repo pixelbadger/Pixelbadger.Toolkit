@@ -132,21 +132,23 @@ pbtk web serve-html --file index.html --port 8080
 
 ---
 
-### openai
+### llm
 
-Requires `OPENAI_API_KEY` environment variable.
+Requires `OPENAI_API_KEY` environment variable (when using the default OpenAI provider).
 
-All commands automatically persist conversation history to a SQLite database at `~/.pbtk/history.db`. Use `openai history` to inspect and manage sessions.
+All commands automatically persist conversation history to a SQLite database at `~/.pbtk/history.db`. Use `llm history` to inspect and manage sessions.
 
 #### chat
 ```
---message <text>      Message to send (required)
---session-id <id>     Session ID to continue a previous conversation (optional, omit to start new)
---model <name>        OpenAI model to use (default: gpt-5-nano)
+--message <text>            Message to send (required)
+--session-id <id>           Session ID to continue a previous conversation (optional, omit to start new)
+--model <name>              Model to use (default: gpt-5-nano)
+--reasoning-effort <level>  Reasoning effort level for o-series models: low, medium, high (optional)
 ```
 ```bash
-pbtk openai chat --message "Hello"
-pbtk openai chat --message "Continue our conversation" --session-id 42
+pbtk llm chat --message "Hello"
+pbtk llm chat --message "Continue our conversation" --session-id 42
+pbtk llm chat --message "Solve this hard problem" --reasoning-effort high
 ```
 The session ID is written to stderr after each call so it can be captured for follow-up messages.
 
@@ -154,19 +156,19 @@ The session ID is written to stderr after each call so it can be captured for fo
 ```
 --text <text>               Text to translate (required)
 --target-language <lang>    Target language (required)
---model <name>              OpenAI model to use (default: gpt-5-nano)
+--model <name>              Model to use (default: gpt-5-nano)
 ```
 ```bash
-pbtk openai translate --text "Hello, how are you?" --target-language "Spanish"
+pbtk llm translate --text "Hello, how are you?" --target-language "Spanish"
 ```
 
 #### ocaaar
 ```
 --image-path <path>   Path to the image file (required)
---model <name>        OpenAI model to use (default: gpt-5-nano)
+--model <name>        Model to use (default: gpt-5-nano)
 ```
 ```bash
-pbtk openai ocaaar --image-path poster.jpg
+pbtk llm ocaaar --image-path poster.jpg
 ```
 
 #### corpospeak
@@ -175,17 +177,17 @@ pbtk openai ocaaar --image-path poster.jpg
 --audience <name>             Target audience (required): csuite, engineering, product, sales,
                               marketing, operations, finance, legal, hr, customer-success
 --user-messages <text|path>   Writing style examples (optional, multiple values allowed)
---model <name>                OpenAI model to use (default: gpt-5-nano)
+--model <name>                Model to use (default: gpt-5-nano)
 ```
 ```bash
-pbtk openai corpospeak --source "API performance is great" --audience "csuite"
-pbtk openai corpospeak --source update.txt --audience "engineering" --user-messages "Hey team" "Let's ship this"
+pbtk llm corpospeak --source "API performance is great" --audience "csuite"
+pbtk llm corpospeak --source update.txt --audience "engineering" --user-messages "Hey team" "Let's ship this"
 ```
 
 #### history list
 Lists all stored sessions with their ID, command, creation time, and token usage.
 ```bash
-pbtk openai history list
+pbtk llm history list
 ```
 
 #### history delete
@@ -194,7 +196,7 @@ Deletes a session and all its stored messages.
 --session-id <id>   ID of the session to delete (required)
 ```
 ```bash
-pbtk openai history delete --session-id 42
+pbtk llm history delete --session-id 42
 ```
 
 ---

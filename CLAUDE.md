@@ -70,12 +70,13 @@ The project is .NET 9, and uses Microsoft's System.CommandLine library for build
   - `pbtk interpreters brainfuck --file hello.bf`
   - `pbtk interpreters ook --file hello.ook`
   - `pbtk interpreters bf-to-ook --source hello.bf --output hello.ook`
-  - `pbtk openai chat --message "Hello, how are you?"`
-  - `pbtk openai chat --message "Continue our conversation" --chat-history ./chat.json --model "gpt-4o-mini"`
-  - `pbtk openai translate --text "Hello, how are you?" --target-language "Spanish"`
-  - `pbtk openai ocaaar --image-path ./image.jpg`
-  - `pbtk openai corpospeak --source "API performance is great" --audience "csuite"`
-  - `pbtk openai corpospeak --source "New feature deployed" --audience "engineering" --user-messages "Hey team" "Let's ship this"`
+  - `pbtk llm chat --message "Hello, how are you?"`
+  - `pbtk llm chat --message "Continue our conversation" --session-id 42 --model "gpt-4o-mini"`
+  - `pbtk llm chat --message "Solve this hard problem" --reasoning-effort high`
+  - `pbtk llm translate --text "Hello, how are you?" --target-language "Spanish"`
+  - `pbtk llm ocaaar --image-path ./image.jpg`
+  - `pbtk llm corpospeak --source "API performance is great" --audience "csuite"`
+  - `pbtk llm corpospeak --source "New feature deployed" --audience "engineering" --user-messages "Hey team" "Let's ship this"`
 
 ### Testing Requirements
 
@@ -220,12 +221,13 @@ The project follows a topic-based command architecture with a component-per-comm
 ### Example Structure:
 ```
 Services/
-└── OpenAiClientService.cs      # Shared OpenAI functionality (with interface)
+├── ILlmClientService.cs        # Provider-neutral LLM interface (with LlmChatResult record)
+└── OpenAiLlmClientService.cs   # OpenAI implementation of ILlmClientService
 
 Components/
-├── ChatComponent.cs            # Chat command logic (injects IOpenAiClientService)
-├── TranslateComponent.cs       # Translate command logic (injects IOpenAiClientService)
-└── OcaaarComponent.cs          # Ocaaar command logic (injects IOpenAiClientService)
+├── ChatComponent.cs            # Chat command logic (injects ILlmClientService)
+├── TranslateComponent.cs       # Translate command logic (injects ILlmClientService)
+└── OcaaarComponent.cs          # Ocaaar command logic (injects ILlmClientService)
 ```
 
 ### Dependency Injection Pattern:
@@ -248,7 +250,7 @@ Available topics and actions:
 - **interpreters**: brainfuck, ook, bf-to-ook
 - **images**: steganography
 - **web**: serve-html
-- **openai**: chat, translate, ocaaar, corpospeak
+- **llm**: chat, translate, ocaaar, corpospeak
 
 ## Dependencies
 
@@ -262,7 +264,7 @@ Available topics and actions:
 
 ## Environment Variables
 
-- **OPENAI_API_KEY**: Required for LLM functionality (openai, translate, ocaaar actions)
+- **OPENAI_API_KEY**: Required for LLM functionality (llm commands using OpenAI as provider)
 - **NUGET_API_KEY**: Required for publishing packages to NuGet
 
 ## Autonomous Ticket Workflow

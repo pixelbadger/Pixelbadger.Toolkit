@@ -5,12 +5,12 @@ namespace Pixelbadger.Toolkit.Components;
 
 public class OcaaarComponent
 {
-    private readonly IOpenAiClientService _openAiClientService;
+    private readonly ILlmClientService _llmClientService;
     private readonly IHistoryService _historyService;
 
-    public OcaaarComponent(IOpenAiClientService openAiClientService, IHistoryService historyService)
+    public OcaaarComponent(ILlmClientService llmClientService, IHistoryService historyService)
     {
-        _openAiClientService = openAiClientService;
+        _llmClientService = llmClientService;
         _historyService = historyService;
     }
 
@@ -35,7 +35,7 @@ public class OcaaarComponent
             )
         };
 
-        var chatResult = await _openAiClientService.CompleteChatAsync(messages);
+        var chatResult = await _llmClientService.CompleteChatAsync(messages);
 
         var sessionId = await _historyService.CreateSessionAsync("ocaaar");
         await _historyService.AddMessageAsync(sessionId, "system", systemPrompt);

@@ -7,7 +7,7 @@ rootCommand.Add(StringsCommand.Create());
 rootCommand.Add(InterpretersCommand.Create());
 rootCommand.Add(ImagesCommand.Create());
 rootCommand.Add(WebCommand.Create());
-rootCommand.Add(OpenAiCommand.Create());
+rootCommand.Add(LlmCommand.Create());
 rootCommand.Add(OAuthCommand.Create());
 rootCommand.Add(CryptoCommand.Create());
 

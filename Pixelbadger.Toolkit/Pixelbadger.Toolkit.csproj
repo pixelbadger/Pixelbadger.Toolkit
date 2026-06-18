@@ -10,10 +10,10 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>pbtk</ToolCommandName>
     <PackageId>Pixelbadger.Toolkit</PackageId>
-    <Version>5.1.0</Version>
+    <Version>6.0.0</Version>
     <Authors>Pixelbadger</Authors>
-    <Description>A CLI toolkit exposing varied functionality organized by topic, including string manipulation, distance calculations, esoteric programming language interpreters, image steganography, web serving, OpenAI integration, and homomorphic encryption.</Description>
-    <PackageTags>cli;toolkit;strings;interpreters;steganography;openai;crypto;homomorphic-encryption</PackageTags>
+    <Description>A CLI toolkit exposing varied functionality organized by topic, including string manipulation, distance calculations, esoteric programming language interpreters, image steganography, web serving, LLM integration, and homomorphic encryption.</Description>
+    <PackageTags>cli;toolkit;strings;interpreters;steganography;llm;openai;crypto;homomorphic-encryption</PackageTags>
     <RepositoryUrl>https://github.com/pixelbadger/Pixelbadger.Toolkit</RepositoryUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
@@ -24,9 +24,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
-      <_Parameter1>Pixelbadger.Toolkit.Tests</_Parameter1>
-    </AssemblyAttribute>
+    <InternalsVisibleTo Include="Pixelbadger.Toolkit.Tests" />
   </ItemGroup>
 
   <ItemGroup>

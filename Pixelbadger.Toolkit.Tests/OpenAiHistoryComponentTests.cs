@@ -6,15 +6,15 @@ using Pixelbadger.Toolkit.Services;
 
 namespace Pixelbadger.Toolkit.Tests;
 
-public class OpenAiHistoryComponentTests
+public class LlmHistoryComponentTests
 {
     private readonly Mock<IHistoryService> _mockHistoryService;
-    private readonly OpenAiHistoryComponent _historyComponent;
+    private readonly LlmHistoryComponent _historyComponent;
 
-    public OpenAiHistoryComponentTests()
+    public LlmHistoryComponentTests()
     {
         _mockHistoryService = new Mock<IHistoryService>();
-        _historyComponent = new OpenAiHistoryComponent(_mockHistoryService.Object);
+        _historyComponent = new LlmHistoryComponent(_mockHistoryService.Object);
     }
 
     [Fact]

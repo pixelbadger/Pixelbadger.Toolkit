@@ -9,7 +9,7 @@ namespace Pixelbadger.Toolkit.Tests;
 public class CorpospeakComponentTests : IDisposable
 {
     private readonly string _testDirectory;
-    private readonly Mock<IOpenAiClientService> _mockOpenAiService;
+    private readonly Mock<ILlmClientService> _mockLlmService;
     private readonly Mock<IHistoryService> _mockHistoryService;
     private readonly CorpospeakComponent _corpospeakComponent;
 
@@ -18,11 +18,10 @@ public class CorpospeakComponentTests : IDisposable
         _testDirectory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
         Directory.CreateDirectory(_testDirectory);
 
-        _mockOpenAiService = new Mock<IOpenAiClientService>();
-        _mockOpenAiService.Setup(x => x.EscapeXml(It.IsAny<string>())).Returns<string>(s => s);
+        _mockLlmService = new Mock<ILlmClientService>();
         _mockHistoryService = new Mock<IHistoryService>();
         _mockHistoryService.Setup(x => x.CreateSessionAsync("corpospeak")).ReturnsAsync(1L);
-        _corpospeakComponent = new CorpospeakComponent(_mockOpenAiService.Object, _mockHistoryService.Object);
+        _corpospeakComponent = new CorpospeakComponent(_mockLlmService.Object, _mockHistoryService.Object);
     }
 
     public void Dispose()
@@ -42,15 +41,15 @@ public class CorpospeakComponentTests : IDisposable
         var userMessages = Array.Empty<string>();
         var expectedResult = "Our API infrastructure delivers exceptional performance metrics, driving significant operational efficiency and competitive advantage.";
 
-        _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
-            .ReturnsAsync(new ChatResult(expectedResult, 50, 30));
+        _mockLlmService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>(), It.IsAny<string?>()))
+            .ReturnsAsync(new LlmChatResult(expectedResult, 50, 30));
 
         // Act
         var result = await _corpospeakComponent.CorpospeakAsync(source, audience, userMessages);
 
         // Assert
         result.Should().Be(expectedResult);
-        _mockOpenAiService.Verify(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()), Times.Once);
+        _mockLlmService.Verify(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>(), It.IsAny<string?>()), Times.Once);
     }
 
     [Theory]
@@ -93,8 +92,8 @@ public class CorpospeakComponentTests : IDisposable
         var userMessages = Array.Empty<string>();
         var expectedResult = "Rewritten test message";
 
-        _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
-            .ReturnsAsync(new ChatResult(expectedResult, 30, 15));
+        _mockLlmService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>(), It.IsAny<string?>()))
+            .ReturnsAsync(new LlmChatResult(expectedResult, 30, 15));
 
         // Act
         var result = await _corpospeakComponent.CorpospeakAsync(source, audience, userMessages);
@@ -126,8 +125,8 @@ public class CorpospeakComponentTests : IDisposable
         var userMessages = Array.Empty<string>();
         var expectedResult = "Executive-level rewritten message";
 
-        _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
-            .ReturnsAsync(new ChatResult(expectedResult, 40, 20));
+        _mockLlmService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>(), It.IsAny<string?>()))
+            .ReturnsAsync(new LlmChatResult(expectedResult, 40, 20));
 
         // Act
         var result = await _corpospeakComponent.CorpospeakAsync(source, audience, userMessages);
@@ -145,8 +144,8 @@ public class CorpospeakComponentTests : IDisposable
         var userMessages = Array.Empty<string>();
         var expectedResult = "Technical rewritten message";
 
-        _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
-            .ReturnsAsync(new ChatResult(expectedResult, 35, 18));
+        _mockLlmService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>(), It.IsAny<string?>()))
+            .ReturnsAsync(new LlmChatResult(expectedResult, 35, 18));
 
         // Act
         var result = await _corpospeakComponent.CorpospeakAsync(source, audience, userMessages);
@@ -167,8 +166,8 @@ public class CorpospeakComponentTests : IDisposable
         var userMessages = Array.Empty<string>();
         var expectedResult = "Technical version of file content";
 
-        _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
-            .ReturnsAsync(new ChatResult(expectedResult, 45, 22));
+        _mockLlmService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>(), It.IsAny<string?>()))
+            .ReturnsAsync(new LlmChatResult(expectedResult, 45, 22));
 
         // Act
         var result = await _corpospeakComponent.CorpospeakAsync(sourceFilePath, audience, userMessages);
@@ -186,8 +185,8 @@ public class CorpospeakComponentTests : IDisposable
         var userMessages = Array.Empty<string>();
         var expectedResult = "Marketing-friendly rewritten text";
 
-        _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
-            .ReturnsAsync(new ChatResult(expectedResult, 40, 20));
+        _mockLlmService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>(), It.IsAny<string?>()))
+            .ReturnsAsync(new LlmChatResult(expectedResult, 40, 20));
 
         // Act
         var result = await _corpospeakComponent.CorpospeakAsync(source, audience, userMessages);
@@ -210,8 +209,8 @@ public class CorpospeakComponentTests : IDisposable
         var userMessages = new[] { userMessageFile1, userMessageFile2 };
         var expectedResult = "Sales-optimized message";
 
-        _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
-            .ReturnsAsync(new ChatResult(expectedResult, 60, 25));
+        _mockLlmService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>(), It.IsAny<string?>()))
+            .ReturnsAsync(new LlmChatResult(expectedResult, 60, 25));
 
         // Act
         var result = await _corpospeakComponent.CorpospeakAsync(source, audience, userMessages);
@@ -229,8 +228,8 @@ public class CorpospeakComponentTests : IDisposable
         var userMessages = new[] { "Direct user message 1", "Direct user message 2" };
         var expectedResult = "Product-focused message";
 
-        _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
-            .ReturnsAsync(new ChatResult(expectedResult, 55, 22));
+        _mockLlmService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>(), It.IsAny<string?>()))
+            .ReturnsAsync(new LlmChatResult(expectedResult, 55, 22));
 
         // Act
         var result = await _corpospeakComponent.CorpospeakAsync(source, audience, userMessages);
@@ -249,9 +248,9 @@ public class CorpospeakComponentTests : IDisposable
         var expectedResult = "Executive summary";
         List<ChatMessage>? capturedMessages = null;
 
-        _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
-            .Callback<IEnumerable<ChatMessage>>(messages => capturedMessages = messages.ToList())
-            .ReturnsAsync(new ChatResult(expectedResult, 50, 20));
+        _mockLlmService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>(), It.IsAny<string?>()))
+            .Callback<IEnumerable<ChatMessage>, string?>((messages, _) => capturedMessages = messages.ToList())
+            .ReturnsAsync(new LlmChatResult(expectedResult, 50, 20));
 
         // Act
         await _corpospeakComponent.CorpospeakAsync(source, audience, userMessages);
@@ -274,9 +273,9 @@ public class CorpospeakComponentTests : IDisposable
         var expectedResult = "Technical update";
         List<ChatMessage>? capturedMessages = null;
 
-        _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
-            .Callback<IEnumerable<ChatMessage>>(messages => capturedMessages = messages.ToList())
-            .ReturnsAsync(new ChatResult(expectedResult, 70, 30));
+        _mockLlmService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>(), It.IsAny<string?>()))
+            .Callback<IEnumerable<ChatMessage>, string?>((messages, _) => capturedMessages = messages.ToList())
+            .ReturnsAsync(new LlmChatResult(expectedResult, 70, 30));
 
         // Act
         await _corpospeakComponent.CorpospeakAsync(source, audience, userMessages);
@@ -320,9 +319,9 @@ public class CorpospeakComponentTests : IDisposable
         var expectedResult = "Audience-specific result";
         List<ChatMessage>? capturedMessages = null;
 
-        _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
-            .Callback<IEnumerable<ChatMessage>>(messages => capturedMessages = messages.ToList())
-            .ReturnsAsync(new ChatResult(expectedResult, 45, 20));
+        _mockLlmService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>(), It.IsAny<string?>()))
+            .Callback<IEnumerable<ChatMessage>, string?>((messages, _) => capturedMessages = messages.ToList())
+            .ReturnsAsync(new LlmChatResult(expectedResult, 45, 20));
 
         // Act
         await _corpospeakComponent.CorpospeakAsync(source, audience, userMessages);
@@ -346,9 +345,9 @@ public class CorpospeakComponentTests : IDisposable
         var expectedResult = "Result with idiolect";
         List<ChatMessage>? capturedMessages = null;
 
-        _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
-            .Callback<IEnumerable<ChatMessage>>(messages => capturedMessages = messages.ToList())
-            .ReturnsAsync(new ChatResult(expectedResult, 40, 18));
+        _mockLlmService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>(), It.IsAny<string?>()))
+            .Callback<IEnumerable<ChatMessage>, string?>((messages, _) => capturedMessages = messages.ToList())
+            .ReturnsAsync(new LlmChatResult(expectedResult, 40, 18));
 
         // Act
         await _corpospeakComponent.CorpospeakAsync(source, audience, userMessages);
@@ -372,9 +371,9 @@ public class CorpospeakComponentTests : IDisposable
         var expectedResult = "Result without idiolect";
         List<ChatMessage>? capturedMessages = null;
 
-        _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
-            .Callback<IEnumerable<ChatMessage>>(messages => capturedMessages = messages.ToList())
-            .ReturnsAsync(new ChatResult(expectedResult, 35, 15));
+        _mockLlmService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>(), It.IsAny<string?>()))
+            .Callback<IEnumerable<ChatMessage>, string?>((messages, _) => capturedMessages = messages.ToList())
+            .ReturnsAsync(new LlmChatResult(expectedResult, 35, 15));
 
         // Act
         await _corpospeakComponent.CorpospeakAsync(source, audience, userMessages);
@@ -397,17 +396,18 @@ public class CorpospeakComponentTests : IDisposable
         var userMessages = new[] { "Team update" };
         var expectedResult = "Product-focused announcement";
 
-        _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
-            .ReturnsAsync(new ChatResult(expectedResult, 55, 25));
+        _mockLlmService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>(), It.IsAny<string?>()))
+            .ReturnsAsync(new LlmChatResult(expectedResult, 55, 25));
 
         // Act
         var result = await _corpospeakComponent.CorpospeakAsync(source, audience, userMessages);
 
         // Assert
         result.Should().Be(expectedResult);
-        _mockOpenAiService.Verify(x => x.CompleteChatAsync(
+        _mockLlmService.Verify(x => x.CompleteChatAsync(
             It.Is<IEnumerable<ChatMessage>>(messages =>
-                messages.Count() == 3)), Times.Once); // user message + assistant + final prompt
+                messages.Count() == 3),
+            It.IsAny<string?>()), Times.Once); // user message + assistant + final prompt
     }
 
     [Fact]
@@ -419,9 +419,9 @@ public class CorpospeakComponentTests : IDisposable
         var userMessages = Array.Empty<string>();
         List<ChatMessage>? capturedMessages = null;
 
-        _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
-            .Callback<IEnumerable<ChatMessage>>(messages => capturedMessages = messages.ToList())
-            .ReturnsAsync(new ChatResult("Technical rewrite", 40, 18));
+        _mockLlmService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>(), It.IsAny<string?>()))
+            .Callback<IEnumerable<ChatMessage>, string?>((messages, _) => capturedMessages = messages.ToList())
+            .ReturnsAsync(new LlmChatResult("Technical rewrite", 40, 18));
 
         // Act
         await _corpospeakComponent.CorpospeakAsync(source, audience, userMessages);
@@ -445,10 +445,9 @@ public class CorpospeakComponentTests : IDisposable
         var userMessages = Array.Empty<string>();
         List<ChatMessage>? capturedMessages = null;
 
-        _mockOpenAiService.Setup(x => x.EscapeXml(source)).Returns(escapedSource);
-        _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
-            .Callback<IEnumerable<ChatMessage>>(messages => capturedMessages = messages.ToList())
-            .ReturnsAsync(new ChatResult("Technical rewrite", 40, 18));
+        _mockLlmService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>(), It.IsAny<string?>()))
+            .Callback<IEnumerable<ChatMessage>, string?>((messages, _) => capturedMessages = messages.ToList())
+            .ReturnsAsync(new LlmChatResult("Technical rewrite", 40, 18));
 
         // Act
         await _corpospeakComponent.CorpospeakAsync(source, audience, userMessages);
@@ -469,8 +468,8 @@ public class CorpospeakComponentTests : IDisposable
         var userMessages = Array.Empty<string>();
         var expectedResult = "Technical rewrite";
 
-        _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
-            .ReturnsAsync(new ChatResult(expectedResult, 40, 18));
+        _mockLlmService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>(), It.IsAny<string?>()))
+            .ReturnsAsync(new LlmChatResult(expectedResult, 40, 18));
 
         // Act
         await _corpospeakComponent.CorpospeakAsync(source, audience, userMessages);
