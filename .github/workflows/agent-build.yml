@@ -60,7 +60,7 @@ jobs:
             ```
 
             Follow all instructions in CLAUDE.md. Do what has been asked; nothing more, nothing less.
-          claude_args: '--model claude-sonnet-4-6 --max-turns 60 --dangerously-skip-permissions'
+          claude_args: '--model claude-sonnet-4-6 --dangerously-skip-permissions'
 
   agent-build-review:
     if: "github.event_name == 'pull_request_review' && github.event.review.state == 'changes_requested'"
