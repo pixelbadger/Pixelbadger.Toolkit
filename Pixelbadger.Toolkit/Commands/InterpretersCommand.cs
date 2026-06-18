@@ -1,5 +1,6 @@
 using System.CommandLine;
 using Pixelbadger.Toolkit.Components;
+using Spectre.Console;
 
 namespace Pixelbadger.Toolkit.Commands;
 
@@ -31,11 +32,11 @@ public static class InterpretersCommand
                 var file = parseResult.GetValue(fileOption)!;
                 var interpreter = new BrainfuckInterpreter();
                 var result = await interpreter.ExecuteAsync(file);
-                Console.Write(result);
+                AnsiConsole.Write(new Text(result));
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error: {ex.Message}");
+                AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
                 Environment.Exit(1);
             }
         });
@@ -58,11 +59,11 @@ public static class InterpretersCommand
                 var file = parseResult.GetValue(fileOption)!;
                 var interpreter = new OokInterpreter();
                 var result = await interpreter.ExecuteAsync(file);
-                Console.Write(result);
+                AnsiConsole.Write(new Text(result));
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error: {ex.Message}");
+                AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
                 Environment.Exit(1);
             }
         });
@@ -88,11 +89,11 @@ public static class InterpretersCommand
                 var output = parseResult.GetValue(outputOption)!;
                 var component = new BfToOokComponent();
                 await component.TranslateFileAsync(source, output);
-                Console.WriteLine($"Successfully converted {source} to Ook language and saved to {output}");
+                AnsiConsole.MarkupLine($"[green]Successfully converted '{Markup.Escape(source)}' to Ook language and saved to '{Markup.Escape(output)}'[/]");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error: {ex.Message}");
+                AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
                 Environment.Exit(1);
             }
         });

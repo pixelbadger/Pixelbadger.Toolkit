@@ -1,6 +1,7 @@
 using System.CommandLine;
 using Pixelbadger.Toolkit.Components;
 using Pixelbadger.Toolkit.Services;
+using Spectre.Console;
 
 namespace Pixelbadger.Toolkit.Commands;
 
@@ -29,21 +30,19 @@ public static class OAuthCommand
             try
             {
                 var profile = parseResult.GetValue(profileOption)!;
-                Console.Write("Username: ");
-                var username = Console.ReadLine() ?? string.Empty;
-
-                var password = ReadSecureInput("Password: ");
+                var username = AnsiConsole.Ask<string>("Username:");
+                var password = AnsiConsole.Prompt(new TextPrompt<string>("Password:").Secret().AllowEmpty());
 
                 var profileService = new OAuthProfileService();
                 var httpClient = new OAuthHttpClient();
                 var tokenComponent = new OAuthTokenComponent(profileService, httpClient);
                 var accessToken = await tokenComponent.GetTokenAsync(profile, username, password);
 
-                Console.WriteLine(accessToken);
+                AnsiConsole.WriteLine(accessToken);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error: {ex.Message}");
+                AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
                 Environment.Exit(1);
             }
         });
@@ -89,17 +88,17 @@ public static class OAuthCommand
                 var scope = parseResult.GetValue(scopeOption);
 
                 if (clientSecret is null)
-                    clientSecret = ReadSecureInput("Client Secret (leave blank if none): ");
+                    clientSecret = AnsiConsole.Prompt(new TextPrompt<string>("Client Secret (leave blank if none):").Secret().AllowEmpty());
 
                 var profileService = new OAuthProfileService();
                 var profileComponent = new OAuthProfileComponent(profileService);
                 await profileComponent.AddProfileAsync(name, authority, clientId, clientSecret, scope);
 
-                Console.WriteLine($"Profile '{name}' added successfully.");
+                AnsiConsole.MarkupLine($"[green]Profile '{Markup.Escape(name)}' added successfully.[/]");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error: {ex.Message}");
+                AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
                 Environment.Exit(1);
             }
         });
@@ -137,11 +136,11 @@ public static class OAuthCommand
                 var profileComponent = new OAuthProfileComponent(profileService);
                 await profileComponent.UpdateProfileAsync(name, authority, clientId, clientSecret, scope);
 
-                Console.WriteLine($"Profile '{name}' updated successfully.");
+                AnsiConsole.MarkupLine($"[green]Profile '{Markup.Escape(name)}' updated successfully.[/]");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error: {ex.Message}");
+                AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
                 Environment.Exit(1);
             }
         });
@@ -166,48 +165,15 @@ public static class OAuthCommand
                 var profileComponent = new OAuthProfileComponent(profileService);
                 await profileComponent.DeleteProfileAsync(name);
 
-                Console.WriteLine($"Profile '{name}' deleted successfully.");
+                AnsiConsole.MarkupLine($"[green]Profile '{Markup.Escape(name)}' deleted successfully.[/]");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error: {ex.Message}");
+                AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
                 Environment.Exit(1);
             }
         });
 
         return command;
-    }
-
-    private static string ReadSecureInput(string prompt)
-    {
-        Console.Write(prompt);
-
-        var input = new System.Text.StringBuilder();
-
-        while (true)
-        {
-            var key = Console.ReadKey(intercept: true);
-
-            if (key.Key == ConsoleKey.Enter)
-            {
-                Console.WriteLine();
-                break;
-            }
-
-            if (key.Key == ConsoleKey.Backspace)
-            {
-                if (input.Length > 0)
-                {
-                    input.Remove(input.Length - 1, 1);
-                    Console.Write("\b \b");
-                }
-                continue;
-            }
-
-            input.Append(key.KeyChar);
-            Console.Write('*');
-        }
-
-        return input.ToString();
     }
 }

@@ -2,6 +2,7 @@ using System.CommandLine;
 using System.Text.Json;
 using Pixelbadger.Toolkit.Components;
 using Pixelbadger.Toolkit.Models;
+using Spectre.Console;
 
 namespace Pixelbadger.Toolkit.Commands;
 
@@ -51,12 +52,12 @@ public static class CryptoCommand
                 await File.WriteAllTextAsync(publicKeyFile, JsonSerializer.Serialize(publicKey, JsonOptions));
                 await WriteOwnerOnlyTextAsync(privateKeyFile, JsonSerializer.Serialize(keyPair, JsonOptions));
 
-                Console.WriteLine($"Public key written to '{publicKeyFile}'");
-                Console.WriteLine($"Private key written to '{privateKeyFile}'");
+                AnsiConsole.MarkupLine($"[green]Public key written to '{Markup.Escape(publicKeyFile)}'[/]");
+                AnsiConsole.MarkupLine($"[green]Private key written to '{Markup.Escape(privateKeyFile)}'[/]");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error: {ex.Message}");
+                AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
                 Environment.Exit(1);
             }
         });
@@ -93,11 +94,11 @@ public static class CryptoCommand
 
                 var json = JsonSerializer.Serialize(encrypted, JsonOptions);
                 await File.WriteAllTextAsync(outFile, json);
-                Console.WriteLine($"Encrypted number written to '{outFile}'");
+                AnsiConsole.MarkupLine($"[green]Encrypted number written to '{Markup.Escape(outFile)}'[/]");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error: {ex.Message}");
+                AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
                 Environment.Exit(1);
             }
         });
@@ -132,11 +133,11 @@ public static class CryptoCommand
 
                 var component = new HomomorphicEncryptionComponent();
                 var plaintext = component.Decrypt(encrypted, keyPair);
-                Console.WriteLine(plaintext.ToString());
+                AnsiConsole.WriteLine(plaintext.ToString());
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error: {ex.Message}");
+                AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
                 Environment.Exit(1);
             }
         });
@@ -177,11 +178,11 @@ public static class CryptoCommand
 
                 var json = JsonSerializer.Serialize(sum, JsonOptions);
                 await File.WriteAllTextAsync(outFile, json);
-                Console.WriteLine($"Encrypted sum written to '{outFile}'");
+                AnsiConsole.MarkupLine($"[green]Encrypted sum written to '{Markup.Escape(outFile)}'[/]");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error: {ex.Message}");
+                AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
                 Environment.Exit(1);
             }
         });
@@ -222,11 +223,11 @@ public static class CryptoCommand
 
                 var json = JsonSerializer.Serialize(difference, JsonOptions);
                 await File.WriteAllTextAsync(outFile, json);
-                Console.WriteLine($"Encrypted difference written to '{outFile}'");
+                AnsiConsole.MarkupLine($"[green]Encrypted difference written to '{Markup.Escape(outFile)}'[/]");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error: {ex.Message}");
+                AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
                 Environment.Exit(1);
             }
         });
@@ -263,11 +264,11 @@ public static class CryptoCommand
 
                 var json = JsonSerializer.Serialize(product, JsonOptions);
                 await File.WriteAllTextAsync(outFile, json);
-                Console.WriteLine($"Encrypted product written to '{outFile}'");
+                AnsiConsole.MarkupLine($"[green]Encrypted product written to '{Markup.Escape(outFile)}'[/]");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error: {ex.Message}");
+                AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
                 Environment.Exit(1);
             }
         });
@@ -303,11 +304,11 @@ public static class CryptoCommand
                 var encrypted = component.EncryptString(str, publicKey);
 
                 await File.WriteAllTextAsync(outFile, JsonSerializer.Serialize(encrypted, JsonOptions));
-                Console.WriteLine($"Encrypted string ({encrypted.Characters.Length} characters) written to '{outFile}'");
+                AnsiConsole.MarkupLine($"[green]Encrypted string ({encrypted.Characters.Length} characters) written to '{Markup.Escape(outFile)}'[/]");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error: {ex.Message}");
+                AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
                 Environment.Exit(1);
             }
         });
@@ -341,11 +342,11 @@ public static class CryptoCommand
                     ?? throw new InvalidOperationException("Failed to deserialize private key.");
 
                 var component = new HomomorphicEncryptionComponent();
-                Console.WriteLine(component.DecryptString(encrypted, keyPair));
+                AnsiConsole.WriteLine(component.DecryptString(encrypted, keyPair));
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error: {ex.Message}");
+                AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
                 Environment.Exit(1);
             }
         });
@@ -384,11 +385,11 @@ public static class CryptoCommand
                 var updated = component.ReplaceInString(encrypted, start, replacement);
 
                 await File.WriteAllTextAsync(outFile, JsonSerializer.Serialize(updated, JsonOptions));
-                Console.WriteLine($"Updated encrypted string written to '{outFile}'");
+                AnsiConsole.MarkupLine($"[green]Updated encrypted string written to '{Markup.Escape(outFile)}'[/]");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error: {ex.Message}");
+                AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
                 Environment.Exit(1);
             }
         });
@@ -427,11 +428,11 @@ public static class CryptoCommand
                 var substring = component.SubstringEncrypted(encrypted, start, length);
 
                 await File.WriteAllTextAsync(outFile, JsonSerializer.Serialize(substring, JsonOptions));
-                Console.WriteLine($"Encrypted substring ({substring.Characters.Length} characters) written to '{outFile}'");
+                AnsiConsole.MarkupLine($"[green]Encrypted substring ({substring.Characters.Length} characters) written to '{Markup.Escape(outFile)}'[/]");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error: {ex.Message}");
+                AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
                 Environment.Exit(1);
             }
         });
