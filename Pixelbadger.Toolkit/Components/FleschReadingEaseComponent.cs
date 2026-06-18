@@ -2,9 +2,13 @@ using System.Text.RegularExpressions;
 
 namespace Pixelbadger.Toolkit.Components;
 
-public class FleschReadingEaseComponent
+public interface IFleschReadingEaseComponent
 {
-    private static readonly Regex WordRegex = new Regex("[A-Za-z]+(?:'[A-Za-z]+)?", RegexOptions.Compiled);
+    FleschReadingEaseResult AnalyzeText(string text);
+}
+
+public class FleschReadingEaseComponent : IFleschReadingEaseComponent
+{
     private static readonly Regex SentenceRegex = new Regex("[.!?]+", RegexOptions.Compiled);
 
     public async Task<FleschReadingEaseResult> AnalyzeFileAsync(string inputFilePath)
@@ -30,7 +34,7 @@ public class FleschReadingEaseComponent
             return new FleschReadingEaseResult(0, 0, 0, 0, "N/A (empty input)");
         }
 
-        var words = WordRegex.Matches(text);
+        var words = StringTokenPatterns.WordRegex.Matches(text);
         var wordCount = words.Count;
 
         if (wordCount == 0)

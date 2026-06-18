@@ -13,6 +13,7 @@ public static class StringsCommand
         command.Add(CreateLevenshteinDistanceCommand());
         command.Add(CreateAbjadifyCommand());
         command.Add(CreateFleschReadingEaseCommand());
+        command.Add(CreateReportCommand());
 
         return command;
     }
@@ -140,5 +141,79 @@ public static class StringsCommand
         });
 
         return command;
+    }
+
+    private static Command CreateReportCommand()
+    {
+        var command = new Command("report", "Performs a full text analysis of the input text");
+
+        var inFileOption = new Option<string?>("--in-file") { Description = "Input file path" };
+        var stringOption = new Option<string?>("--string") { Description = "Input text string" };
+
+        command.Add(inFileOption);
+        command.Add(stringOption);
+
+        command.SetAction(async (parseResult, cancellationToken) =>
+        {
+            try
+            {
+                var inFile = parseResult.GetValue(inFileOption);
+                var inputString = parseResult.GetValue(stringOption);
+
+                if (inFile is null && inputString is null)
+                {
+                    Console.WriteLine("Error: Either '--in-file' or '--string' must be provided.");
+                    Environment.Exit(1);
+                    return;
+                }
+
+                if (inFile is not null && inputString is not null)
+                {
+                    Console.WriteLine("Error: Only one of '--in-file' or '--string' may be provided.");
+                    Environment.Exit(1);
+                    return;
+                }
+
+                var component = new StringReportComponent();
+                StringReportResult result;
+
+                if (inFile is not null)
+                    result = await component.AnalyzeFileAsync(inFile);
+                else
+                    result = component.AnalyzeText(inputString!);
+
+                Console.WriteLine($"Characters (with spaces):    {result.Characters}");
+                Console.WriteLine($"Characters (without spaces): {result.CharactersNoSpaces}");
+                Console.WriteLine($"Words:                       {result.Words}");
+                Console.WriteLine($"Unique words:                {result.UniqueWords}");
+                Console.WriteLine($"Sentences:                   {result.Sentences}");
+                Console.WriteLine($"Paragraphs:                  {result.Paragraphs}");
+                Console.WriteLine($"Avg words per sentence:      {result.AverageWordsPerSentence:F1}");
+                Console.WriteLine($"Avg sentences per paragraph: {result.AverageSentencesPerParagraph:F1}");
+                Console.WriteLine($"Estimated pages:             {result.EstimatedPages}");
+                Console.WriteLine($"Est. reading time:           {FormatReadingTime(result.EstimatedReadingTimeSeconds)}");
+                Console.WriteLine($"Flesch Reading Ease:         {result.FleschReadingEase:F2}");
+                Console.WriteLine($"Readability:                 {result.ReadabilityBand}");
+                Console.WriteLine($"Longest word:                {result.LongestWord}");
+                Console.WriteLine($"Most common word:            {result.MostCommonWord}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error: {ex.Message}");
+                Environment.Exit(1);
+            }
+        });
+
+        return command;
+    }
+
+    internal static string FormatReadingTime(int totalSeconds)
+    {
+        if (totalSeconds < 60)
+            return $"{totalSeconds}s";
+
+        var minutes = totalSeconds / 60;
+        var seconds = totalSeconds % 60;
+        return seconds == 0 ? $"{minutes}m" : $"{minutes}m {seconds}s";
     }
 }
