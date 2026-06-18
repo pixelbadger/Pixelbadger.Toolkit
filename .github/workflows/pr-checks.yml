@@ -1,0 +1,281 @@
+name: PR Checks
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    branches: [ master ]
+
+concurrency:
+  group: pr-checks-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  check-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      main-code-changed: ${{ steps.changes.outputs.main-code }}
+      main-any-changed: ${{ steps.changes.outputs.main-any }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            main-code:
+              - 'Pixelbadger.Toolkit/**'
+              - '!Pixelbadger.Toolkit.Tests/**'
+              - '!Pixelbadger.Toolkit.Benchmarks/**'
+              - '!docs/**'
+              - '!.github/**'
+            main-any:
+              - 'Pixelbadger.Toolkit/**'
+              - 'Pixelbadger.Toolkit.Tests/**'
+              - '!Pixelbadger.Toolkit.Benchmarks/**'
+              - '!docs/**'
+              - '!.github/**'
+
+  mechanical-checks:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check version bump
+        id: version-bump
+        run: |
+          FAILED=false
+
+          PROD_CHANGES=$(git diff origin/master...HEAD --name-only | grep -E '\.(cs|csproj)$' | grep -vE '^Pixelbadger\.Toolkit\.(Tests|Benchmarks)/' || true)
+
+          if [ -n "$PROD_CHANGES" ]; then
+            CSPROJ_IN_DIFF=$(git diff origin/master...HEAD --name-only | grep 'Pixelbadger\.Toolkit/Pixelbadger\.Toolkit\.csproj' || true)
+            if [ -z "$CSPROJ_IN_DIFF" ]; then
+              echo "::error::Version bump required: production .cs/.csproj files changed but Pixelbadger.Toolkit.csproj is not in the diff."
+              FAILED=true
+            else
+              BRANCH_VERSION=$(grep -oP '(?<=<Version>)[^<]+' Pixelbadger.Toolkit/Pixelbadger.Toolkit.csproj)
+              MASTER_VERSION=$(git show origin/master:Pixelbadger.Toolkit/Pixelbadger.Toolkit.csproj | grep -oP '(?<=<Version>)[^<]+')
+              HIGHER=$(printf '%s\n%s\n' "$MASTER_VERSION" "$BRANCH_VERSION" | sort -V | tail -1)
+              if [ "$HIGHER" = "$MASTER_VERSION" ] || [ "$BRANCH_VERSION" = "$MASTER_VERSION" ]; then
+                echo "::error::Version bump required: branch version ($BRANCH_VERSION) is not strictly higher than master ($MASTER_VERSION)."
+                FAILED=true
+              else
+                echo "Version bump OK: $MASTER_VERSION -> $BRANCH_VERSION"
+              fi
+            fi
+          else
+            echo "No production code changes — version bump not required."
+          fi
+
+          echo "failed=$FAILED" >> "$GITHUB_OUTPUT"
+
+      - name: Check tests present
+        id: tests-present
+        run: |
+          FAILED=false
+
+          NEW_IMPL=$(git diff origin/master...HEAD --diff-filter=A --name-only | grep -E '^Pixelbadger\.Toolkit/(Components|Commands)/[^/]+\.cs$' || true)
+
+          for FILE in $NEW_IMPL; do
+            BASENAME=$(basename "$FILE" .cs)
+            EXPECTED="${BASENAME}Tests.cs"
+            MATCH=$(find Pixelbadger.Toolkit.Tests -name "$EXPECTED" 2>/dev/null || true)
+            if [ -z "$MATCH" ]; then
+              echo "::error::Missing test file: no $EXPECTED found under Pixelbadger.Toolkit.Tests/ for new file $FILE."
+              FAILED=true
+            else
+              echo "Test coverage OK: $EXPECTED exists for $FILE"
+            fi
+          done
+
+          if [ -z "$NEW_IMPL" ]; then
+            echo "No new Components/ or Commands/ files — test presence check skipped."
+          fi
+
+          echo "failed=$FAILED" >> "$GITHUB_OUTPUT"
+
+      - name: Check benchmarks updated
+        id: benchmarks-updated
+        run: |
+          FAILED=false
+
+          WATCHLIST=(
+            "LevenshteinCalculator"
+            "BrainfuckInterpreter"
+            "OokInterpreter"
+            "AbjadifyComponent"
+            "ImageSteganography"
+            "HomomorphicEncryptionComponent"
+          )
+
+          CHANGED_BASENAMES=$(git diff origin/master...HEAD --name-only | xargs -I{} basename {} .cs)
+
+          for ENTRY in "${WATCHLIST[@]}"; do
+            if echo "$CHANGED_BASENAMES" | grep -qx "$ENTRY"; then
+              BENCHMARK_REFS=$(git diff origin/master...HEAD --name-only | grep -E '^Pixelbadger\.Toolkit\.Benchmarks/' || true)
+              FOUND=false
+              for BF in $BENCHMARK_REFS; do
+                if grep -q "$ENTRY" "$BF" 2>/dev/null; then
+                  FOUND=true
+                  break
+                fi
+              done
+              if [ "$FOUND" = false ]; then
+                echo "::error::Benchmark update required: $ENTRY was changed but no benchmark file under Pixelbadger.Toolkit.Benchmarks/ referencing it appears in the diff."
+                FAILED=true
+              else
+                echo "Benchmark OK: $ENTRY has a corresponding benchmark update."
+              fi
+            fi
+          done
+
+          echo "failed=$FAILED" >> "$GITHUB_OUTPUT"
+
+      - name: Fail if any check failed
+        if: steps.version-bump.outputs.failed == 'true' || steps.tests-present.outputs.failed == 'true' || steps.benchmarks-updated.outputs.failed == 'true'
+        run: |
+          echo "One or more mechanical checks failed. See ::error:: annotations above."
+          exit 1
+
+  check-version:
+    runs-on: ubuntu-latest
+    needs: [check-changes]
+    if: needs.check-changes.outputs.main-code-changed == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+      - name: Check version increment
+        shell: pwsh
+        run: |
+          ./.github/scripts/check-version-increment.ps1 -ProjectFile "Pixelbadger.Toolkit/Pixelbadger.Toolkit.csproj" -PackageId "Pixelbadger.Toolkit"
+
+  build-and-test:
+    runs-on: ubuntu-latest
+    needs: [check-changes, check-version]
+    if: always() && (needs.check-version.result == 'success' || needs.check-version.result == 'skipped')
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+      - name: Restore dependencies
+        run: dotnet restore
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+      - name: Test
+        run: dotnet test --no-build --configuration Release --verbosity normal
+      - name: Pack (validation only)
+        run: dotnet pack --no-build --configuration Release --output ./artifacts
+
+  claude-review:
+    runs-on: ubuntu-latest
+    needs: [mechanical-checks, build-and-test]
+    if: always() && needs.mechanical-checks.result != 'cancelled' && needs.build-and-test.result != 'cancelled'
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: read
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Detect review type
+        id: review-type
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR=${{ github.event.pull_request.number }}
+          PRIOR=$(gh api repos/${{ github.repository }}/pulls/$PR/reviews \
+            --jq '[.[] | select(.state != "PENDING")] | length')
+          if [ "$PRIOR" -gt 0 ]; then
+            echo "type=followup" >> "$GITHUB_OUTPUT"
+          else
+            echo "type=primary" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Primary review (full diff)
+        if: steps.review-type.outputs.type == 'primary'
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          allowed_bots: '*'
+          prompt: |
+            Review this pull request thoroughly. Read the full diff. Be concise — flag issues only, don't praise.
+
+            FIRST: Check CI status with `gh pr checks ${{ github.event.pull_request.number }}`. If any required check is failing, that is an immediate blocker — include the failure in your findings and request changes regardless of code quality.
+
+            Then evaluate the diff across all five dimensions:
+
+            **Correctness** — Flag:
+            - Logic errors, off-by-ones, incorrect conditionals
+            - Edge cases that are unhandled or produce wrong results
+            - Unhandled nulls in critical paths
+
+            **Test quality** — Flag:
+            - Coverage gaps: success paths, error conditions, or edge cases missing tests
+            - Weak assertions (testing the wrong thing, or asserting too little)
+            - Missing error-path tests
+
+            **Architecture** — Flag:
+            - Violations of the component-per-command pattern (each command action must have its own dedicated component class)
+            - Single Responsibility Principle violations
+            - Shared logic that should be extracted into a service with an interface
+
+            **Security** — Flag:
+            - Prompt injection: user-controlled strings passed directly into LLM calls without sanitisation
+            - Path traversal: user-supplied file paths used in file operations without validation
+            - Any other OWASP top-10 risks
+
+            **Consistency** — Flag:
+            - Naming or style inconsistencies with the rest of the codebase
+            - README examples that don't match the actual implementation
+            - CLAUDE.md patterns that are violated
+
+            Where an issue is tied to a specific line, post an inline comment using:
+            `gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments` with `path`, `line`, and `body`.
+
+            MANDATORY FINAL STEP — you MUST do this:
+            - If no issues found: `gh pr review ${{ github.event.pull_request.number }} --approve --body "LGTM."`
+            - If issues found: `gh pr review ${{ github.event.pull_request.number }} --request-changes --body "<summary>"`
+            Do not finish without running one of these two commands.
+
+          claude_args: '--model claude-sonnet-4-6 --max-turns 30 --allowed-tools "Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*),Bash(gh pr review:*),Bash(gh pr checks:*),Bash(gh api:*)"'
+
+      - name: Follow-up review (latest commit only)
+        if: steps.review-type.outputs.type == 'followup'
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          allowed_bots: '*'
+          prompt: |
+            This is a follow-up review after the author addressed previous feedback.
+
+            FIRST: Check CI status with `gh pr checks ${{ github.event.pull_request.number }}`. Failing checks are an immediate blocker.
+
+            Then: read only the latest commit's changes with `gh pr diff ${{ github.event.pull_request.number }}` filtered to what changed since the last review. Focus solely on:
+            1. Whether the issues raised in prior review comments have been properly addressed
+            2. Any new bugs or regressions introduced by the fixes
+
+            Do not re-review code that was already approved. Be brief.
+
+            MANDATORY FINAL STEP — you MUST do this:
+            - If all prior issues resolved and no new problems: `gh pr review ${{ github.event.pull_request.number }} --approve --body "LGTM."`
+            - If issues remain or new problems found: `gh pr review ${{ github.event.pull_request.number }} --request-changes --body "<summary>"`
+            Do not finish without running one of these two commands.
+
+          claude_args: '--model claude-sonnet-4-6 --max-turns 20 --allowed-tools "Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*),Bash(gh pr review:*),Bash(gh pr checks:*),Bash(gh api:*)"'
