@@ -222,7 +222,7 @@
       ever edits a file or sits at a terminal waiting for a build.
     </p>
     <div class="info-box">
-      This page describes the as-built system as of May 2026. The workflows are in
+      This page describes the as-built system as of June 2026. The workflows are in
       <code>.github/workflows/</code>; the autonomous agent instructions live in
       <code>CLAUDE.md</code>.
     </div>
@@ -231,20 +231,16 @@
   <section>
     <h2>The environment</h2>
     <p>
-      Everything in this lifecycle that does not happen inside a GitHub Actions runner happens
-      on a single Android device — a Pixel 10 Pro XL running a terminal emulator. The full
-      local toolchain is installed directly on the phone:
+      Every step of this lifecycle runs in the cloud. There is no local machine, no terminal,
+      and no device involvement of any kind. GitHub Actions spins up ephemeral Ubuntu runners
+      on demand, installs the .NET 9 toolchain and the <code>gh</code> CLI, and invokes
+      Claude Code headlessly via the <code>anthropics/claude-code-action</code> GitHub Action.
     </p>
-    <ul>
-      <li><strong>.NET 9 SDK</strong> — build, test, and pack the project locally</li>
-      <li><strong>gh CLI</strong> — manage issues, PRs, and labels from the terminal</li>
-      <li><strong>Claude Code</strong> — drive the AI agent interactively</li>
-    </ul>
     <p>
-      Code generation, build and test iterations, the authoring of GitHub Actions workflows,
-      and NuGet deployment are all driven from that terminal. There is no laptop, no desktop,
-      and no cloud IDE. That is the "smol" in SmolDLC: not just a lean process, but a lean
-      machine.
+      The only local tooling involved is a web browser to write a GitHub issue. Everything
+      else — code generation, build, test, review, merge, and NuGet publication — happens
+      in cloud runners. That is the "smol" in SmolDLC: a lean process with zero local
+      infrastructure.
     </p>
   </section>
 
@@ -359,7 +355,8 @@
             <li>Benchmark updated for every watched algorithm</li>
           </ul>
           <div class="tag-row" style="margin-top:0.6rem;">
-            <span class="tag">pr-mechanical-checks.yml</span>
+            <span class="tag">pr-checks.yml</span>
+            <span class="tag">mechanical-checks job</span>
           </div>
         </div>
 
@@ -377,11 +374,14 @@
             <li>Consistency: naming, style, README accuracy vs. implementation</li>
           </ul>
           <p style="margin-top:0.5rem;">
-            Posts inline comments on specific lines, then approves or requests changes
-            via a formal GitHub review. Flags issues only — no praise.
+            Posts inline comments on specific lines, then submits a formal GitHub review —
+            approve or request changes. On the first push, Claude reviews the full diff.
+            On subsequent pushes, it focuses on whether prior feedback was addressed and
+            checks for new regressions. Flags issues only — no praise.
           </p>
           <div class="tag-row">
-            <span class="tag">claude-code-review.yml</span>
+            <span class="tag">pr-checks.yml</span>
+            <span class="tag">claude-review job</span>
             <span class="tag">claude-sonnet-4-6</span>
             <span class="tag">gh pr review</span>
           </div>
@@ -396,7 +396,8 @@
             Also verifies the version is strictly higher than what is already on NuGet.
           </p>
           <div class="tag-row">
-            <span class="tag">pr-validation.yml</span>
+            <span class="tag">pr-checks.yml</span>
+            <span class="tag">build-and-test job</span>
             <span class="tag">dotnet test</span>
             <span class="tag">dotnet pack</span>
             <span class="tag">check-version-increment.ps1</span>
@@ -537,33 +538,33 @@
       <tbody>
         <tr>
           <td><code>agent-build.yml</code></td>
-          <td>Issue labeled <code>status: to-do</code>; or PR comment containing <code>&lt;!-- CHANGES_REQUESTED --&gt;</code></td>
+          <td>Issue labeled <code>status: to-do</code>; or PR review submitted by Claude that is not an approval</td>
           <td><span class="wf-actor claude-tag">Claude Sonnet</span></td>
           <td>Invokes Claude Code headlessly. Claude enters a plan phase (auto-accepted), then claims the ticket, creates a branch, implements the feature, and opens (or updates) a PR. Re-runs on review feedback to iterate autonomously.</td>
         </tr>
         <tr>
-          <td><code>claude-code-review.yml</code></td>
-          <td>PR opened or synchronised</td>
+          <td><code>pr-checks.yml</code> — <code>claude-review</code> job</td>
+          <td>PR opened or synchronised (runs after mechanical checks and build pass)</td>
           <td><span class="wf-actor claude-tag">Claude Sonnet</span></td>
-          <td>Thorough review of the full diff: correctness, test quality, architecture, security, and README consistency. Posts inline comments, then posts a PR comment containing <code>&lt;!-- APPROVED --&gt;</code> or <code>&lt;!-- CHANGES_REQUESTED --&gt;</code> as the formal decision. Cancels in-progress runs when a new commit arrives.</td>
+          <td>Reviews the full diff on the first push; on subsequent pushes focuses on whether prior feedback was addressed and checks for new regressions. Posts inline comments, then submits a formal GitHub review — approve or request changes. Cancels in-progress runs when a new commit arrives.</td>
         </tr>
         <tr>
-          <td><code>pr-mechanical-checks.yml</code></td>
+          <td><code>pr-checks.yml</code> — <code>mechanical-checks</code> job</td>
           <td>PR opened or synchronised</td>
           <td><span class="wf-actor actions-tag">GitHub Actions (bash)</span></td>
           <td>Deterministic, zero-cost checks: version bump present, test file paired with every new component, benchmark updated for watched algorithms.</td>
         </tr>
         <tr>
-          <td><code>pr-validation.yml</code></td>
+          <td><code>pr-checks.yml</code> — <code>build-and-test</code> job</td>
           <td>PR targeting master (production paths only)</td>
           <td><span class="wf-actor actions-tag">GitHub Actions (.NET)</span></td>
           <td>Restore → build → test → pack. Also verifies the branch version is strictly greater than the published NuGet version.</td>
         </tr>
         <tr>
           <td><code>auto-merge.yml</code></td>
-          <td>PR comment containing <code>&lt;!-- APPROVED --&gt;</code>; or check suite completed</td>
+          <td>PR review submitted (any); or check suite completed</td>
           <td><span class="wf-actor actions-tag">GitHub Actions (bash)</span></td>
-          <td>Squash-merges the PR and deletes the feature branch automatically once an <code>&lt;!-- APPROVED --&gt;</code> comment exists and all three parallel checks are green.</td>
+          <td>Squash-merges the PR and deletes the feature branch automatically once the PR has a formal GitHub approval and all required checks are green.</td>
         </tr>
         <tr>
           <td><code>project-automation.yml</code></td>
@@ -624,21 +625,10 @@
       evaluate the same kinds of nuance the author intended.
     </p>
     <div class="info-box">
-      The concurrency setting on <code>claude-code-review.yml</code> cancels an in-flight
-      review when a new commit arrives, so a fast iteration cycle does not stack up
-      multiple simultaneous review jobs. The agent build workflow uses a per-PR concurrency
-      group on the review-iteration job, so only one agent is ever iterating on a branch at a time.
-    </div>
-    <div class="info-box">
-      <strong>GitHub self-review limitation.</strong> GitHub blocks an actor from submitting
-      a formal approval or change-request review on a PR they authored. Because both the
-      agent build and the code review share the same <code>CLAUDE_CODE_OAUTH_TOKEN</code>,
-      Claude cannot use <code>gh pr review --approve</code> or <code>--request-changes</code>
-      on its own PRs. The workaround: the reviewer posts a regular PR comment containing an
-      HTML comment marker (<code>&lt;!-- APPROVED --&gt;</code> or
-      <code>&lt;!-- CHANGES_REQUESTED --&gt;</code>) that the downstream workflows detect
-      via <code>issue_comment</code> events. This sidesteps the restriction entirely while
-      keeping the signal machine-readable.
+      The <code>pr-checks.yml</code> workflow cancels an in-flight review job when a new
+      commit arrives, so a fast iteration cycle does not stack up multiple simultaneous
+      review runs. The agent build workflow uses a per-PR concurrency group on the
+      review-iteration job, so only one agent is ever iterating on a branch at a time.
     </div>
   </section>
 
