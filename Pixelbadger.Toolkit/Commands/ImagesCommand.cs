@@ -1,5 +1,6 @@
 using System.CommandLine;
 using Pixelbadger.Toolkit.Components;
+using Spectre.Console;
 
 namespace Pixelbadger.Toolkit.Commands;
 
@@ -42,35 +43,35 @@ public static class ImagesCommand
                 {
                     if (string.IsNullOrEmpty(message))
                     {
-                        Console.WriteLine("Error: --message is required for encode mode");
+                        AnsiConsole.MarkupLine("[red]Error:[/] --message is required for encode mode");
                         Environment.Exit(1);
                         return;
                     }
 
                     if (string.IsNullOrEmpty(output))
                     {
-                        Console.WriteLine("Error: --output is required for encode mode");
+                        AnsiConsole.MarkupLine("[red]Error:[/] --output is required for encode mode");
                         Environment.Exit(1);
                         return;
                     }
 
                     await steganography.EncodeMessageAsync(image, message, output);
-                    Console.WriteLine($"Message encoded successfully in '{output}'");
+                    AnsiConsole.MarkupLine($"[green]Message encoded successfully in '{Markup.Escape(output)}'[/]");
                 }
                 else if (mode.ToLower() == "decode")
                 {
                     var decodedMessage = await steganography.DecodeMessageAsync(image);
-                    Console.WriteLine($"Decoded message: {decodedMessage}");
+                    AnsiConsole.MarkupLine($"Decoded message: {Markup.Escape(decodedMessage)}");
                 }
                 else
                 {
-                    Console.WriteLine("Error: Mode must be 'encode' or 'decode'");
+                    AnsiConsole.MarkupLine("[red]Error:[/] Mode must be 'encode' or 'decode'");
                     Environment.Exit(1);
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error: {ex.Message}");
+                AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
                 Environment.Exit(1);
             }
         });

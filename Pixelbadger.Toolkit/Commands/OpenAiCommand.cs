@@ -1,6 +1,7 @@
 using System.CommandLine;
 using Pixelbadger.Toolkit.Components;
 using Pixelbadger.Toolkit.Services;
+using Spectre.Console;
 
 namespace Pixelbadger.Toolkit.Commands;
 
@@ -44,12 +45,12 @@ public static class OpenAiCommand
                 var chatComponent = new ChatComponent(openAiClientService, historyService);
                 var result = await chatComponent.ChatAsync(message, sessionId);
 
-                Console.WriteLine(result.Response);
+                AnsiConsole.WriteLine(result.Response);
                 Console.Error.WriteLine($"Session: {result.SessionId}");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error: {ex.Message}");
+                AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
                 Environment.Exit(1);
             }
         });
@@ -82,11 +83,11 @@ public static class OpenAiCommand
                 var translateComponent = new TranslateComponent(openAiClientService, historyService);
                 var translation = await translateComponent.TranslateAsync(text, targetLanguage);
 
-                Console.WriteLine(translation);
+                AnsiConsole.WriteLine(translation);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error: {ex.Message}");
+                AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
                 Environment.Exit(1);
             }
         });
@@ -116,11 +117,11 @@ public static class OpenAiCommand
                 var ocaaarComponent = new OcaaarComponent(openAiClientService, historyService);
                 var response = await ocaaarComponent.OcaaarAsync(imagePath);
 
-                Console.WriteLine(response);
+                AnsiConsole.WriteLine(response);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error: {ex.Message}");
+                AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
                 Environment.Exit(1);
             }
         });
@@ -156,11 +157,11 @@ public static class OpenAiCommand
                 var corpospeakComponent = new CorpospeakComponent(openAiClientService, historyService);
                 var result = await corpospeakComponent.CorpospeakAsync(source, audience, userMessages);
 
-                Console.WriteLine(result);
+                AnsiConsole.WriteLine(result);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error: {ex.Message}");
+                AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
                 Environment.Exit(1);
             }
         });
@@ -189,11 +190,11 @@ public static class OpenAiCommand
                 using var historyService = new HistoryService();
                 var historyComponent = new OpenAiHistoryComponent(historyService);
                 var output = await historyComponent.ListAsync();
-                Console.WriteLine(output);
+                AnsiConsole.WriteLine(output);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error: {ex.Message}");
+                AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
                 Environment.Exit(1);
             }
         });
@@ -218,11 +219,11 @@ public static class OpenAiCommand
                 var historyComponent = new OpenAiHistoryComponent(historyService);
                 await historyComponent.DeleteAsync(sessionId);
 
-                Console.WriteLine($"Session {sessionId} deleted.");
+                AnsiConsole.MarkupLine($"[green]Session {sessionId} deleted.[/]");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error: {ex.Message}");
+                AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
                 Environment.Exit(1);
             }
         });

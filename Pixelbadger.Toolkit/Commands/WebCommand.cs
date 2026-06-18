@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Hosting;
+using Spectre.Console;
 
 namespace Pixelbadger.Toolkit.Commands;
 
@@ -36,7 +37,7 @@ public static class WebCommand
 
                 if (!File.Exists(file))
                 {
-                    Console.WriteLine($"Error: File '{file}' not found");
+                    AnsiConsole.MarkupLine($"[red]Error:[/] File '{Markup.Escape(file)}' not found");
                     Environment.Exit(1);
                     return;
                 }
@@ -67,14 +68,14 @@ public static class WebCommand
                     return Task.CompletedTask;
                 });
 
-                Console.WriteLine($"Serving '{file}' on http://0.0.0.0:{port}");
-                Console.WriteLine("Press Ctrl+C to stop the server");
+                AnsiConsole.MarkupLine($"[green]Serving[/] '{Markup.Escape(file)}' on [link]http://0.0.0.0:{port}[/]");
+                AnsiConsole.MarkupLine("[yellow]Press Ctrl+C to stop the server[/]");
 
                 await app.RunAsync($"http://0.0.0.0:{port}");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error: {ex.Message}");
+                AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
                 Environment.Exit(1);
             }
         });
