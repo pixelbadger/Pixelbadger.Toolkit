@@ -252,7 +252,7 @@ public static class LlmCommand
                 var historyComponent = new LlmHistoryComponent(historyService);
                 await historyComponent.DeleteAsync(sessionId);
 
-                AnsiConsole.MarkupLine($"[green]Session {sessionId} deleted.[/]");
+                AnsiConsole.MarkupLine($"[green]Session {Markup.Escape(sessionId.ToString())} deleted.[/]");
             }
             catch (Exception ex)
             {

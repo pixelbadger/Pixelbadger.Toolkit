@@ -125,7 +125,7 @@ public class StringsCommandIntegrationTests : IDisposable
         startInfo.ArgumentList.Add("--project");
         startInfo.ArgumentList.Add(projectPath);
         startInfo.ArgumentList.Add("-c");
-        startInfo.ArgumentList.Add("Debug");
+        startInfo.ArgumentList.Add("Release");
         startInfo.ArgumentList.Add("--no-build");
         startInfo.ArgumentList.Add("--");
 

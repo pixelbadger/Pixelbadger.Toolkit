@@ -31,7 +31,7 @@ public static class OAuthCommand
             {
                 var profile = parseResult.GetValue(profileOption)!;
                 var username = AnsiConsole.Ask<string>("Username:");
-                var password = AnsiConsole.Prompt(new TextPrompt<string>("Password:").Secret());
+                var password = AnsiConsole.Prompt(new TextPrompt<string>("Password:").Secret().AllowEmpty());
 
                 var profileService = new OAuthProfileService();
                 var httpClient = new OAuthHttpClient();
