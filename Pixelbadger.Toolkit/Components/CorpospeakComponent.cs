@@ -1,11 +1,12 @@
 using OpenAI.Chat;
 using Pixelbadger.Toolkit.Services;
+using Pixelbadger.Toolkit.Utilities;
 
 namespace Pixelbadger.Toolkit.Components;
 
 public class CorpospeakComponent
 {
-    private readonly IOpenAiClientService _openAiClientService;
+    private readonly ILlmClientService _llmClientService;
     private readonly IHistoryService _historyService;
 
     private static readonly string[] ValidAudiences = [
@@ -21,9 +22,9 @@ public class CorpospeakComponent
         "customer-success", "support", "cs"
     ];
 
-    public CorpospeakComponent(IOpenAiClientService openAiClientService, IHistoryService historyService)
+    public CorpospeakComponent(ILlmClientService llmClientService, IHistoryService historyService)
     {
-        _openAiClientService = openAiClientService;
+        _llmClientService = llmClientService;
         _historyService = historyService;
     }
 
@@ -34,11 +35,11 @@ public class CorpospeakComponent
         var resolvedSource = await ResolveTextOrFilePath(source);
         var resolvedUserMessages = await ResolveTextOrFilePathArray(userMessages);
 
-        var escapedSource = _openAiClientService.EscapeXml(resolvedSource);
+        var escapedSource = XmlUtility.EscapeXml(resolvedSource);
         var prompt = GetCombinedPrompt(audience, escapedSource, resolvedUserMessages);
         var (chatMessages, historyEntries) = BuildChatMessages(resolvedUserMessages, prompt);
 
-        var chatResult = await _openAiClientService.CompleteChatAsync(chatMessages);
+        var chatResult = await _llmClientService.CompleteChatAsync(chatMessages);
 
         var sessionId = await _historyService.CreateSessionAsync("corpospeak");
         foreach (var (role, content) in historyEntries)

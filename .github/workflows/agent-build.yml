@@ -63,7 +63,7 @@ jobs:
           claude_args: '--model claude-sonnet-4-6 --dangerously-skip-permissions'
 
   agent-build-review:
-    if: "github.event_name == 'pull_request_review' && github.event.review.state == 'changes_requested'"
+    if: "github.event_name == 'pull_request_review' && github.event.review.state != 'approved' && contains(github.event.review.user.login, 'claude')"
     concurrency:
       group: agent-build-pr-${{ github.event.pull_request.number }}
       cancel-in-progress: true

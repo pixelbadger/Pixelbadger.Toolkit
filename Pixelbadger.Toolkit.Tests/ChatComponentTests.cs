@@ -9,15 +9,15 @@ namespace Pixelbadger.Toolkit.Tests;
 
 public class ChatComponentTests
 {
-    private readonly Mock<IOpenAiClientService> _mockOpenAiService;
+    private readonly Mock<ILlmClientService> _mockLlmService;
     private readonly Mock<IHistoryService> _mockHistoryService;
     private readonly ChatComponent _chatComponent;
 
     public ChatComponentTests()
     {
-        _mockOpenAiService = new Mock<IOpenAiClientService>();
+        _mockLlmService = new Mock<ILlmClientService>();
         _mockHistoryService = new Mock<IHistoryService>();
-        _chatComponent = new ChatComponent(_mockOpenAiService.Object, _mockHistoryService.Object);
+        _chatComponent = new ChatComponent(_mockLlmService.Object, _mockHistoryService.Object);
     }
 
     [Fact]
@@ -27,8 +27,8 @@ public class ChatComponentTests
         var question = "What is the weather today?";
         var expectedResponse = "It's sunny and warm today.";
 
-        _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
-            .ReturnsAsync(new ChatResult(expectedResponse, 10, 5));
+        _mockLlmService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>(), It.IsAny<string?>()))
+            .ReturnsAsync(new LlmChatResult(expectedResponse, 10, 5));
         _mockHistoryService.Setup(x => x.CreateSessionAsync("chat")).ReturnsAsync(1L);
 
         // Act
@@ -36,7 +36,7 @@ public class ChatComponentTests
 
         // Assert
         result.Response.Should().Be(expectedResponse);
-        _mockOpenAiService.Verify(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()), Times.Once);
+        _mockLlmService.Verify(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>(), It.IsAny<string?>()), Times.Once);
     }
 
     [Fact]
@@ -44,8 +44,8 @@ public class ChatComponentTests
     {
         // Arrange
         var question = "Hello";
-        _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
-            .ReturnsAsync(new ChatResult("Hi there!", 5, 3));
+        _mockLlmService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>(), It.IsAny<string?>()))
+            .ReturnsAsync(new LlmChatResult("Hi there!", 5, 3));
         _mockHistoryService.Setup(x => x.CreateSessionAsync("chat")).ReturnsAsync(42L);
 
         // Act
@@ -67,8 +67,8 @@ public class ChatComponentTests
                 new Message { Role = "user", Content = "First question" },
                 new Message { Role = "assistant", Content = "First answer" }
             ]);
-        _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
-            .ReturnsAsync(new ChatResult("Follow up answer", 20, 10));
+        _mockLlmService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>(), It.IsAny<string?>()))
+            .ReturnsAsync(new LlmChatResult("Follow up answer", 20, 10));
 
         // Act
         var result = await _chatComponent.ChatAsync(question, existingSessionId);
@@ -91,9 +91,9 @@ public class ChatComponentTests
                 new Message { Role = "user", Content = "Previous question" },
                 new Message { Role = "assistant", Content = "Previous response" }
             ]);
-        _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
-            .Callback<IEnumerable<ChatMessage>>(msgs => capturedMessages = msgs.ToList())
-            .ReturnsAsync(new ChatResult("Follow up response", 30, 15));
+        _mockLlmService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>(), It.IsAny<string?>()))
+            .Callback<IEnumerable<ChatMessage>, string?>((msgs, _) => capturedMessages = msgs.ToList())
+            .ReturnsAsync(new LlmChatResult("Follow up response", 30, 15));
 
         // Act
         await _chatComponent.ChatAsync(question, existingSessionId);
@@ -109,8 +109,8 @@ public class ChatComponentTests
         // Arrange
         var question = "Test question";
         var response = "Test response";
-        _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
-            .ReturnsAsync(new ChatResult(response, 10, 5));
+        _mockLlmService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>(), It.IsAny<string?>()))
+            .ReturnsAsync(new LlmChatResult(response, 10, 5));
         _mockHistoryService.Setup(x => x.CreateSessionAsync("chat")).ReturnsAsync(1L);
 
         // Act
@@ -126,8 +126,8 @@ public class ChatComponentTests
     {
         // Arrange
         var question = "Test question";
-        _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
-            .ReturnsAsync(new ChatResult("Response", 25, 12));
+        _mockLlmService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>(), It.IsAny<string?>()))
+            .ReturnsAsync(new LlmChatResult("Response", 25, 12));
         _mockHistoryService.Setup(x => x.CreateSessionAsync("chat")).ReturnsAsync(5L);
 
         // Act
@@ -144,9 +144,9 @@ public class ChatComponentTests
         var question = "What is AI?";
         List<ChatMessage>? capturedMessages = null;
 
-        _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
-            .Callback<IEnumerable<ChatMessage>>(msgs => capturedMessages = msgs.ToList())
-            .ReturnsAsync(new ChatResult("AI is artificial intelligence.", 10, 5));
+        _mockLlmService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>(), It.IsAny<string?>()))
+            .Callback<IEnumerable<ChatMessage>, string?>((msgs, _) => capturedMessages = msgs.ToList())
+            .ReturnsAsync(new LlmChatResult("AI is artificial intelligence.", 10, 5));
         _mockHistoryService.Setup(x => x.CreateSessionAsync("chat")).ReturnsAsync(1L);
 
         // Act
@@ -171,9 +171,9 @@ public class ChatComponentTests
                 new Message { Role = "user", Content = "Hi" },
                 new Message { Role = "assistant", Content = "Hello!" }
             ]);
-        _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
-            .Callback<IEnumerable<ChatMessage>>(msgs => capturedMessages = msgs.ToList())
-            .ReturnsAsync(new ChatResult("Sure!", 20, 8));
+        _mockLlmService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>(), It.IsAny<string?>()))
+            .Callback<IEnumerable<ChatMessage>, string?>((msgs, _) => capturedMessages = msgs.ToList())
+            .ReturnsAsync(new LlmChatResult("Sure!", 20, 8));
 
         // Act
         await _chatComponent.ChatAsync(question, existingSessionId);
@@ -188,8 +188,8 @@ public class ChatComponentTests
     {
         // Arrange
         var question = "";
-        _mockOpenAiService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>()))
-            .ReturnsAsync(new ChatResult("I need more information.", 2, 8));
+        _mockLlmService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>(), It.IsAny<string?>()))
+            .ReturnsAsync(new LlmChatResult("I need more information.", 2, 8));
         _mockHistoryService.Setup(x => x.CreateSessionAsync("chat")).ReturnsAsync(1L);
 
         // Act
@@ -197,5 +197,43 @@ public class ChatComponentTests
 
         // Assert
         result.Response.Should().Be("I need more information.");
+    }
+
+    [Fact]
+    public async Task ChatAsync_ShouldPassReasoningEffortToService_WhenProvided()
+    {
+        // Arrange
+        var question = "Solve this problem";
+        string? capturedEffort = null;
+
+        _mockLlmService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>(), It.IsAny<string?>()))
+            .Callback<IEnumerable<ChatMessage>, string?>((_, effort) => capturedEffort = effort)
+            .ReturnsAsync(new LlmChatResult("Solution", 20, 10));
+        _mockHistoryService.Setup(x => x.CreateSessionAsync("chat")).ReturnsAsync(1L);
+
+        // Act
+        await _chatComponent.ChatAsync(question, null, "high");
+
+        // Assert
+        capturedEffort.Should().Be("high");
+    }
+
+    [Fact]
+    public async Task ChatAsync_ShouldPassNullReasoningEffort_WhenNotProvided()
+    {
+        // Arrange
+        var question = "Hello";
+        string? capturedEffort = "sentinel";
+
+        _mockLlmService.Setup(x => x.CompleteChatAsync(It.IsAny<IEnumerable<ChatMessage>>(), It.IsAny<string?>()))
+            .Callback<IEnumerable<ChatMessage>, string?>((_, effort) => capturedEffort = effort)
+            .ReturnsAsync(new LlmChatResult("Hi", 5, 3));
+        _mockHistoryService.Setup(x => x.CreateSessionAsync("chat")).ReturnsAsync(1L);
+
+        // Act
+        await _chatComponent.ChatAsync(question, null);
+
+        // Assert
+        capturedEffort.Should().BeNull();
     }
 }

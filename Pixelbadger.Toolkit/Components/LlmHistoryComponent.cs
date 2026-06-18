@@ -3,11 +3,11 @@ using Pixelbadger.Toolkit.Services;
 
 namespace Pixelbadger.Toolkit.Components;
 
-public class OpenAiHistoryComponent
+public class LlmHistoryComponent
 {
     private readonly IHistoryService _historyService;
 
-    public OpenAiHistoryComponent(IHistoryService historyService)
+    public LlmHistoryComponent(IHistoryService historyService)
     {
         _historyService = historyService;
     }
