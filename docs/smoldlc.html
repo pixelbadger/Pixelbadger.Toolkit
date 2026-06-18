@@ -189,6 +189,72 @@
       color: var(--text2);
       margin: 0;
     }
+
+    /* ── sequential check jobs within pr-checks stage ──────────────────────── */
+    .check-jobs {
+      display: flex;
+      flex-direction: column;
+      margin-top: 0.8rem;
+    }
+
+    .check-job {
+      border-top: 1px solid var(--border);
+      padding-top: 0.6rem;
+      margin-top: 0.6rem;
+    }
+
+    .check-job-name {
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--text3);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      margin-bottom: 0.25rem;
+    }
+
+    /* ── review mode cards ──────────────────────────────────────────────────── */
+    .review-modes {
+      display: flex;
+      gap: 0.6rem;
+      margin-top: 0.45rem;
+    }
+
+    .review-mode {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 0.5rem 0.7rem;
+    }
+
+    .review-mode-label {
+      font-size: 0.64rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: #90b8e8;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      margin-bottom: 0.2rem;
+    }
+
+    .review-mode p {
+      font-size: 0.78rem;
+      color: var(--text2);
+      margin: 0;
+      line-height: 1.5;
+    }
+
+    /* ── loop annotation ────────────────────────────────────────────────────── */
+    .loop-note {
+      font-size: 0.8rem;
+      color: var(--text3);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      margin-top: 0.55rem;
+      padding-top: 0.55rem;
+      border-top: 1px dashed var(--border);
+      line-height: 1.5;
+    }
   </style>
 </head>
 <body>
@@ -337,97 +403,80 @@
         </div>
       </div>
 
-      <div class="arrow-down split">↓ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ↓ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ↓</div>
-      <div class="parallel-label">Three workflows fire in parallel on PR open / push</div>
+      <div class="arrow-down">↓ PR opened or pushed to GitHub</div>
 
-      <!-- Stage 4: parallel checks -->
-      <div class="pipeline-row parallel">
-
+      <!-- Stage 4: pr-checks.yml — single consolidated workflow, sequential jobs -->
+      <div class="pipeline-row">
         <div class="stage automation">
-          <div class="stage-label">GitHub Actions — free bash</div>
-          <h3>Mechanical checks</h3>
-          <p>
-            Pure bash — no API cost. Enforces three invariants:
-          </p>
-          <ul style="font-size:0.82rem; color:var(--text2); margin: 0.5rem 0 0 1.2rem; line-height:1.7;">
-            <li>Version bumped if production code changed</li>
-            <li>Test file exists for every new component</li>
-            <li>Benchmark updated for every watched algorithm</li>
-          </ul>
-          <div class="tag-row" style="margin-top:0.6rem;">
-            <span class="tag">pr-checks.yml</span>
-            <span class="tag">mechanical-checks job</span>
-          </div>
-        </div>
+          <div class="stage-label">GitHub Actions — pr-checks.yml</div>
+          <h3>PR checks — three sequential jobs</h3>
+          <div class="check-jobs">
 
-        <div class="stage claude-agent">
-          <div class="stage-label">Claude (Sonnet) — AI reviewer</div>
-          <h3>Thorough code review</h3>
-          <p>
-            Sonnet reads the full diff — not just a cursory scan — and evaluates:
-          </p>
-          <ul style="font-size:0.82rem; color:var(--text2); margin: 0.5rem 0 0 1.2rem; line-height:1.7;">
-            <li>Correctness: logic errors, off-by-ones, edge cases</li>
-            <li>Test quality: coverage gaps, weak assertions, missing error paths</li>
-            <li>Architecture: adherence to component-per-command pattern, SRP</li>
-            <li>Security: prompt injection, path traversal, input validation</li>
-            <li>Consistency: naming, style, README accuracy vs. implementation</li>
-          </ul>
-          <p style="margin-top:0.5rem;">
-            Posts inline comments on specific lines, then submits a formal GitHub review —
-            approve or request changes. On the first push, Claude reviews the full diff.
-            On subsequent pushes, it focuses on whether prior feedback was addressed and
-            checks for new regressions. Flags issues only — no praise.
-          </p>
-          <div class="tag-row">
+            <div class="check-job">
+              <div class="check-job-name">1 · mechanical-checks</div>
+              <p style="font-size:0.82rem; color:var(--text2); margin:0; line-height:1.5;">
+                Pure bash, zero API cost. Enforces three invariants: version bumped if production code changed, test file paired with every new component, benchmark updated for watched algorithms.
+              </p>
+            </div>
+
+            <div class="check-job">
+              <div class="check-job-name">2 · build-and-test</div>
+              <p style="font-size:0.82rem; color:var(--text2); margin:0; line-height:1.5;">
+                Restore → build → test → pack. Verifies the branch version is strictly greater than the published NuGet version.
+              </p>
+            </div>
+
+            <div class="check-job">
+              <div class="check-job-name">3 · claude-review — runs after jobs 1 &amp; 2 pass</div>
+              <p style="font-size:0.82rem; color:var(--text2); margin:0 0 0.5rem; line-height:1.5;">
+                Checks CI status first — a failing check is an immediate blocker. Reads the diff, posts inline comments on specific lines, and submits a formal GitHub review. Behaviour differs by push number:
+              </p>
+              <div class="review-modes">
+                <div class="review-mode">
+                  <div class="review-mode-label">First push — primary review</div>
+                  <p>Full diff. Evaluates correctness, test quality, architecture (component-per-command pattern), security (prompt injection, path traversal), and README consistency.</p>
+                </div>
+                <div class="review-mode">
+                  <div class="review-mode-label">Subsequent pushes — follow-up review</div>
+                  <p>Verifies each prior comment was addressed. Checks for new regressions introduced by the fixes. Does not re-review already-approved code.</p>
+                </div>
+              </div>
+            </div>
+
+          </div>
+          <div class="tag-row" style="margin-top:0.75rem;">
             <span class="tag">pr-checks.yml</span>
-            <span class="tag">claude-review job</span>
             <span class="tag">claude-sonnet-4-6</span>
-            <span class="tag">gh pr review</span>
+            <span class="tag">gh pr review --approve / --request-changes</span>
           </div>
         </div>
-
-        <div class="stage automation">
-          <div class="stage-label">GitHub Actions — .NET CI</div>
-          <h3>Build, test &amp; pack</h3>
-          <p>
-            Installs .NET 9, restores, builds in Release, runs the full test suite, and
-            dry-runs a <code>dotnet pack</code> to confirm the package is well-formed.
-            Also verifies the version is strictly higher than what is already on NuGet.
-          </p>
-          <div class="tag-row">
-            <span class="tag">pr-checks.yml</span>
-            <span class="tag">build-and-test job</span>
-            <span class="tag">dotnet test</span>
-            <span class="tag">dotnet pack</span>
-            <span class="tag">check-version-increment.ps1</span>
-          </div>
-        </div>
-
       </div>
 
-      <div class="arrow-down">↓ all three must pass</div>
+      <div class="arrow-down">↓ claude-review submits decision</div>
 
-      <!-- Stage 5: iterate -->
+      <!-- Stage 5: iterate — fires only when changes requested, loops back to stage 4 -->
       <div class="pipeline-row">
         <div class="stage claude-agent">
-          <div class="stage-label">Claude (Sonnet) — autonomous iteration</div>
+          <div class="stage-label">Claude (Sonnet) — autonomous iteration · only when changes requested</div>
           <h3>Fix &amp; push</h3>
           <p>
-            If the reviewer requests changes, the agent build workflow is re-triggered
-            automatically. Claude reads the review comments, addresses each one, and
-            pushes a new commit — no human in the loop. The new push re-triggers all
-            three parallel checks above.
+            When claude-review requests changes, <code>agent-build.yml</code> re-fires automatically.
+            Claude reads every review comment, addresses each one, and pushes a new commit — no human in the loop.
           </p>
-          <div class="tag-row">
+          <div class="loop-note">
+            ↺ &nbsp;The push re-triggers <code>pr-checks.yml</code> from the top. claude-review now runs in
+            <strong>follow-up mode</strong> — it verifies prior feedback was addressed and checks for new
+            regressions only. This cycle repeats until the review approves.
+          </div>
+          <div class="tag-row" style="margin-top:0.6rem;">
             <span class="tag">agent-build.yml</span>
-            <span class="tag">on: pull_request review</span>
+            <span class="tag">on: pull_request_review (non-approval by Claude)</span>
             <span class="tag">claude-sonnet-4-6</span>
           </div>
         </div>
       </div>
 
-      <div class="arrow-down">↓</div>
+      <div class="arrow-down">↓ once claude-review approves and all checks are green</div>
 
       <!-- Stage 6: merge -->
       <div class="pipeline-row">
@@ -435,14 +484,14 @@
           <div class="stage-label">GitHub Actions — auto-merge</div>
           <h3>Squash merge to master</h3>
           <p>
-            Once all three parallel checks pass and the Sonnet review approves, the PR
-            is automatically squash-merged via <code>gh pr merge --squash --delete-branch</code>.
+            Once the PR has a formal GitHub approval and all checks are green, it is automatically
+            squash-merged via <code>gh pr merge --squash --delete-branch</code>.
             The feature branch is deleted. No human action required.
           </p>
           <div class="tag-row">
             <span class="tag">auto-merge.yml</span>
-            <span class="tag">gh pr merge</span>
-            <span class="tag">squash</span>
+            <span class="tag">on: pull_request_review; check_suite</span>
+            <span class="tag">gh pr merge --squash</span>
           </div>
         </div>
       </div>
