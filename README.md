@@ -348,6 +348,32 @@ pbtk crypto substring --in-file msg.estr --start 6 --length 5 --out-file sub.est
 
 ---
 
+### markov
+
+Word-level Markov chain text generation. The model is stored in a `.Markov` subfolder relative to the current working directory.
+
+#### train
+Trains a Markov chain model from a source text file.
+```
+--source <path>   Path to the source text file (required)
+```
+```bash
+pbtk markov train --source corpus.txt
+```
+
+#### complete
+Generates a text completion using the trained Markov chain model.
+```
+--text <text>     Input text to complete (required)
+--count <n>       Number of words to generate (default: 50)
+```
+```bash
+pbtk markov complete --text "The quick brown"
+pbtk markov complete --text "Once upon a time" --count 100
+```
+
+---
+
 ## Requirements
 
 - .NET 9.0
