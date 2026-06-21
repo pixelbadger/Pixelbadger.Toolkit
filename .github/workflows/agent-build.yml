@@ -80,6 +80,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
+          token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 
 
 
