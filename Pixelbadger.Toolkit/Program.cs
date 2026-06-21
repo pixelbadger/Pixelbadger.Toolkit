@@ -10,5 +10,6 @@ rootCommand.Add(WebCommand.Create());
 rootCommand.Add(LlmCommand.Create());
 rootCommand.Add(OAuthCommand.Create());
 rootCommand.Add(CryptoCommand.Create());
+rootCommand.Add(MarkovCommand.Create());
 
 return await rootCommand.Parse(args).InvokeAsync();
