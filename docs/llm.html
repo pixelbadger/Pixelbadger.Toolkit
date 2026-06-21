@@ -3,16 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pixelbadger Toolkit — OpenAI</title>
+  <title>Pixelbadger Toolkit — LLM</title>
   <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
 <header>
-  <h1>OpenAI <span class="badge">openai</span></h1>
-  <div class="subtitle">OpenAI-powered utilities — chat, translation, image OCR, corpospeak rewriting, and session history</div>
-  <div class="meta">Pixelbadger Toolkit &mdash; <code>pbtk openai</code> &mdash; <a href="index.html" style="color:#60a5fa">&#8592; all topics</a></div>
+  <h1>LLM <span class="badge">llm</span></h1>
+  <div class="subtitle">LLM utilities — chat, translation, image OCR, corpospeak rewriting, and session history</div>
+  <div class="meta">Pixelbadger Toolkit &mdash; <code>pbtk llm</code> &mdash; <a href="index.html" style="color:#60a5fa">&#8592; all topics</a></div>
 </header>
 
 <nav>
@@ -49,7 +49,7 @@
   <section id="history-overview">
     <h2>Session History</h2>
     <p>
-      Every <code>openai</code> command automatically persists conversation history — including the system
+      Every <code>llm</code> command automatically persists conversation history — including the system
       prompt — to a shared SQLite database at <code>~/.pbtk/history.db</code>. Each invocation creates a
       new <em>session</em> and stores the full message exchange along with token usage counts.
     </p>
@@ -59,8 +59,8 @@
       <code>corpospeak</code> in a single unified view.
     </p>
     <p>
-      Use <a href="#history-list"><code>openai history list</code></a> to see all sessions and
-      <a href="#history-delete"><code>openai history delete</code></a> to remove one.
+      Use <a href="#history-list"><code>llm history list</code></a> to see all sessions and
+      <a href="#history-delete"><code>llm history delete</code></a> to remove one.
     </p>
   </section>
 
@@ -68,28 +68,35 @@
   <section id="chat">
     <h2>chat</h2>
     <p>
-      Sends a message to the OpenAI chat completion API and prints the response. Every invocation is
+      Sends a message to the LLM chat completion API and prints the response. Every invocation is
       recorded as a session in the history database. Ongoing conversations are resumed by passing the
       session ID returned from a previous call.
     </p>
 
     <div class="cmd-block">
-      <span class="prompt">$ </span><span class="cmd">pbtk openai chat</span>
+      <span class="prompt">$ </span><span class="cmd">pbtk llm chat</span>
       <span class="opt"> --message</span> <span class="val">"Hello, how are you?"</span>
     </div>
 
     <div class="cmd-block">
-      <span class="prompt">$ </span><span class="cmd">pbtk openai chat</span>
+      <span class="prompt">$ </span><span class="cmd">pbtk llm chat</span>
       <span class="opt"> --message</span> <span class="val">"Continue our conversation"</span>
       <span class="opt"> --session-id</span> <span class="val">42</span>
       <span class="opt"> --model</span> <span class="val">gpt-4o-mini</span>
     </div>
 
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk llm chat</span>
+      <span class="opt"> --message</span> <span class="val">"Solve this hard problem"</span>
+      <span class="opt"> --reasoning-effort</span> <span class="val">high</span>
+    </div>
+
     <div class="diagram-wrap">
       <div class="mermaid">
 flowchart LR
-    MSG["--message"] --> COMP["Send to\nOpenAI chat API"]
+    MSG["--message"] --> COMP["Send to\nLLM chat API"]
     SID["--session-id\n(optional)"] -->|"load prior\nmessages"| COMP
+    RE["--reasoning-effort\n(optional)"] --> COMP
     COMP --> RESP(["stdout: assistant reply"])
     COMP --> HIST["Session stored\nin ~/.pbtk/history.db"]
     COMP --> SID_OUT(["stderr: Session: &lt;id&gt;"])
@@ -113,7 +120,8 @@ flowchart LR
       <tbody>
         <tr><td><code>--message</code></td><td>Yes</td><td>&mdash;</td><td>The user message to send</td></tr>
         <tr><td><code>--session-id</code></td><td>No</td><td>&mdash;</td><td>Session ID to continue a previous conversation</td></tr>
-        <tr><td><code>--model</code></td><td>No</td><td><code>gpt-5-nano</code></td><td>OpenAI model to use</td></tr>
+        <tr><td><code>--model</code></td><td>No</td><td><code>gpt-5-nano</code></td><td>Model to use</td></tr>
+        <tr><td><code>--reasoning-effort</code></td><td>No</td><td>&mdash;</td><td>Reasoning effort level for o-series models: <code>low</code>, <code>medium</code>, <code>high</code></td></tr>
       </tbody>
     </table>
   </section>
@@ -122,12 +130,12 @@ flowchart LR
   <section id="translate">
     <h2>translate</h2>
     <p>
-      Translates a given text into a specified target language using the OpenAI API. The output is
+      Translates a given text into a specified target language using the LLM. The output is
       the translated text printed to stdout. Each invocation creates a new history session.
     </p>
 
     <div class="cmd-block">
-      <span class="prompt">$ </span><span class="cmd">pbtk openai translate</span>
+      <span class="prompt">$ </span><span class="cmd">pbtk llm translate</span>
       <span class="opt"> --text</span> <span class="val">"Hello, how are you?"</span>
       <span class="opt"> --target-language</span> <span class="val">Spanish</span>
     </div>
@@ -135,7 +143,7 @@ flowchart LR
     <div class="diagram-wrap">
       <div class="mermaid">
 flowchart LR
-    T["--text"] --> CALL["OpenAI\nchat completion"]
+    T["--text"] --> CALL["LLM\nchat completion"]
     LANG["--target-language"] --> CALL
     CALL --> OUT(["stdout: translated text"])
     CALL --> HIST["Session stored\nin ~/.pbtk/history.db"]
@@ -147,7 +155,7 @@ flowchart LR
       <tbody>
         <tr><td><code>--text</code></td><td>Yes</td><td>&mdash;</td><td>The text to translate</td></tr>
         <tr><td><code>--target-language</code></td><td>Yes</td><td>&mdash;</td><td>Target language (e.g. <code>Spanish</code>, <code>French</code>, <code>Japanese</code>)</td></tr>
-        <tr><td><code>--model</code></td><td>No</td><td><code>gpt-5-nano</code></td><td>OpenAI model to use</td></tr>
+        <tr><td><code>--model</code></td><td>No</td><td><code>gpt-5-nano</code></td><td>Model to use</td></tr>
       </tbody>
     </table>
   </section>
@@ -156,13 +164,13 @@ flowchart LR
   <section id="ocaaar">
     <h2>ocaaar</h2>
     <p>
-      <strong>OCR as a Pirate.</strong> Sends an image file to the OpenAI vision API, extracts any text
+      <strong>OCR as a Pirate.</strong> Sends an image file to the LLM vision API, extracts any text
       found in the image, and returns it rewritten in pirate speak. Each invocation creates a new history
       session; the image is recorded as a reference path rather than binary data.
     </p>
 
     <div class="cmd-block">
-      <span class="prompt">$ </span><span class="cmd">pbtk openai ocaaar</span>
+      <span class="prompt">$ </span><span class="cmd">pbtk llm ocaaar</span>
       <span class="opt"> --image-path</span> <span class="val">./sign.jpg</span>
     </div>
 
@@ -170,7 +178,7 @@ flowchart LR
       <div class="mermaid">
 flowchart LR
     IMG["--image-path\n(local image file)"] --> ENC["Base64 encode\nimage"]
-    ENC --> CALL["OpenAI vision\nchat completion\n(extract text + pirate-speak prompt)"]
+    ENC --> CALL["LLM vision\nchat completion\n(extract text + pirate-speak prompt)"]
     CALL --> OUT(["stdout: pirate-speak text"])
     CALL --> HIST["Session stored\nin ~/.pbtk/history.db"]
       </div>
@@ -185,7 +193,7 @@ flowchart LR
       <thead><tr><th>Option</th><th>Required</th><th>Default</th><th>Description</th></tr></thead>
       <tbody>
         <tr><td><code>--image-path</code></td><td>Yes</td><td>&mdash;</td><td>Path to the image file to process</td></tr>
-        <tr><td><code>--model</code></td><td>No</td><td><code>gpt-5-nano</code></td><td>OpenAI model to use (must support vision)</td></tr>
+        <tr><td><code>--model</code></td><td>No</td><td><code>gpt-5-nano</code></td><td>Model to use (must support vision)</td></tr>
       </tbody>
     </table>
   </section>
@@ -200,13 +208,13 @@ flowchart LR
     </p>
 
     <div class="cmd-block">
-      <span class="prompt">$ </span><span class="cmd">pbtk openai corpospeak</span>
+      <span class="prompt">$ </span><span class="cmd">pbtk llm corpospeak</span>
       <span class="opt"> --source</span> <span class="val">"API performance is great"</span>
       <span class="opt"> --audience</span> <span class="val">csuite</span>
     </div>
 
     <div class="cmd-block">
-      <span class="prompt">$ </span><span class="cmd">pbtk openai corpospeak</span>
+      <span class="prompt">$ </span><span class="cmd">pbtk llm corpospeak</span>
       <span class="opt"> --source</span> <span class="val">"New feature deployed"</span>
       <span class="opt"> --audience</span> <span class="val">engineering</span>
       <span class="opt"> --user-messages</span> <span class="val">"Hey team"</span> <span class="val">"Let's ship this"</span>
@@ -229,7 +237,7 @@ flowchart LR
     <div class="diagram-wrap">
       <div class="mermaid">
 flowchart LR
-    SRC["--source\n(text or file path)"] --> CALL["OpenAI\nchat completion\n(audience-tuned prompt)"]
+    SRC["--source\n(text or file path)"] --> CALL["LLM\nchat completion\n(audience-tuned prompt)"]
     AUD["--audience"] --> CALL
     UM["--user-messages\n(optional idiolect examples)"] --> CALL
     CALL --> OUT(["stdout: rewritten text"])
@@ -249,7 +257,7 @@ flowchart LR
         <tr><td><code>--source</code></td><td>Yes</td><td>&mdash;</td><td>Source text to rewrite (or file path)</td></tr>
         <tr><td><code>--audience</code></td><td>Yes</td><td>&mdash;</td><td>Target audience slug (see list above)</td></tr>
         <tr><td><code>--user-messages</code></td><td>No</td><td>&mdash;</td><td>Example messages to learn idiolect from (text or file paths, repeatable)</td></tr>
-        <tr><td><code>--model</code></td><td>No</td><td><code>gpt-5-nano</code></td><td>OpenAI model to use</td></tr>
+        <tr><td><code>--model</code></td><td>No</td><td><code>gpt-5-nano</code></td><td>Model to use</td></tr>
       </tbody>
     </table>
   </section>
@@ -263,7 +271,7 @@ flowchart LR
     </p>
 
     <div class="cmd-block">
-      <span class="prompt">$ </span><span class="cmd">pbtk openai history list</span>
+      <span class="prompt">$ </span><span class="cmd">pbtk llm history list</span>
     </div>
 
     <p>Example output:</p>
@@ -275,7 +283,7 @@ flowchart LR
 
     <p>
       The database file is at <code>~/.pbtk/history.db</code>. It is created automatically on first use
-      and shared by all <code>openai</code> commands.
+      and shared by all <code>llm</code> commands.
     </p>
   </section>
 
@@ -288,7 +296,7 @@ flowchart LR
     </p>
 
     <div class="cmd-block">
-      <span class="prompt">$ </span><span class="cmd">pbtk openai history delete</span>
+      <span class="prompt">$ </span><span class="cmd">pbtk llm history delete</span>
       <span class="opt"> --session-id</span> <span class="val">42</span>
     </div>
 
@@ -315,37 +323,37 @@ flowchart LR
       </thead>
       <tbody>
         <tr>
-          <td><code>openai chat</code></td>
+          <td><code>llm chat</code></td>
           <td><code>--message</code></td>
-          <td><code>--session-id</code> <code>--model</code></td>
+          <td><code>--session-id</code> <code>--model</code> <code>--reasoning-effort</code></td>
           <td>Assistant reply to stdout; session ID to stderr</td>
         </tr>
         <tr>
-          <td><code>openai translate</code></td>
+          <td><code>llm translate</code></td>
           <td><code>--text</code> <code>--target-language</code></td>
           <td><code>--model</code></td>
           <td>Translated text to stdout</td>
         </tr>
         <tr>
-          <td><code>openai ocaaar</code></td>
+          <td><code>llm ocaaar</code></td>
           <td><code>--image-path</code></td>
           <td><code>--model</code></td>
           <td>Pirate-speak OCR result to stdout</td>
         </tr>
         <tr>
-          <td><code>openai corpospeak</code></td>
+          <td><code>llm corpospeak</code></td>
           <td><code>--source</code> <code>--audience</code></td>
           <td><code>--user-messages</code> <code>--model</code></td>
           <td>Rewritten text to stdout</td>
         </tr>
         <tr>
-          <td><code>openai history list</code></td>
+          <td><code>llm history list</code></td>
           <td>&mdash;</td>
           <td>&mdash;</td>
           <td>Session table to stdout</td>
         </tr>
         <tr>
-          <td><code>openai history delete</code></td>
+          <td><code>llm history delete</code></td>
           <td><code>--session-id</code></td>
           <td>&mdash;</td>
           <td>Confirmation message to stdout</td>
@@ -357,7 +365,7 @@ flowchart LR
 </div>
 
 <footer>
-  Pixelbadger Toolkit &mdash; OpenAI Documentation
+  Pixelbadger Toolkit &mdash; LLM Documentation
 </footer>
 
 <script>
