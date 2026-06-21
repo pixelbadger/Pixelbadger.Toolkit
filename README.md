@@ -52,6 +52,20 @@ dotnet run -- [topic] [action] [options]
 dotnet tool install --global --add-source ./bin/Release Pixelbadger.Toolkit
 ```
 
+## Topics
+
+| Topic | Description |
+|---|---|
+| `strings` | String manipulation — reverse, Levenshtein distance, abjadify, Flesch reading ease, report |
+| `interpreters` | Esoteric language interpreters — Brainfuck, Ook, bf-to-ook |
+| `images` | Image steganography — hide and recover messages in PNG files |
+| `web` | Local web server — serve a single HTML file over HTTP |
+| `llm` | LLM utilities — chat, translate, OCR, corpospeak, session history |
+| `oauth` | OAuth token management — acquire tokens, manage connection profiles |
+| `crypto` | Paillier homomorphic encryption — encrypt, decrypt, and perform arithmetic on ciphertext |
+| `markov` | Markov chain text generation — train a model from a corpus, generate completions |
+| `demoscene` | Classic Amiga demoscene effects — Kefrens bars and Boing Ball rendered in the terminal |
+
 ## Requirements
 
 - .NET 9.0
