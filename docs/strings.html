@@ -20,6 +20,7 @@
   <a href="#levenshtein">levenshtein-distance</a>
   <a href="#abjadify">abjadify</a>
   <a href="#flesch">flesch-reading-ease</a>
+  <a href="#report">report</a>
   <a href="#command-ref">Command Reference</a>
 </nav>
 
@@ -226,6 +227,38 @@ Syllables: 301
     </table>
   </section>
 
+  <!-- REPORT -->
+  <section id="report">
+    <h2>report</h2>
+    <p>
+      Performs a full text analysis of the input, producing a comprehensive report that includes word count,
+      sentence averages, estimated page count, Flesch Reading Ease score, readability band, reading time,
+      and more. Input can be provided as a file path or as a direct string value.
+    </p>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk strings report</span>
+      <span class="opt"> --in-file</span> <span class="val">article.txt</span>
+    </div>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk strings report</span>
+      <span class="opt"> --string</span> <span class="val">"The quick brown fox jumps over the lazy dog."</span>
+    </div>
+
+    <div class="info-box">
+      Exactly one of <code>--in-file</code> or <code>--string</code> must be provided.
+    </div>
+
+    <table>
+      <thead><tr><th>Option</th><th>Required</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--in-file</code></td><td>One of</td><td>Path to the input plain-text file to analyse</td></tr>
+        <tr><td><code>--string</code></td><td>One of</td><td>Direct text string to analyse</td></tr>
+      </tbody>
+    </table>
+  </section>
+
   <!-- COMMAND REFERENCE -->
   <section id="command-ref">
     <h2>Command Reference</h2>
@@ -263,6 +296,12 @@ Syllables: 301
           <td><code>--in-file</code></td>
           <td>&mdash;</td>
           <td>Score, readability band, and counts printed to stdout</td>
+        </tr>
+        <tr>
+          <td><code>strings report</code></td>
+          <td><code>--in-file</code> or <code>--string</code></td>
+          <td>&mdash;</td>
+          <td>Full text analysis report printed to stdout</td>
         </tr>
       </tbody>
     </table>

@@ -46,14 +46,15 @@ The project is .NET 9, and uses Microsoft's System.CommandLine library for build
 
 **Note**: README.md changes DO require version bumps as README files are published with NuGet packages.
 
-### README Maintenance
+### HTML Docs Maintenance
 
-**CRITICAL**: All new commands, topics, or modifications to existing functionality must trigger a README review and update:
-- **New topics or actions**: Add to table of contents and create detailed sections with usage examples
-- **Modified commands**: Update existing documentation, examples, and option descriptions
-- **Ensure consistency**: README examples must match CLAUDE.md examples and actual command behavior
-- **Complete documentation**: Include usage, options, examples, and technical details for each command
-- README updates are mandatory for any PR that adds or modifies CLI functionality
+**CRITICAL**: All new commands, topics, or modifications to existing functionality must trigger a review and update of the HTML documentation in `/docs`:
+- **New topics**: Create a new `<topic>.html` page and add a topic card to `index.html`
+- **New actions**: Add a section to the relevant `<topic>.html` page with description, usage example, options table, and update the Command Reference table and nav at the top of the page
+- **Modified commands**: Update the relevant section in the topic HTML page
+- **Ensure consistency**: Examples in HTML docs must match CLAUDE.md examples and actual command behavior
+- HTML doc updates are mandatory for any PR that adds or modifies CLI functionality
+- `README.md` is for developer documentation only (building, testing, installation) — do not add CLI usage to README.md
 
 ### Development Commands
 
