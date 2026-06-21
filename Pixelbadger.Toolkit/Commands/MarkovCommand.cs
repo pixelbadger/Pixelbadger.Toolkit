@@ -7,7 +7,7 @@ namespace Pixelbadger.Toolkit.Commands;
 
 public static class MarkovCommand
 {
-    private static readonly string DefaultModelDirectory =
+    private static string DefaultModelDirectory =>
         Path.Combine(Directory.GetCurrentDirectory(), ".Markov");
 
     public static Command Create()
@@ -36,7 +36,7 @@ public static class MarkovCommand
                 var component = new MarkovTrainComponent(new MarkovModelService());
                 var uniqueWords = await component.TrainAsync(source, DefaultModelDirectory);
 
-                AnsiConsole.MarkupLine($"[green]Model trained successfully from '{Markup.Escape(source)}' ({uniqueWords} unique words). Model saved to '{Markup.Escape(DefaultModelDirectory)}'.[/]");
+                AnsiConsole.MarkupLine($"[green]Model trained successfully from '{Markup.Escape(source)}' ({uniqueWords} unique transition words). Model saved to '{Markup.Escape(DefaultModelDirectory)}'.[/]");
             }
             catch (Exception ex)
             {

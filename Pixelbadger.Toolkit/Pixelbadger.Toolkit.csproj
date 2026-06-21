@@ -12,8 +12,8 @@
     <PackageId>Pixelbadger.Toolkit</PackageId>
     <Version>6.2.0</Version>
     <Authors>Pixelbadger</Authors>
-    <Description>A CLI toolkit exposing varied functionality organized by topic, including string manipulation, distance calculations, esoteric programming language interpreters, image steganography, web serving, LLM integration, and homomorphic encryption.</Description>
-    <PackageTags>cli;toolkit;strings;interpreters;steganography;llm;openai;crypto;homomorphic-encryption</PackageTags>
+    <Description>A CLI toolkit exposing varied functionality organized by topic, including string manipulation, distance calculations, esoteric programming language interpreters, image steganography, web serving, LLM integration, homomorphic encryption, and Markov chain text generation.</Description>
+    <PackageTags>cli;toolkit;strings;interpreters;steganography;llm;openai;crypto;homomorphic-encryption;markov;text-generation</PackageTags>
     <RepositoryUrl>https://github.com/pixelbadger/Pixelbadger.Toolkit</RepositoryUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
