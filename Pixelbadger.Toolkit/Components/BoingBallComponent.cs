@@ -6,7 +6,6 @@ public class BoingBallComponent
     private static readonly PixelColor GridColor = new(120, 120, 120);
     private static readonly PixelColor BallRed = new(220, 40, 40);
     private static readonly PixelColor BallWhite = new(240, 240, 240);
-    private static readonly PixelColor Shadow = new(140, 140, 140);
 
     public void RenderFrame(PixelBuffer buffer, int frame)
     {
