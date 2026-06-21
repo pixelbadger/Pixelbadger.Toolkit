@@ -10,7 +10,7 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>pbtk</ToolCommandName>
     <PackageId>Pixelbadger.Toolkit</PackageId>
-    <Version>6.4.0</Version>
+    <Version>6.4.1</Version>
     <Authors>Pixelbadger</Authors>
     <Description>A CLI toolkit exposing varied functionality organized by topic, including string manipulation, distance calculations, esoteric programming language interpreters, image steganography, web serving, LLM integration, homomorphic encryption, Markov chain text generation, and Amiga demoscene effects.</Description>
     <PackageTags>cli;toolkit;strings;interpreters;steganography;llm;openai;crypto;homomorphic-encryption;markov;text-generation;demoscene;amiga</PackageTags>
