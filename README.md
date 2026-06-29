@@ -348,6 +348,52 @@ pbtk crypto substring --in-file msg.estr --start 6 --length 5 --out-file sub.est
 
 ---
 
+### gpt
+
+A tiny char-level GPT (decoder-only transformer) implemented entirely from scratch in pure C# — a hand-rolled tensor library with reverse-mode autograd, manual forward and backward passes, and an AdamW optimizer. Inspired by Karpathy's nanoGPT/microGPT. Hot kernels are accelerated with SIMD via `System.Numerics.Tensors` (`TensorPrimitives`) and `Parallel.For` across independent matmul rows; reductions are kept sequential so results are reproducible regardless of thread count.
+
+A checkpoint is a directory containing `config.json` (model config + vocabulary) and `weights.bin` (raw parameter floats).
+
+#### train
+
+Builds a character vocabulary from the corpus, trains the model by gradient descent, and writes a checkpoint.
+
+```
+--source <path>       Path to a training corpus file, or literal text (required)
+--out <dir>           Checkpoint output directory (default: ./.gpt)
+--steps <int>         Number of training steps (default: 2000)
+--batch-size <int>    Sequences per training step (default: 16)
+--block-size <int>    Context length in characters (default: 64)
+--n-embd <int>        Embedding dimension (default: 128)
+--n-head <int>        Number of attention heads (default: 4)
+--n-layer <int>       Number of transformer blocks (default: 3)
+--lr <float>          Learning rate (default: 0.0003)
+--seed <int>          Random seed for reproducible runs (default: 1337)
+```
+```bash
+pbtk gpt train --source corpus.txt --out ./.gpt --steps 2000
+```
+
+> `--n-embd` must be divisible by `--n-head`, and the corpus must be longer than `--block-size`.
+
+#### complete
+
+Loads a checkpoint and autoregressively generates a continuation of the prompt.
+
+```
+--model <dir>          Checkpoint directory (default: ./.gpt)
+--prompt <text>        Prompt to continue (required)
+--max-tokens <int>     Number of characters to generate (default: 200)
+--temperature <float>  Sampling temperature; 0 = greedy/deterministic (default: 0.8)
+--seed <int>           Random seed for sampling (default: 1337)
+```
+```bash
+pbtk gpt complete --model ./.gpt --prompt "ROMEO:" --max-tokens 200
+pbtk gpt complete --model ./.gpt --prompt "The" --temperature 0
+```
+
+---
+
 ## Requirements
 
 - .NET 9.0
