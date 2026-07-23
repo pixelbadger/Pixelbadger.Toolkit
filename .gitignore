@@ -485,3 +485,7 @@ $RECYCLE.BIN/
 
 # Test assets and temporary files
 test-assets/
+
+# GPT/Markov model checkpoint directories
+.gpt/
+.Markov/
