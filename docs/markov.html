@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pixelbadger Toolkit — Markov</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header>
+  <h1>Markov <span class="badge">markov</span></h1>
+  <div class="subtitle">Word-level Markov chain text generation — train a model from a corpus, then generate completions</div>
+  <div class="meta">Pixelbadger Toolkit &mdash; <code>pbtk markov</code> &mdash; <a href="index.html" style="color:#60a5fa">&#8592; all topics</a></div>
+</header>
+
+<nav>
+  <a href="#overview">Overview</a>
+  <a href="#train">train</a>
+  <a href="#complete">complete</a>
+  <a href="#command-ref">Command Reference</a>
+</nav>
+
+<div class="content">
+
+  <!-- OVERVIEW -->
+  <section id="overview">
+    <h2>Overview</h2>
+    <p>
+      The <code>markov</code> topic provides word-level Markov chain text generation. A Markov chain model
+      learns transition probabilities between words from a source corpus, then uses those probabilities to
+      generate plausible continuations of a given input text.
+    </p>
+    <p>
+      The trained model is persisted to a <code>.Markov</code> subfolder relative to the current working
+      directory. Train the model once from a corpus, then call <code>complete</code> as many times as needed.
+    </p>
+
+    <div class="diagram-wrap">
+      <div class="mermaid">
+flowchart LR
+    CORPUS["corpus.txt"] --> TRAIN["pbtk markov train"]
+    TRAIN --> MODEL[".Markov/\nmodel files"]
+    MODEL --> COMPLETE["pbtk markov complete"]
+    INPUT["--text\n(seed text)"] --> COMPLETE
+    COMPLETE --> OUT(["stdout: generated text"])
+      </div>
+    </div>
+
+    <div class="info-box">
+      The model directory is always <code>.Markov/</code> relative to the current working directory.
+      Run both <code>train</code> and <code>complete</code> from the same directory to use the same model.
+    </div>
+  </section>
+
+  <!-- TRAIN -->
+  <section id="train">
+    <h2>train</h2>
+    <p>
+      Trains a Markov chain model from a source text file. The model records word-to-word transition
+      probabilities across the entire corpus. The trained model is saved to the <code>.Markov/</code>
+      subfolder in the current working directory, replacing any previously trained model.
+    </p>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk markov train</span>
+      <span class="opt"> --source</span> <span class="val">corpus.txt</span>
+    </div>
+
+    <p>
+      On success, the number of unique transition words in the model is reported to stdout.
+    </p>
+
+    <table>
+      <thead><tr><th>Option</th><th>Required</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--source</code></td><td>Yes</td><td>Path to the source text file to train from</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- COMPLETE -->
+  <section id="complete">
+    <h2>complete</h2>
+    <p>
+      Generates a text completion by extending the provided seed text using the trained Markov chain model.
+      The model must have been trained with <a href="#train"><code>markov train</code></a> first.
+      The seed text is used to find a starting point in the model; generation then follows learned
+      transition probabilities word by word.
+    </p>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk markov complete</span>
+      <span class="opt"> --text</span> <span class="val">"The quick brown"</span>
+    </div>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk markov complete</span>
+      <span class="opt"> --text</span> <span class="val">"Once upon a time"</span>
+      <span class="opt"> --count</span> <span class="val">100</span>
+    </div>
+
+    <div class="diagram-wrap">
+      <div class="mermaid">
+flowchart LR
+    TEXT["--text\n(seed)"] --> LOOKUP["Find seed in\nmodel transitions"]
+    LOOKUP --> GEN["Generate next word\nfrom transition table"]
+    GEN -->|"repeat --count times"| GEN
+    GEN --> OUT(["stdout: seed + generated words"])
+      </div>
+    </div>
+
+    <table>
+      <thead><tr><th>Option</th><th>Required</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--text</code></td><td>Yes</td><td>&mdash;</td><td>Seed text to start the completion from</td></tr>
+        <tr><td><code>--count</code></td><td>No</td><td><code>50</code></td><td>Number of words to generate</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- COMMAND REFERENCE -->
+  <section id="command-ref">
+    <h2>Command Reference</h2>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Command</th>
+          <th>Required options</th>
+          <th>Optional options</th>
+          <th>Output</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>markov train</code></td>
+          <td><code>--source</code></td>
+          <td>&mdash;</td>
+          <td>Success message with unique word count to stdout</td>
+        </tr>
+        <tr>
+          <td><code>markov complete</code></td>
+          <td><code>--text</code></td>
+          <td><code>--count</code></td>
+          <td>Generated text to stdout</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+</div>
+
+<footer>
+  Pixelbadger Toolkit &mdash; Markov Documentation
+</footer>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'dark',
+    themeVariables: {
+      background: '#0f172a',
+      primaryColor: '#1e3a5f',
+      primaryTextColor: '#e2e8f0',
+      primaryBorderColor: '#3b82f6',
+      lineColor: '#475569',
+      secondaryColor: '#1e293b',
+      tertiaryColor: '#0f172a',
+      edgeLabelBackground: '#1e293b',
+      clusterBkg: '#1e293b',
+      titleColor: '#f1f5f9',
+      nodeTextColor: '#e2e8f0',
+    }
+  });
+</script>
+</body>
+</html>

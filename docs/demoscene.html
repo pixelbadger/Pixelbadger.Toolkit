@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pixelbadger Toolkit — Demoscene</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header>
+  <h1>Demoscene <span class="badge">demoscene</span></h1>
+  <div class="subtitle">Classic Amiga demoscene effects rendered in the terminal using half-block ANSI characters</div>
+  <div class="meta">Pixelbadger Toolkit &mdash; <code>pbtk demoscene</code> &mdash; <a href="index.html" style="color:#60a5fa">&#8592; all topics</a></div>
+</header>
+
+<nav>
+  <a href="#overview">Overview</a>
+  <a href="#kefrens">kefrens</a>
+  <a href="#boing">boing</a>
+  <a href="#command-ref">Command Reference</a>
+</nav>
+
+<div class="content">
+
+  <!-- OVERVIEW -->
+  <section id="overview">
+    <h2>Overview</h2>
+    <p>
+      The <code>demoscene</code> topic renders classic Amiga demoscene effects directly in your terminal.
+      It uses the Unicode upper half block character <code>&#x2580;</code> (U+2580) with 24-bit ANSI colour codes
+      to double the effective pixel density: the foreground colour paints the top half of each character cell
+      and the background colour paints the bottom half, giving two pixel rows per terminal row.
+    </p>
+    <p>
+      Both effects animate in real time, running for a configurable number of frames at ~20 fps before returning
+      to the shell. Press <kbd>Ctrl+C</kbd> at any time to stop early.
+    </p>
+
+    <div class="info-box">
+      A terminal that supports 24-bit (true colour) ANSI codes is required for full colour fidelity.
+      Most modern terminals (iTerm2, Windows Terminal, GNOME Terminal, Alacritty) support true colour.
+    </div>
+  </section>
+
+  <!-- KEFRENS -->
+  <section id="kefrens">
+    <h2>kefrens</h2>
+    <p>
+      Renders a Kefrens-style effect — multiple vertical colour bars that scroll across the screen following
+      independent sine wave paths. Each bar has a distinct hue and a soft brightness falloff from its centre,
+      giving the classic glowing-bars look of the Amiga demo era.
+    </p>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk demoscene kefrens</span>
+    </div>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk demoscene kefrens</span>
+      <span class="opt"> --frames</span> <span class="val">400</span>
+    </div>
+
+    <p>
+      The effect fills the full terminal window and runs until the requested frame count is reached.
+      Eight bars covering the rainbow spectrum are rendered simultaneously, each moving at a different phase
+      so they weave across and through one another.
+    </p>
+
+    <table>
+      <thead><tr><th>Option</th><th>Required</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--frames</code></td><td>No</td><td>200</td><td>Number of animation frames to render before exiting</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- BOING -->
+  <section id="boing">
+    <h2>boing</h2>
+    <p>
+      Renders the classic Amiga Boing Ball — a red-and-white checkered sphere bouncing around a grey grid
+      background. The checkerboard pattern rotates as the ball moves, giving the impression of spin.
+      This effect was famously used to demonstrate the graphical capabilities of the original Amiga 1000 in 1984.
+    </p>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk demoscene boing</span>
+    </div>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk demoscene boing</span>
+      <span class="opt"> --frames</span> <span class="val">400</span>
+    </div>
+
+    <p>
+      The ball bounces off all four walls and its checkerboard pattern rotates continuously.
+      The grey grid background echoes the original demo's distinctive aesthetic.
+    </p>
+
+    <table>
+      <thead><tr><th>Option</th><th>Required</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--frames</code></td><td>No</td><td>200</td><td>Number of animation frames to render before exiting</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- COMMAND REFERENCE -->
+  <section id="command-ref">
+    <h2>Command Reference</h2>
+    <table>
+      <thead><tr><th>Command</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>pbtk demoscene kefrens [--frames N]</code></td>
+          <td>Animate Kefrens-style sine wave colour bars across the terminal</td>
+        </tr>
+        <tr>
+          <td><code>pbtk demoscene boing [--frames N]</code></td>
+          <td>Animate the classic Amiga Boing Ball bouncing on a grey grid</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+</div>
+
+<footer>
+  <p>Pixelbadger Toolkit &mdash; <a href="index.html">Documentation index</a></p>
+</footer>
+
+</body>
+</html>
