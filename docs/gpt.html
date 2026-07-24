@@ -17,6 +17,12 @@
 
 <nav>
   <a href="#overview">Overview</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#model">Model</a>
+  <a href="#autograd">Autograd Engine</a>
+  <a href="#training-pipeline">Training Pipeline</a>
+  <a href="#inference-pipeline">Inference Pipeline</a>
+  <a href="#checkpoint-format">Checkpoint Format</a>
   <a href="#train">train</a>
   <a href="#complete">complete</a>
   <a href="#command-ref">Command Reference</a>
@@ -54,8 +60,262 @@ flowchart LR
 
     <div class="info-box">
       This is an educational toy model, not a production LLM. With the default hyperparameters it trains a
-      model of roughly half a million parameters — enough to pick up the character-level style of a corpus
+      model of roughly 600K parameters — enough to pick up the character-level style of a corpus
       (e.g. Shakespeare) in a couple of minutes, not to produce coherent long-form text.
+    </div>
+  </section>
+
+  <!-- ARCHITECTURE -->
+  <section id="architecture">
+    <h2>Architecture</h2>
+    <p>
+      The <code>gpt</code> topic follows the toolkit's component-per-command pattern: a thin
+      System.CommandLine layer (<code>GptCommand</code>) parses options and delegates to one component per
+      action. The components orchestrate a small set of services that together form a self-contained
+      training and inference platform — there are no external ML dependencies (no TorchSharp, no ONNX,
+      no native libraries). The entire stack, from autograd to optimizer, is implemented in C# in the
+      spirit of Karpathy's micrograd/nanoGPT.
+    </p>
+
+    <div class="diagram-wrap">
+      <div class="mermaid">
+flowchart TB
+    CMD["GptCommand\n(System.CommandLine topic)"]
+    TRAINC["GptTrainComponent\n(training loop)"]
+    COMPC["GptCompleteComponent\n(autoregressive sampling)"]
+    TOK["CharTokenizer\n(char ↔ id mapping)"]
+    MODEL["GptModel\n(decoder-only transformer)"]
+    TENSOR["Tensor\n(reverse-mode autograd + SIMD kernels)"]
+    OPT["AdamW\n(optimizer)"]
+    CKPT["CheckpointService\n(config.json + weights.bin)"]
+
+    CMD --> TRAINC
+    CMD --> COMPC
+    TRAINC --> TOK
+    TRAINC --> MODEL
+    TRAINC --> OPT
+    TRAINC --> CKPT
+    COMPC --> TOK
+    COMPC --> MODEL
+    COMPC --> CKPT
+    MODEL --> TENSOR
+    OPT --> TENSOR
+      </div>
+    </div>
+
+    <table>
+      <thead><tr><th>Type</th><th>Layer</th><th>Responsibility</th></tr></thead>
+      <tbody>
+        <tr><td><code>GptCommand</code></td><td>Commands/</td><td>Defines the <code>train</code> and <code>complete</code> actions, parses options, resolves <code>--source</code> as a file path or literal text, and reports progress/errors via Spectre.Console</td></tr>
+        <tr><td><code>GptTrainComponent</code></td><td>Components/</td><td>Runs the training loop: builds the tokenizer, samples minibatches, drives forward/backward/optimizer steps, and saves the final checkpoint</td></tr>
+        <tr><td><code>GptCompleteComponent</code></td><td>Components/</td><td>Loads a checkpoint, reconstructs model and tokenizer, and autoregressively samples one character at a time (greedy or temperature sampling)</td></tr>
+        <tr><td><code>CharTokenizer</code></td><td>Services/</td><td>Character-level vocabulary: the sorted set of distinct chars in the corpus, with <code>Encode</code>/<code>Decode</code> between text and integer ids</td></tr>
+        <tr><td><code>GptModel</code> + <code>GptConfig</code></td><td>Services/</td><td>The decoder-only transformer: owns parameter tensors, weight initialization, and the forward pass producing logits and cross-entropy loss</td></tr>
+        <tr><td><code>Tensor</code></td><td>Services/</td><td>Minimal reverse-mode automatic differentiation engine over 2D float matrices; every model op (matmul, layernorm, softmax, GELU, …) lives here with its backward function</td></tr>
+        <tr><td><code>AdamW</code></td><td>Services/</td><td>AdamW optimizer with decoupled weight decay over the model's parameter list</td></tr>
+        <tr><td><code>CheckpointService</code></td><td>Services/</td><td>Persists and restores checkpoints behind the <code>ICheckpointService</code> interface (injected into both components for testability)</td></tr>
+      </tbody>
+    </table>
+
+    <div class="info-box">
+      Both components receive <code>ICheckpointService</code> via constructor injection, following the
+      toolkit's interface-based service pattern — file I/O can be mocked in unit tests while the numeric
+      core (<code>GptModel</code>, <code>Tensor</code>, <code>AdamW</code>) is deterministic and tested directly.
+    </div>
+  </section>
+
+  <!-- MODEL -->
+  <section id="model">
+    <h2>Model</h2>
+    <p>
+      <code>GptModel</code> implements a nanoGPT-style decoder-only transformer. A <code>GptConfig</code>
+      record (<code>VocabSize</code>, <code>BlockSize</code>, <code>NEmbd</code>, <code>NHead</code>,
+      <code>NLayer</code>) fixes the architecture; the head dimension is <code>NEmbd / NHead</code>, and
+      construction validates that <code>--n-embd</code> is divisible by <code>--n-head</code>.
+    </p>
+
+    <div class="diagram-wrap">
+      <div class="mermaid">
+flowchart TB
+    IDS["token ids (B×T)"] --> EMB["token embedding (wte) +\npositional embedding (wpe)"]
+    EMB --> BLK["× n-layer transformer blocks:\nLayerNorm → causal multi-head attention → residual\nLayerNorm → MLP (4×, GELU) → residual"]
+    BLK --> LNF["final LayerNorm"]
+    LNF --> HEAD["weight-tied head:\nlogits = x · wteᵀ"]
+    HEAD --> LOGITS["logits (B·T, vocab)"]
+    LOGITS --> CE["cross-entropy vs targets\n(training only)"]
+      </div>
+    </div>
+
+    <p>Key architectural details:</p>
+    <table>
+      <thead><tr><th>Feature</th><th>Implementation</th></tr></thead>
+      <tbody>
+        <tr><td>Embeddings</td><td>Learned token embedding table <code>wte</code> (vocab &times; n-embd) plus learned positional embedding <code>wpe</code> (block-size &times; n-embd), summed per position</td></tr>
+        <tr><td>Block structure</td><td>Pre-LayerNorm: each block computes <code>x = x + Attn(LN(x))</code> then <code>x = x + MLP(LN(x))</code></td></tr>
+        <tr><td>Attention</td><td>Causal multi-head self-attention: per-head Q/K/V projections with bias, scores scaled by <code>1/&radic;head-dim</code>, upper-triangular positions masked to &minus;1e9 before row softmax, heads concatenated and passed through an output projection</td></tr>
+        <tr><td>MLP</td><td>Two linear layers with a 4&times; hidden expansion and GELU activation (tanh approximation)</td></tr>
+        <tr><td>Output head</td><td>Weight-tied with the token embedding: <code>logits = x &middot; wte&#7488;</code> — no separate unembedding matrix, reducing parameter count</td></tr>
+        <tr><td>Initialization</td><td>Seeded Box-Muller normal N(0, 0.02) for weight matrices, zeros for biases, gamma=1/beta=0 for LayerNorms — reproducible for a given <code>--seed</code></td></tr>
+      </tbody>
+    </table>
+
+    <p>
+      With the default hyperparameters (n-embd 128, 4 heads, 3 layers, block size 64) and a typical
+      corpus vocabulary, the model comes out at roughly 600K parameters.
+    </p>
+  </section>
+
+  <!-- AUTOGRAD -->
+  <section id="autograd">
+    <h2>Autograd Engine</h2>
+    <p>
+      All numerics run through <code>Tensor</code>, a minimal reverse-mode automatic differentiation
+      engine over 2D float matrices. Each operation (e.g. <code>MatMul</code>, <code>LayerNorm</code>,
+      <code>SoftmaxRows</code>, <code>Gelu</code>, <code>CrossEntropy</code>) computes its result eagerly,
+      records its parent tensors, and attaches a closure that knows how to propagate gradients backwards.
+      Calling <code>Backward()</code> on the loss performs a topological sort of the computation graph,
+      seeds the root gradient with 1, and invokes each node's backward function in reverse order,
+      accumulating into every parameter's <code>Grad</code> buffer.
+    </p>
+
+    <div class="diagram-wrap">
+      <div class="mermaid">
+flowchart LR
+    FWD["Forward pass\n(eager ops build graph:\nParents + BackwardFn)"] --> LOSS["loss (1×1 tensor)"]
+    LOSS --> TOPO["Backward():\ntopological sort"]
+    TOPO --> PROP["invoke BackwardFn\nin reverse order"]
+    PROP --> GRADS["accumulated .Grad\non every parameter"]
+    GRADS --> STEP["AdamW.Step()"]
+      </div>
+    </div>
+
+    <p>The op set is exactly what the transformer needs:</p>
+    <table>
+      <thead><tr><th>Operation</th><th>Used for</th></tr></thead>
+      <tbody>
+        <tr><td><code>MatMul</code>, <code>Transpose</code>, <code>AddBias</code></td><td>Linear projections (Q/K/V/output, MLP, weight-tied head)</td></tr>
+        <tr><td><code>Add</code>, <code>Scale</code></td><td>Residual connections; attention score scaling</td></tr>
+        <tr><td><code>Gather</code></td><td>Token and positional embedding lookup</td></tr>
+        <tr><td><code>LayerNorm</code>, <code>Gelu</code></td><td>Normalization and MLP activation</td></tr>
+        <tr><td><code>CausalMask</code>, <code>SoftmaxRows</code></td><td>Causal attention weights (max-subtracted softmax for numerical stability)</td></tr>
+        <tr><td><code>SliceRows</code>/<code>SliceCols</code>, <code>ConcatRows</code>/<code>ConcatCols</code></td><td>Splitting the batch into sequences and sequences into attention heads, then reassembling</td></tr>
+        <tr><td><code>CrossEntropy</code></td><td>Fused softmax + mean negative log-likelihood loss with a simple <code>probs &minus; one-hot</code> backward</td></tr>
+      </tbody>
+    </table>
+
+    <p>
+      Performance and determinism are balanced deliberately: hot kernels use
+      <code>System.Numerics.Tensors.TensorPrimitives</code> (SIMD) for dot products and elementwise math,
+      and matrix multiplication parallelizes across independent output rows with <code>Parallel.For</code>.
+      Reductions inside a single dot product stay sequential, so results are bit-identical regardless of
+      thread count — which is what makes <code>--seed</code> fully reproducible.
+    </p>
+  </section>
+
+  <!-- TRAINING PIPELINE -->
+  <section id="training-pipeline">
+    <h2>Training Pipeline</h2>
+    <p>
+      <code>GptTrainComponent.TrainAsync</code> wires the services together into a standard
+      minibatch gradient-descent loop:
+    </p>
+
+    <div class="diagram-wrap">
+      <div class="mermaid">
+flowchart TB
+    SRC["corpus text\n(file or literal via --source)"] --> BUILD["CharTokenizer.Build\n(sorted distinct chars)"]
+    BUILD --> ENC["Encode corpus → int[] ids"]
+    ENC --> LOOP["for each step 1..N"]
+    LOOP --> BATCH["SampleBatch: random windows\n(batch-size × block-size,\ntargets shifted by one char)"]
+    BATCH --> FWD["GptModel.Forward\n→ logits + cross-entropy loss"]
+    FWD --> BWD["loss.Backward()\n(reverse-mode autograd)"]
+    BWD --> ADAM["AdamW.Step()\n(decoupled weight decay)"]
+    ADAM --> LOOP
+    LOOP --> SAVE["CheckpointService.SaveAsync\n(config.json + weights.bin)"]
+      </div>
+    </div>
+
+    <ol>
+      <li><strong>Tokenize</strong> — <code>CharTokenizer.Build</code> derives the vocabulary from the sorted distinct characters of the corpus, then encodes the whole corpus into one integer array. The corpus must contain at least <code>block-size + 1</code> characters.</li>
+      <li><strong>Construct</strong> — a <code>GptModel</code> is built from the config and initialized from the seeded RNG; an <code>AdamW</code> instance is bound to the model's parameter list (learning rate from <code>--lr</code>; betas 0.9/0.95, weight decay 0.1).</li>
+      <li><strong>Sample batches</strong> — each step draws <code>--batch-size</code> random windows of <code>--block-size</code> characters; the target sequence is the same window shifted one character right, so every position learns next-character prediction simultaneously.</li>
+      <li><strong>Step</strong> — <code>ZeroGrad</code> &rarr; <code>Forward</code> (logits + loss) &rarr; <code>loss.Backward()</code> &rarr; <code>optimizer.Step()</code>. The command layer prints step/loss at step 1, every 100th step, and the final step.</li>
+      <li><strong>Persist</strong> — after the final step the checkpoint (config, vocabulary, and all weight tensors in construction order) is written via <code>CheckpointService</code>, and a summary (parameter count, vocab size, final loss, path) is reported.</li>
+    </ol>
+  </section>
+
+  <!-- INFERENCE PIPELINE -->
+  <section id="inference-pipeline">
+    <h2>Inference Pipeline</h2>
+    <p>
+      <code>GptCompleteComponent.CompleteAsync</code> performs autoregressive decoding — the same
+      forward pass as training, but without targets, and repeated once per generated character:
+    </p>
+
+    <div class="diagram-wrap">
+      <div class="mermaid">
+flowchart TB
+    LOAD["CheckpointService.LoadAsync\n→ config + vocabulary + weights"] --> RECON["Rebuild GptModel + CharTokenizer\n(LoadWeights validates tensor\ncount and shapes)"]
+    RECON --> ENCP["Encode --prompt to ids\n(empty prompt seeds with id 0)"]
+    ENCP --> WINDOW["Take last block-size ids\nas context window"]
+    WINDOW --> FWD2["Forward (no targets)\n→ logits for every position"]
+    FWD2 --> LAST["Select logits of the\nfinal time-step"]
+    LAST --> PICK{"temperature ≤ 0?"}
+    PICK -->|yes| GREEDY["ArgMax (greedy,\ndeterministic)"]
+    PICK -->|no| TEMP["logits / temperature →\nstable softmax → seeded\ncategorical sample"]
+    GREEDY --> APPEND["append id, repeat\n× max-tokens"]
+    TEMP --> APPEND
+    APPEND --> WINDOW
+    APPEND --> DEC["tokenizer.Decode(all ids)\n→ stdout"]
+      </div>
+    </div>
+
+    <p>
+      Because the context window is capped at <code>block-size</code> characters, generation slides the
+      window forward once the sequence outgrows it — earlier characters simply fall out of context. Each
+      iteration is a full forward pass over the current window (there is no KV caching in this
+      implementation). Sampling divides logits by <code>--temperature</code> before a max-subtracted
+      softmax; <code>--temperature 0</code> switches to pure argmax, and any sampled run is reproducible
+      via <code>--seed</code>. The prompt may only contain characters present in the training corpus —
+      unknown characters fail with an error, since the vocabulary is fixed at training time.
+    </p>
+  </section>
+
+  <!-- CHECKPOINT FORMAT -->
+  <section id="checkpoint-format">
+    <h2>Checkpoint Format</h2>
+    <p>
+      A checkpoint is a directory (default <code>./.gpt</code>) written by <code>CheckpointService</code>
+      containing two files:
+    </p>
+
+    <table>
+      <thead><tr><th>File</th><th>Format</th><th>Contents</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>config.json</code></td>
+          <td>Indented JSON</td>
+          <td>The model hyperparameters (<code>VocabSize</code>, <code>BlockSize</code>, <code>NEmbd</code>, <code>NHead</code>, <code>NLayer</code>) plus the vocabulary serialized as a single string of characters in id order</td>
+        </tr>
+        <tr>
+          <td><code>weights.bin</code></td>
+          <td>Little-endian binary</td>
+          <td>Tensor count (int32), then for each tensor its length (int32) followed by its float32 values — written in the model's fixed parameter construction order</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>
+      On load, <code>GptModel.LoadWeights</code> validates that the tensor count and every tensor length
+      match what the config-constructed model expects, so a corrupted or mismatched checkpoint fails fast
+      with a clear error rather than producing garbage output. Because the config fully determines the
+      parameter shapes and ordering, the checkpoint is portable across machines — inference only needs
+      the two files.
+    </p>
+
+    <div class="info-box">
+      Training always overwrites the checkpoint in <code>--out</code>. To keep multiple models, train
+      into different directories and select one at inference time with <code>--model</code>.
     </div>
   </section>
 
