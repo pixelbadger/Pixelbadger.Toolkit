@@ -15,16 +15,17 @@ public sealed class CheckpointService : ICheckpointService
     private static readonly JsonSerializerOptions SerializerOptions = new() { WriteIndented = true };
 
     private sealed record ConfigDto(
-        int VocabSize, int BlockSize, int NEmbd, int NHead, int NLayer, string Vocabulary);
+        int VocabSize, int BlockSize, int NEmbd, int NHead, int NLayer,
+        TokenizerKind TokenizerKind, string? Vocabulary, int[][]? Merges);
 
     public async Task SaveAsync(
-        string directory, GptConfig config, IReadOnlyList<char> vocabulary, IReadOnlyList<Tensor> parameters)
+        string directory, GptConfig config, TokenizerState tokenizer, IReadOnlyList<Tensor> parameters)
     {
         Directory.CreateDirectory(directory);
 
         var dto = new ConfigDto(
             config.VocabSize, config.BlockSize, config.NEmbd, config.NHead, config.NLayer,
-            new string(vocabulary.ToArray()));
+            tokenizer.Kind, tokenizer.Vocabulary, tokenizer.Merges);
         var json = JsonSerializer.Serialize(dto, SerializerOptions);
         await File.WriteAllTextAsync(Path.Combine(directory, ConfigFileName), json);
 
@@ -67,7 +68,8 @@ public sealed class CheckpointService : ICheckpointService
             weights[p] = data;
         }
 
-        return new GptCheckpoint(config, dto.Vocabulary.ToCharArray(), weights);
+        var tokenizer = new TokenizerState(dto.TokenizerKind, dto.Vocabulary, dto.Merges);
+        return new GptCheckpoint(config, tokenizer, weights);
     }
 
     public Task SaveOptimizerStateAsync(string directory, AdamWState state)

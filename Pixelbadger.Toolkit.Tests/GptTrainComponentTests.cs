@@ -46,7 +46,7 @@ public class GptTrainComponentTests
         _mockCheckpoint.Verify(x => x.SaveAsync(
             "out-dir",
             It.IsAny<GptConfig>(),
-            It.IsAny<IReadOnlyList<char>>(),
+            It.IsAny<TokenizerState>(),
             It.IsAny<IReadOnlyList<Tensor>>()), Times.Once);
     }
 
@@ -88,12 +88,12 @@ public class GptTrainComponentTests
 
     private static GptCheckpoint CreateCheckpoint(string corpusForVocab)
     {
-        var vocab = corpusForVocab.Distinct().OrderBy(ch => ch).ToArray();
-        var config = new GptConfig(vocab.Length, BlockSize: 8, NEmbd: 8, NHead: 2, NLayer: 1);
+        var tokenizer = CharTokenizer.Build(corpusForVocab);
+        var config = new GptConfig(tokenizer.VocabSize, BlockSize: 8, NEmbd: 8, NHead: 2, NLayer: 1);
         var model = new GptModel(config);
         model.InitWeights(99);
         var weights = model.Parameters().Select(p => p.Data.ToArray()).ToArray();
-        return new GptCheckpoint(config, vocab, weights);
+        return new GptCheckpoint(config, tokenizer.ExportState(), weights);
     }
 
     [Fact]
@@ -113,7 +113,7 @@ public class GptTrainComponentTests
         result.ParameterCount.Should().Be(checkpoint.Weights.Sum(w => w.Length));
         _mockCheckpoint.Verify(x => x.LoadAsync("ckpt"), Times.Once);
         _mockCheckpoint.Verify(x => x.SaveAsync(
-            "ckpt", checkpoint.Config, It.IsAny<IReadOnlyList<char>>(), It.IsAny<IReadOnlyList<Tensor>>()), Times.Once);
+            "ckpt", checkpoint.Config, It.IsAny<TokenizerState>(), It.IsAny<IReadOnlyList<Tensor>>()), Times.Once);
         _mockCheckpoint.Verify(x => x.SaveOptimizerStateAsync("ckpt", It.IsAny<AdamWState>()), Times.Once);
     }
 

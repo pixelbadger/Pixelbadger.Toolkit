@@ -21,22 +21,42 @@ public class CheckpointServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task SaveThenLoad_ShouldRoundTripConfigVocabularyAndWeights()
+    public async Task SaveThenLoad_ShouldRoundTripConfigCharTokenizerAndWeights()
     {
         var config = new GptConfig(VocabSize: 6, BlockSize: 4, NEmbd: 8, NHead: 2, NLayer: 1);
         var model = new GptModel(config);
         model.InitWeights(123);
-        var vocab = new[] { 'a', 'b', 'c', 'd', 'e', 'f' };
+        var tokenizer = new TokenizerState(TokenizerKind.Char, "abcdef", Merges: null);
         var dir = Path.Combine(_testDirectory, "ckpt");
 
-        await _service.SaveAsync(dir, config, vocab, model.Parameters());
+        await _service.SaveAsync(dir, config, tokenizer, model.Parameters());
         var loaded = await _service.LoadAsync(dir);
 
         loaded.Config.Should().Be(config);
-        loaded.Vocabulary.Should().Equal(vocab);
+        loaded.Tokenizer.Kind.Should().Be(TokenizerKind.Char);
+        loaded.Tokenizer.Vocabulary.Should().Be("abcdef");
+        loaded.Tokenizer.Merges.Should().BeNull();
         loaded.Weights.Length.Should().Be(model.Parameters().Count);
         for (int i = 0; i < loaded.Weights.Length; i++)
             loaded.Weights[i].Should().Equal(model.Parameters()[i].Data);
+    }
+
+    [Fact]
+    public async Task SaveThenLoad_ShouldRoundTripBpeMerges()
+    {
+        var config = new GptConfig(VocabSize: 258, BlockSize: 4, NEmbd: 8, NHead: 2, NLayer: 1);
+        var model = new GptModel(config);
+        model.InitWeights(123);
+        var merges = new[] { new[] { 104, 105 }, new[] { 256, 106 } };
+        var tokenizer = new TokenizerState(TokenizerKind.Bpe, Vocabulary: null, merges);
+        var dir = Path.Combine(_testDirectory, "ckpt");
+
+        await _service.SaveAsync(dir, config, tokenizer, model.Parameters());
+        var loaded = await _service.LoadAsync(dir);
+
+        loaded.Tokenizer.Kind.Should().Be(TokenizerKind.Bpe);
+        loaded.Tokenizer.Vocabulary.Should().BeNull();
+        loaded.Tokenizer.Merges.Should().BeEquivalentTo(merges, options => options.WithStrictOrdering());
     }
 
     [Fact]
@@ -45,9 +65,9 @@ public class CheckpointServiceTests : IDisposable
         var config = new GptConfig(VocabSize: 6, BlockSize: 4, NEmbd: 8, NHead: 2, NLayer: 1);
         var original = new GptModel(config);
         original.InitWeights(7);
-        var vocab = new[] { 'a', 'b', 'c', 'd', 'e', 'f' };
+        var tokenizer = new TokenizerState(TokenizerKind.Char, "abcdef", Merges: null);
         var dir = Path.Combine(_testDirectory, "ckpt");
-        await _service.SaveAsync(dir, config, vocab, original.Parameters());
+        await _service.SaveAsync(dir, config, tokenizer, original.Parameters());
 
         var loaded = await _service.LoadAsync(dir);
         var restored = new GptModel(loaded.Config);

@@ -42,7 +42,9 @@ public static class GptCommand
         var nLayerOption = new Option<int>("--n-layer") { Description = "Number of transformer blocks", DefaultValueFactory = _ => 3 };
         var lrOption = new Option<float>("--lr") { Description = "Learning rate", DefaultValueFactory = _ => 3e-4f };
         var seedOption = new Option<int>("--seed") { Description = "Random seed for reproducible runs", DefaultValueFactory = _ => 1337 };
-        var resumeOption = new Option<bool>("--resume") { Description = "Resume training from the checkpoint in --out (architecture options are taken from the checkpoint)" };
+        var resumeOption = new Option<bool>("--resume") { Description = "Resume training from the checkpoint in --out (architecture and tokenizer options are taken from the checkpoint)" };
+        var tokenizerOption = new Option<TokenizerKind>("--tokenizer") { Description = "Tokenizer: bpe (byte-pair subwords) or char (one token per character)", DefaultValueFactory = _ => TokenizerKind.Bpe };
+        var vocabSizeOption = new Option<int>("--vocab-size") { Description = "Target vocabulary size for the bpe tokenizer (>= 256; ignored for char)", DefaultValueFactory = _ => 512 };
 
         command.Add(sourceOption);
         command.Add(outOption);
@@ -55,6 +57,8 @@ public static class GptCommand
         command.Add(lrOption);
         command.Add(seedOption);
         command.Add(resumeOption);
+        command.Add(tokenizerOption);
+        command.Add(vocabSizeOption);
 
         command.SetAction(async (parseResult, cancellationToken) =>
         {
@@ -71,7 +75,9 @@ public static class GptCommand
                     NLayer: parseResult.GetValue(nLayerOption),
                     LearningRate: parseResult.GetValue(lrOption),
                     Seed: parseResult.GetValue(seedOption),
-                    Resume: parseResult.GetValue(resumeOption));
+                    Resume: parseResult.GetValue(resumeOption),
+                    Tokenizer: parseResult.GetValue(tokenizerOption),
+                    VocabSize: parseResult.GetValue(vocabSizeOption));
 
                 var corpus = await ResolveTextOrFilePath(source);
 
@@ -82,8 +88,10 @@ public static class GptCommand
                         AnsiConsole.MarkupLine($"[grey]step[/] {step}/{options.Steps}  [yellow]loss[/] {loss:F4}");
                 });
 
+                var charsPerToken = result.CorpusTokenCount > 0 ? (double)corpus.Length / result.CorpusTokenCount : 0d;
                 AnsiConsole.MarkupLine(
-                    $"[green]Trained[/] {result.ParameterCount:N0} params (vocab {result.VocabSize}) — final loss {result.FinalLoss:F4}. Checkpoint: {Markup.Escape(result.CheckpointPath)}");
+                    $"[green]Trained[/] {result.ParameterCount:N0} params (vocab {result.VocabSize}) — final loss {result.FinalLoss:F4}. " +
+                    $"Corpus: {result.CorpusTokenCount:N0} tokens ({charsPerToken:F2} chars/token). Checkpoint: {Markup.Escape(result.CheckpointPath)}");
             }
             catch (Exception ex)
             {

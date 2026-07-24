@@ -25,7 +25,7 @@ public class GptCompleteComponent
         int seed)
     {
         var checkpoint = await _checkpointService.LoadAsync(modelDirectory);
-        var tokenizer = CharTokenizer.FromVocabulary(checkpoint.Vocabulary);
+        var tokenizer = Tokenizers.Restore(checkpoint.Tokenizer);
 
         var model = new GptModel(checkpoint.Config);
         model.LoadWeights(checkpoint.Weights);

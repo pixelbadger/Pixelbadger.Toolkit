@@ -11,7 +11,7 @@
 
 <header>
   <h1>GPT <span class="badge">gpt</span></h1>
-  <div class="subtitle">Tiny from-scratch char-level GPT — train a transformer on a text corpus, then sample completions</div>
+  <div class="subtitle">Tiny from-scratch GPT with BPE or char tokenization — train a transformer on a text corpus, then sample completions</div>
   <div class="meta">Pixelbadger Toolkit &mdash; <code>pbtk gpt</code> &mdash; <a href="index.html" style="color:#60a5fa">&#8592; all topics</a></div>
 </header>
 
@@ -34,7 +34,7 @@
   <section id="overview">
     <h2>Overview</h2>
     <p>
-      The <code>gpt</code> topic implements a tiny character-level GPT trained from scratch — a decoder-only
+      The <code>gpt</code> topic implements a tiny GPT trained from scratch — a decoder-only
       transformer with token and positional embeddings, multi-head self-attention, and feed-forward blocks.
       Train it on any text corpus with <code>train</code>, then generate continuations of a prompt with
       <code>complete</code>. Unlike the <a href="llm.html"><code>llm</code></a> topic, no API key or network
@@ -42,10 +42,18 @@
     </p>
     <p>
       Training produces a checkpoint directory (default <code>./.gpt</code>) containing
-      <code>config.json</code> (model configuration and character vocabulary), <code>weights.bin</code>
+      <code>config.json</code> (model configuration and tokenizer state), <code>weights.bin</code>
       (the weight tensors), and <code>optimizer.bin</code> (AdamW optimizer state). Train once, then call
       <code>complete</code> as many times as needed against the same checkpoint — or continue training it
       later with <code>--resume</code>.
+    </p>
+    <p>
+      Two tokenizers are available via <code>--tokenizer</code>. The default <strong><code>bpe</code></strong>
+      is a byte-level byte-pair encoding (à la GPT-2): it learns subword tokens by repeatedly merging the most
+      frequent adjacent byte pair up to <code>--vocab-size</code> tokens, so a fixed <code>--block-size</code>
+      covers several times more text and the model spends capacity on structure rather than spelling. The
+      alternative <strong><code>char</code></strong> is the original one-token-per-character scheme. Because
+      BPE works on raw UTF-8 bytes, any input is representable — there are no out-of-vocabulary characters.
     </p>
 
     <div class="diagram-wrap">
@@ -110,8 +118,10 @@ flowchart TB
       <tbody>
         <tr><td><code>GptCommand</code></td><td>Commands/</td><td>Defines the <code>train</code> and <code>complete</code> actions, parses options, resolves <code>--source</code> as a file path or literal text, and reports progress/errors via Spectre.Console</td></tr>
         <tr><td><code>GptTrainComponent</code></td><td>Components/</td><td>Runs the training loop: builds the tokenizer, samples minibatches, drives forward/backward/optimizer steps, and saves the final checkpoint</td></tr>
-        <tr><td><code>GptCompleteComponent</code></td><td>Components/</td><td>Loads a checkpoint, reconstructs model and tokenizer, and autoregressively samples one character at a time (greedy or temperature sampling)</td></tr>
-        <tr><td><code>CharTokenizer</code></td><td>Services/</td><td>Character-level vocabulary: the sorted set of distinct chars in the corpus, with <code>Encode</code>/<code>Decode</code> between text and integer ids</td></tr>
+        <tr><td><code>GptCompleteComponent</code></td><td>Components/</td><td>Loads a checkpoint, reconstructs model and tokenizer, and autoregressively samples one token at a time (greedy or temperature sampling)</td></tr>
+        <tr><td><code>ITokenizer</code></td><td>Services/</td><td>Common tokenizer contract (<code>Encode</code>/<code>Decode</code>/<code>ExportState</code>); a serialized <code>TokenizerState</code> in the checkpoint lets <code>complete</code> and <code>--resume</code> rebuild the exact tokenizer used for training</td></tr>
+        <tr><td><code>CharTokenizer</code></td><td>Services/</td><td>Character-level vocabulary: the sorted set of distinct chars in the corpus, mapping between text and integer ids</td></tr>
+        <tr><td><code>BpeTokenizer</code></td><td>Services/</td><td>Byte-level byte-pair encoding: base vocabulary of 256 bytes plus learned merges. Trains word-frequency-weighted over GPT-2-style regex chunks (fast on large corpora) and memoizes per-chunk encodings</td></tr>
         <tr><td><code>GptModel</code> + <code>GptConfig</code></td><td>Services/</td><td>The decoder-only transformer: owns parameter tensors, weight initialization, and the forward pass producing logits and cross-entropy loss</td></tr>
         <tr><td><code>Tensor</code></td><td>Services/</td><td>Minimal reverse-mode automatic differentiation engine over 2D float matrices; every model op (matmul, layernorm, softmax, GELU, …) lives here with its backward function</td></tr>
         <tr><td><code>AdamW</code></td><td>Services/</td><td>AdamW optimizer with decoupled weight decay over the model's parameter list</td></tr>
@@ -228,10 +238,10 @@ flowchart LR
     <div class="diagram-wrap">
       <div class="mermaid">
 flowchart TB
-    SRC["corpus text\n(file or literal via --source)"] --> BUILD["CharTokenizer.Build\n(sorted distinct chars)"]
+    SRC["corpus text\n(file or literal via --source)"] --> BUILD["Tokenizers.Build\n(bpe merges or char vocab)"]
     BUILD --> ENC["Encode corpus → int[] ids"]
     ENC --> LOOP["for each step 1..N"]
-    LOOP --> BATCH["SampleBatch: random windows\n(batch-size × block-size,\ntargets shifted by one char)"]
+    LOOP --> BATCH["SampleBatch: random windows\n(batch-size × block-size,\ntargets shifted by one token)"]
     BATCH --> FWD["GptModel.Forward\n→ logits + cross-entropy loss"]
     FWD --> BWD["loss.Backward()\n(reverse-mode autograd)"]
     BWD --> ADAM["AdamW.Step()\n(decoupled weight decay)"]
@@ -241,11 +251,11 @@ flowchart TB
     </div>
 
     <ol>
-      <li><strong>Tokenize</strong> — <code>CharTokenizer.Build</code> derives the vocabulary from the sorted distinct characters of the corpus, then encodes the whole corpus into one integer array. The corpus must contain at least <code>block-size + 1</code> characters.</li>
-      <li><strong>Construct</strong> — a <code>GptModel</code> is built from the config and initialized from the seeded RNG; an <code>AdamW</code> instance is bound to the model's parameter list (learning rate from <code>--lr</code>; betas 0.9/0.95, weight decay 0.1). With <code>--resume</code>, the model, vocabulary, and config are instead loaded from the checkpoint in <code>--out</code> (architecture options are ignored), and saved AdamW moments are restored so training continues without a loss spike.</li>
-      <li><strong>Sample batches</strong> — each step draws <code>--batch-size</code> random windows of <code>--block-size</code> characters; the target sequence is the same window shifted one character right, so every position learns next-character prediction simultaneously.</li>
+      <li><strong>Tokenize</strong> — <code>Tokenizers.Build</code> builds the requested tokenizer (<code>--tokenizer bpe</code> learns byte-pair merges up to <code>--vocab-size</code>; <code>char</code> takes the sorted distinct characters), then encodes the whole corpus into one integer array. The corpus must encode to at least <code>block-size + 1</code> tokens.</li>
+      <li><strong>Construct</strong> — a <code>GptModel</code> is built from the config and initialized from the seeded RNG; an <code>AdamW</code> instance is bound to the model's parameter list (learning rate from <code>--lr</code>; betas 0.9/0.95, weight decay 0.1). With <code>--resume</code>, the model, tokenizer, and config are instead loaded from the checkpoint in <code>--out</code> (architecture and tokenizer options are ignored), and saved AdamW moments are restored so training continues without a loss spike.</li>
+      <li><strong>Sample batches</strong> — each step draws <code>--batch-size</code> random windows of <code>--block-size</code> tokens; the target sequence is the same window shifted one token right, so every position learns next-token prediction simultaneously.</li>
       <li><strong>Step</strong> — <code>ZeroGrad</code> &rarr; <code>Forward</code> (logits + loss) &rarr; <code>loss.Backward()</code> &rarr; <code>optimizer.Step()</code>. The command layer prints step/loss at step 1, every 100th step, and the final step.</li>
-      <li><strong>Persist</strong> — after the final step the checkpoint (config, vocabulary, and all weight tensors in construction order) plus the optimizer state is written via <code>CheckpointService</code>, and a summary (parameter count, vocab size, final loss, path) is reported.</li>
+      <li><strong>Persist</strong> — after the final step the checkpoint (config, tokenizer state, and all weight tensors in construction order) plus the optimizer state is written via <code>CheckpointService</code>, and a summary (parameter count, vocab size, final loss, corpus token count and chars/token, path) is reported.</li>
     </ol>
   </section>
 
@@ -260,7 +270,7 @@ flowchart TB
     <div class="diagram-wrap">
       <div class="mermaid">
 flowchart TB
-    LOAD["CheckpointService.LoadAsync\n→ config + vocabulary + weights"] --> RECON["Rebuild GptModel + CharTokenizer\n(LoadWeights validates tensor\ncount and shapes)"]
+    LOAD["CheckpointService.LoadAsync\n→ config + tokenizer state + weights"] --> RECON["Rebuild GptModel + tokenizer\n(LoadWeights validates tensor\ncount and shapes)"]
     RECON --> ENCP["Encode --prompt to ids\n(empty prompt seeds with id 0)"]
     ENCP --> WINDOW["Take last block-size ids\nas context window"]
     WINDOW --> FWD2["Forward (no targets)\n→ logits for every position"]
@@ -276,13 +286,15 @@ flowchart TB
     </div>
 
     <p>
-      Because the context window is capped at <code>block-size</code> characters, generation slides the
-      window forward once the sequence outgrows it — earlier characters simply fall out of context. Each
+      Because the context window is capped at <code>block-size</code> tokens, generation slides the
+      window forward once the sequence outgrows it — earlier tokens simply fall out of context. Each
       iteration is a full forward pass over the current window (there is no KV caching in this
       implementation). Sampling divides logits by <code>--temperature</code> before a max-subtracted
       softmax; <code>--temperature 0</code> switches to pure argmax, and any sampled run is reproducible
-      via <code>--seed</code>. The prompt may only contain characters present in the training corpus —
-      unknown characters fail with an error, since the vocabulary is fixed at training time.
+      via <code>--seed</code>. <code>--max-tokens</code> counts tokens, not characters, so a BPE checkpoint
+      emits more text per token than a char checkpoint. With the default <code>bpe</code> tokenizer any
+      prompt is valid (it works on raw bytes); a <code>char</code> checkpoint still requires prompt
+      characters that were present in the training corpus, since its vocabulary is fixed at training time.
     </p>
   </section>
 
@@ -300,7 +312,7 @@ flowchart TB
         <tr>
           <td><code>config.json</code></td>
           <td>Indented JSON</td>
-          <td>The model hyperparameters (<code>VocabSize</code>, <code>BlockSize</code>, <code>NEmbd</code>, <code>NHead</code>, <code>NLayer</code>) plus the vocabulary serialized as a single string of characters in id order</td>
+          <td>The model hyperparameters (<code>VocabSize</code>, <code>BlockSize</code>, <code>NEmbd</code>, <code>NHead</code>, <code>NLayer</code>) plus the tokenizer state: <code>TokenizerKind</code> (<code>Char</code> or <code>Bpe</code>) with either the character vocabulary string or the ordered list of byte-pair merges</td>
         </tr>
         <tr>
           <td><code>weights.bin</code></td>
@@ -333,17 +345,20 @@ flowchart TB
   <section id="train">
     <h2>train</h2>
     <p>
-      Trains a char-level GPT on a text corpus and saves a checkpoint. The vocabulary is built from the
-      unique characters in the corpus. Training progress (step and loss) is reported periodically, and on
-      completion the parameter count, vocabulary size, final loss, and checkpoint path are printed.
+      Trains a tiny GPT on a text corpus and saves a checkpoint. The tokenizer is selected with
+      <code>--tokenizer</code>: the default <code>bpe</code> learns byte-pair merges up to
+      <code>--vocab-size</code> tokens, while <code>char</code> uses one token per distinct character.
+      Training progress (step and loss) is reported periodically, and on completion the parameter count,
+      vocabulary size, final loss, corpus token count (with chars/token), and checkpoint path are printed.
       <code>--source</code> accepts either a path to a corpus file or literal text.
     </p>
     <p>
       With <code>--resume</code>, training continues from the checkpoint already in <code>--out</code> for
-      a further <code>--steps</code> steps: weights, vocabulary, and architecture come from the checkpoint
-      (so <code>--block-size</code>, <code>--n-embd</code>, <code>--n-head</code>, and <code>--n-layer</code>
-      are ignored), and saved optimizer state is restored when present. The corpus may only contain
-      characters that were in the original training corpus, since the vocabulary is fixed at first training.
+      a further <code>--steps</code> steps: weights, tokenizer, and architecture come from the checkpoint
+      (so <code>--block-size</code>, <code>--n-embd</code>, <code>--n-head</code>, <code>--n-layer</code>,
+      <code>--tokenizer</code>, and <code>--vocab-size</code> are ignored), and saved optimizer state is
+      restored when present. For a <code>char</code> checkpoint the corpus may only contain characters that
+      were in the original training corpus; a <code>bpe</code> checkpoint accepts any text.
     </p>
 
     <div class="cmd-block">
@@ -363,6 +378,14 @@ flowchart TB
     <div class="cmd-block">
       <span class="prompt">$ </span><span class="cmd">pbtk gpt train</span>
       <span class="opt"> --source</span> <span class="val">shakespeare.txt</span>
+      <span class="opt"> --tokenizer</span> <span class="val">bpe</span>
+      <span class="opt"> --vocab-size</span> <span class="val">1024</span>
+      <span class="opt"> --block-size</span> <span class="val">128</span>
+    </div>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk gpt train</span>
+      <span class="opt"> --source</span> <span class="val">shakespeare.txt</span>
       <span class="opt"> --steps</span> <span class="val">1000</span>
       <span class="opt"> --resume</span>
     </div>
@@ -374,13 +397,15 @@ flowchart TB
         <tr><td><code>--out</code></td><td>No</td><td><code>./.gpt</code></td><td>Checkpoint output directory</td></tr>
         <tr><td><code>--steps</code></td><td>No</td><td><code>2000</code></td><td>Number of training steps</td></tr>
         <tr><td><code>--batch-size</code></td><td>No</td><td><code>16</code></td><td>Sequences per training step</td></tr>
-        <tr><td><code>--block-size</code></td><td>No</td><td><code>64</code></td><td>Context length in characters</td></tr>
+        <tr><td><code>--block-size</code></td><td>No</td><td><code>64</code></td><td>Context length in tokens</td></tr>
         <tr><td><code>--n-embd</code></td><td>No</td><td><code>128</code></td><td>Embedding dimension</td></tr>
         <tr><td><code>--n-head</code></td><td>No</td><td><code>4</code></td><td>Number of attention heads</td></tr>
         <tr><td><code>--n-layer</code></td><td>No</td><td><code>3</code></td><td>Number of transformer blocks</td></tr>
+        <tr><td><code>--tokenizer</code></td><td>No</td><td><code>bpe</code></td><td>Tokenizer: <code>bpe</code> (byte-pair subwords) or <code>char</code> (one token per character)</td></tr>
+        <tr><td><code>--vocab-size</code></td><td>No</td><td><code>512</code></td><td>Target vocabulary size for the <code>bpe</code> tokenizer (&ge; 256; ignored for <code>char</code>)</td></tr>
         <tr><td><code>--lr</code></td><td>No</td><td><code>0.0003</code></td><td>Learning rate</td></tr>
         <tr><td><code>--seed</code></td><td>No</td><td><code>1337</code></td><td>Random seed for reproducible runs</td></tr>
-        <tr><td><code>--resume</code></td><td>No</td><td><code>false</code></td><td>Resume training from the checkpoint in <code>--out</code> (architecture options are taken from the checkpoint)</td></tr>
+        <tr><td><code>--resume</code></td><td>No</td><td><code>false</code></td><td>Resume training from the checkpoint in <code>--out</code> (architecture and tokenizer options are taken from the checkpoint)</td></tr>
       </tbody>
     </table>
   </section>
@@ -411,9 +436,9 @@ flowchart TB
     <div class="diagram-wrap">
       <div class="mermaid">
 flowchart LR
-    PROMPT["--prompt"] --> ENC["Encode chars with\ncheckpoint vocabulary"]
-    ENC --> FWD["Transformer forward pass\n(last block-size chars)"]
-    FWD --> SAMPLE["Sample next char\n(temperature)"]
+    PROMPT["--prompt"] --> ENC["Encode with checkpoint\ntokenizer → ids"]
+    ENC --> FWD["Transformer forward pass\n(last block-size tokens)"]
+    FWD --> SAMPLE["Sample next token\n(temperature)"]
     SAMPLE -->|"repeat --max-tokens times"| FWD
     SAMPLE --> OUT(["stdout: prompt + generated text"])
       </div>
@@ -424,7 +449,7 @@ flowchart LR
       <tbody>
         <tr><td><code>--prompt</code></td><td>Yes</td><td>&mdash;</td><td>Prompt to continue</td></tr>
         <tr><td><code>--model</code></td><td>No</td><td><code>./.gpt</code></td><td>Checkpoint directory</td></tr>
-        <tr><td><code>--max-tokens</code></td><td>No</td><td><code>200</code></td><td>Number of characters to generate</td></tr>
+        <tr><td><code>--max-tokens</code></td><td>No</td><td><code>200</code></td><td>Number of tokens to generate (with <code>bpe</code>, one token is typically several characters)</td></tr>
         <tr><td><code>--temperature</code></td><td>No</td><td><code>0.8</code></td><td>Sampling temperature (0 = greedy/deterministic)</td></tr>
         <tr><td><code>--seed</code></td><td>No</td><td><code>1337</code></td><td>Random seed for sampling</td></tr>
       </tbody>
@@ -448,8 +473,8 @@ flowchart LR
         <tr>
           <td><code>gpt train</code></td>
           <td><code>--source</code></td>
-          <td><code>--out</code>, <code>--steps</code>, <code>--batch-size</code>, <code>--block-size</code>, <code>--n-embd</code>, <code>--n-head</code>, <code>--n-layer</code>, <code>--lr</code>, <code>--seed</code>, <code>--resume</code></td>
-          <td>Training progress, then summary with parameter count, vocab size, final loss, and checkpoint path</td>
+          <td><code>--out</code>, <code>--steps</code>, <code>--batch-size</code>, <code>--block-size</code>, <code>--n-embd</code>, <code>--n-head</code>, <code>--n-layer</code>, <code>--tokenizer</code>, <code>--vocab-size</code>, <code>--lr</code>, <code>--seed</code>, <code>--resume</code></td>
+          <td>Training progress, then summary with parameter count, vocab size, final loss, corpus token count, and checkpoint path</td>
         </tr>
         <tr>
           <td><code>gpt complete</code></td>

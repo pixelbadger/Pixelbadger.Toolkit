@@ -20,8 +20,9 @@ public class GptCompleteComponentTests
         var model = new GptModel(config);
         model.InitWeights(seed);
         var weights = model.Parameters().Select(p => (float[])p.Data.Clone()).ToArray();
+        var tokenizer = new TokenizerState(TokenizerKind.Char, new string(vocab), Merges: null);
         _mockCheckpoint.Setup(x => x.LoadAsync(It.IsAny<string>()))
-            .ReturnsAsync(new GptCheckpoint(config, vocab, weights));
+            .ReturnsAsync(new GptCheckpoint(config, tokenizer, weights));
     }
 
     [Fact]

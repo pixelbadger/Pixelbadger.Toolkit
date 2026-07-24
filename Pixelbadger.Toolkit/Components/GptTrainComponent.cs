@@ -2,7 +2,7 @@ using Pixelbadger.Toolkit.Services;
 
 namespace Pixelbadger.Toolkit.Components;
 
-public record GptTrainResult(int Steps, float FinalLoss, string CheckpointPath, int ParameterCount, int VocabSize);
+public record GptTrainResult(int Steps, float FinalLoss, string CheckpointPath, int ParameterCount, int VocabSize, int CorpusTokenCount);
 
 public record GptTrainOptions(
     int Steps = 2000,
@@ -13,7 +13,9 @@ public record GptTrainOptions(
     int NLayer = 3,
     float LearningRate = 3e-4f,
     int Seed = 1337,
-    bool Resume = false);
+    bool Resume = false,
+    TokenizerKind Tokenizer = TokenizerKind.Bpe,
+    int VocabSize = 512);
 
 /// <summary>
 /// Trains a tiny char-level GPT from a text corpus by gradient descent and writes a checkpoint.
@@ -39,7 +41,7 @@ public class GptTrainComponent
         if (string.IsNullOrEmpty(corpus))
             throw new ArgumentException("Training corpus is empty.", nameof(corpus));
 
-        CharTokenizer tokenizer;
+        ITokenizer tokenizer;
         GptConfig config;
         GptModel model;
         AdamW optimizer;
@@ -47,7 +49,7 @@ public class GptTrainComponent
         if (options.Resume)
         {
             var checkpoint = await _checkpointService.LoadAsync(outputDirectory);
-            tokenizer = CharTokenizer.FromVocabulary(checkpoint.Vocabulary);
+            tokenizer = Tokenizers.Restore(checkpoint.Tokenizer);
             config = checkpoint.Config;
             model = new GptModel(config);
             model.LoadWeights(checkpoint.Weights);
@@ -62,7 +64,7 @@ public class GptTrainComponent
             if (options.NEmbd % options.NHead != 0)
                 throw new ArgumentException($"n-embd ({options.NEmbd}) must be divisible by n-head ({options.NHead}).");
 
-            tokenizer = CharTokenizer.Build(corpus);
+            tokenizer = Tokenizers.Build(options.Tokenizer, corpus, options.VocabSize);
             config = new GptConfig(tokenizer.VocabSize, options.BlockSize, options.NEmbd, options.NHead, options.NLayer);
             model = new GptModel(config);
             model.InitWeights(options.Seed);
@@ -91,10 +93,10 @@ public class GptTrainComponent
             onProgress?.Invoke(step, lastLoss);
         }
 
-        await _checkpointService.SaveAsync(outputDirectory, config, tokenizer.Vocabulary, model.Parameters());
+        await _checkpointService.SaveAsync(outputDirectory, config, tokenizer.ExportState(), model.Parameters());
         await _checkpointService.SaveOptimizerStateAsync(outputDirectory, optimizer.ExportState());
 
-        return new GptTrainResult(options.Steps, lastLoss, outputDirectory, model.ParameterCount(), tokenizer.VocabSize);
+        return new GptTrainResult(options.Steps, lastLoss, outputDirectory, model.ParameterCount(), tokenizer.VocabSize, data.Length);
     }
 
     internal static (int[][] Inputs, int[][] Targets) SampleBatch(int[] data, int batchSize, int blockSize, Random rng)
