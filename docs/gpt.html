@@ -97,7 +97,8 @@ flowchart TB
     MODEL["GptModel\n(decoder-only transformer)"]
     TENSOR["Tensor\n(reverse-mode autograd + SIMD kernels)"]
     OPT["AdamW\n(optimizer)"]
-    CKPT["CheckpointService\n(config.json + weights.bin)"]
+    CKPT["CheckpointService\n(config.json + weights.bin\n+ optimizer.bin + history.bin)"]
+    GRAPHS["LossGraphService\n(HTML loss + coverage report)"]
 
     CMD --> TRAINC
     CMD --> COMPC
@@ -105,6 +106,7 @@ flowchart TB
     TRAINC --> MODEL
     TRAINC --> OPT
     TRAINC --> CKPT
+    TRAINC --> GRAPHS
     COMPC --> TOK
     COMPC --> MODEL
     COMPC --> CKPT
@@ -125,7 +127,8 @@ flowchart TB
         <tr><td><code>GptModel</code> + <code>GptConfig</code></td><td>Services/</td><td>The decoder-only transformer: owns parameter tensors, weight initialization, and the forward pass producing logits and cross-entropy loss</td></tr>
         <tr><td><code>Tensor</code></td><td>Services/</td><td>Minimal reverse-mode automatic differentiation engine over 2D float matrices; every model op (matmul, layernorm, softmax, GELU, …) lives here with its backward function</td></tr>
         <tr><td><code>AdamW</code></td><td>Services/</td><td>AdamW optimizer with decoupled weight decay over the model's parameter list</td></tr>
-        <tr><td><code>CheckpointService</code></td><td>Services/</td><td>Persists and restores checkpoints behind the <code>ICheckpointService</code> interface (injected into both components for testability)</td></tr>
+        <tr><td><code>CheckpointService</code></td><td>Services/</td><td>Persists and restores checkpoints — weights, optimizer state, and the accumulated training history — behind the <code>ICheckpointService</code> interface (injected into both components for testability)</td></tr>
+        <tr><td><code>LossGraphService</code></td><td>Services/</td><td>Renders the recorded per-step loss and corpus-coverage series (across every run against the checkpoint) as a standalone HTML report behind the <code>ILossGraphService</code> interface (injected into <code>GptTrainComponent</code>); the full series is embedded in the page and drawn to a canvas by inline script</td></tr>
       </tbody>
     </table>
 
@@ -246,16 +249,17 @@ flowchart TB
     FWD --> BWD["loss.Backward()\n(reverse-mode autograd)"]
     BWD --> ADAM["AdamW.Step()\n(decoupled weight decay)"]
     ADAM --> LOOP
-    LOOP --> SAVE["CheckpointService.SaveAsync\n(config.json + weights.bin\n+ optimizer.bin)"]
+    LOOP --> SAVE["CheckpointService.SaveAsync\n(config.json + weights.bin\n+ optimizer.bin + history.bin)"]
+    SAVE --> GRAPH["LossGraphService.WriteAsync\n(HTML loss + coverage report,\nonly with --loss-graph)"]
       </div>
     </div>
 
     <ol>
       <li><strong>Tokenize</strong> — <code>Tokenizers.Build</code> builds the requested tokenizer (<code>--tokenizer bpe</code> learns byte-pair merges up to <code>--vocab-size</code>; <code>char</code> takes the sorted distinct characters), then encodes the whole corpus into one integer array. The corpus must encode to at least <code>block-size + 1</code> tokens.</li>
       <li><strong>Construct</strong> — a <code>GptModel</code> is built from the config and initialized from the seeded RNG; an <code>AdamW</code> instance is bound to the model's parameter list (learning rate from <code>--lr</code>; betas 0.9/0.95, weight decay 0.1). With <code>--resume</code>, the model, tokenizer, and config are instead loaded from the checkpoint in <code>--out</code> (architecture and tokenizer options are ignored), and saved AdamW moments are restored so training continues without a loss spike.</li>
-      <li><strong>Sample batches</strong> — each step draws <code>--batch-size</code> random windows of <code>--block-size</code> tokens; the target sequence is the same window shifted one token right, so every position learns next-token prediction simultaneously.</li>
-      <li><strong>Step</strong> — <code>ZeroGrad</code> &rarr; <code>Forward</code> (logits + loss) &rarr; <code>loss.Backward()</code> &rarr; <code>optimizer.Step()</code>. The command layer prints step/loss at step 1, every 100th step, and the final step.</li>
-      <li><strong>Persist</strong> — after the final step the checkpoint (config, tokenizer state, and all weight tensors in construction order) plus the optimizer state is written via <code>CheckpointService</code>, and a summary (parameter count, vocab size, final loss, corpus token count and chars/token, path) is reported.</li>
+      <li><strong>Sample batches</strong> — each step draws <code>--batch-size</code> random windows of <code>--block-size</code> tokens; the target sequence is the same window shifted one token right, so every position learns next-token prediction simultaneously. Each window's start offset is returned with the batch so the component can mark which corpus positions and which vocabulary entries have been visited &mdash; random sampling means coverage is probabilistic, and a run with too few steps will never see parts of the corpus.</li>
+      <li><strong>Step</strong> — <code>ZeroGrad</code> &rarr; <code>Forward</code> (logits + loss) &rarr; <code>loss.Backward()</code> &rarr; <code>optimizer.Step()</code>. The command layer prints step/loss at step 1, every 100th step, and the final step, while the component records every step's loss in full.</li>
+      <li><strong>Persist</strong> — after the final step the checkpoint (config, tokenizer state, and all weight tensors in construction order) plus the optimizer state is written via <code>CheckpointService</code>, the loss and coverage series (with the packed visited sets and run boundaries) are written to <code>history.bin</code> so a later <code>--resume</code> can continue them, and a summary (parameter count, vocab size, final loss, corpus token count and chars/token, path, plus corpus and vocabulary coverage) is reported. When <code>--loss-graph</code> is set, <code>LossGraphService</code> then writes the whole per-step loss and coverage series out as a standalone HTML report.</li>
     </ol>
   </section>
 
@@ -303,7 +307,7 @@ flowchart TB
     <h2>Checkpoint Format</h2>
     <p>
       A checkpoint is a directory (default <code>./.gpt</code>) written by <code>CheckpointService</code>
-      containing three files:
+      containing four files:
     </p>
 
     <table>
@@ -323,6 +327,11 @@ flowchart TB
           <td><code>optimizer.bin</code></td>
           <td>Little-endian binary</td>
           <td>AdamW state: step count (int32), tensor count (int32), then per tensor its length (int32) followed by the float32 first-moment then second-moment values. Used only by <code>--resume</code>; optional — a checkpoint without it resumes with a fresh optimizer</td>
+        </tr>
+        <tr>
+          <td><code>history.bin</code></td>
+          <td>Little-endian binary</td>
+          <td>Training history across every run: format version (int32), corpus token count (int32), step count (int32), the float32 loss of each step, the int32 cumulative tokens-seen of each step, then the run-boundary count (int32) and each boundary (int32), and finally the bit-packed visited sets for corpus positions and vocabulary entries (each an int32 length followed by ceil(length/8) bytes). Read by <code>--resume</code> so the loss graph and coverage continue across runs; optional — a checkpoint without it starts a fresh history</td>
         </tr>
       </tbody>
     </table>
@@ -349,7 +358,8 @@ flowchart TB
       <code>--tokenizer</code>: the default <code>bpe</code> learns byte-pair merges up to
       <code>--vocab-size</code> tokens, while <code>char</code> uses one token per distinct character.
       Training progress (step and loss) is reported periodically, and on completion the parameter count,
-      vocabulary size, final loss, corpus token count (with chars/token), and checkpoint path are printed.
+      vocabulary size, final loss, corpus token count (with chars/token), and checkpoint path are printed,
+      along with how much of the corpus and vocabulary the randomly sampled batches actually visited.
       <code>--source</code> accepts either a path to a corpus file or literal text.
     </p>
     <p>
@@ -359,6 +369,22 @@ flowchart TB
       <code>--tokenizer</code>, and <code>--vocab-size</code> are ignored), and saved optimizer state is
       restored when present. For a <code>char</code> checkpoint the corpus may only contain characters that
       were in the original training corpus; a <code>bpe</code> checkpoint accepts any text.
+    </p>
+    <p>
+      <code>--loss-graph</code> writes a standalone HTML report of the run to the given path (parent
+      directories are created as needed). Every step's loss is recorded &mdash; not just the ones printed
+      to the console &mdash; and embedded in the page, which draws the raw series plus a smoothed trend
+      line on a canvas with hover readouts. A second chart tracks <strong>corpus coverage</strong>: because
+      batches are drawn from random offsets, the report shows the cumulative share of the corpus's token
+      positions that have been sampled at least once, so it is easy to see whether a run visits most of the
+      corpus or keeps re-treading the same windows. The run's configuration, corpus coverage, and vocabulary
+      coverage are tabulated below the charts. The file is self-contained (no external scripts or styles),
+      so it can be opened directly or served with <a href="web.html"><code>web serve-html</code></a>.
+      Because the series and visited sets are stored in the checkpoint's <code>history.bin</code>, a
+      <code>--resume</code> run graphs the whole history — every run against that checkpoint, not just
+      the latest — with a dashed divider at each resume point and coverage carried on from the positions
+      already visited. If the resumed corpus has a different token count the recorded positions no longer
+      apply, so coverage restarts from that run while the loss curve is still kept.
     </p>
 
     <div class="cmd-block">
@@ -390,6 +416,13 @@ flowchart TB
       <span class="opt"> --resume</span>
     </div>
 
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk gpt train</span>
+      <span class="opt"> --source</span> <span class="val">shakespeare.txt</span>
+      <span class="opt"> --steps</span> <span class="val">2000</span>
+      <span class="opt"> --loss-graph</span> <span class="val">./loss.html</span>
+    </div>
+
     <table>
       <thead><tr><th>Option</th><th>Required</th><th>Default</th><th>Description</th></tr></thead>
       <tbody>
@@ -405,7 +438,8 @@ flowchart TB
         <tr><td><code>--vocab-size</code></td><td>No</td><td><code>512</code></td><td>Target vocabulary size for the <code>bpe</code> tokenizer (&ge; 256; ignored for <code>char</code>)</td></tr>
         <tr><td><code>--lr</code></td><td>No</td><td><code>0.0003</code></td><td>Learning rate</td></tr>
         <tr><td><code>--seed</code></td><td>No</td><td><code>1337</code></td><td>Random seed for reproducible runs</td></tr>
-        <tr><td><code>--resume</code></td><td>No</td><td><code>false</code></td><td>Resume training from the checkpoint in <code>--out</code> (architecture and tokenizer options are taken from the checkpoint)</td></tr>
+        <tr><td><code>--resume</code></td><td>No</td><td><code>false</code></td><td>Resume training from the checkpoint in <code>--out</code> (architecture, tokenizer options, and recorded training history are taken from the checkpoint)</td></tr>
+        <tr><td><code>--loss-graph</code></td><td>No</td><td>&mdash;</td><td>Path to write an HTML report graphing per-step training loss and corpus coverage</td></tr>
       </tbody>
     </table>
   </section>
@@ -473,8 +507,8 @@ flowchart LR
         <tr>
           <td><code>gpt train</code></td>
           <td><code>--source</code></td>
-          <td><code>--out</code>, <code>--steps</code>, <code>--batch-size</code>, <code>--block-size</code>, <code>--n-embd</code>, <code>--n-head</code>, <code>--n-layer</code>, <code>--tokenizer</code>, <code>--vocab-size</code>, <code>--lr</code>, <code>--seed</code>, <code>--resume</code></td>
-          <td>Training progress, then summary with parameter count, vocab size, final loss, corpus token count, and checkpoint path</td>
+          <td><code>--out</code>, <code>--steps</code>, <code>--batch-size</code>, <code>--block-size</code>, <code>--n-embd</code>, <code>--n-head</code>, <code>--n-layer</code>, <code>--tokenizer</code>, <code>--vocab-size</code>, <code>--lr</code>, <code>--seed</code>, <code>--resume</code>, <code>--loss-graph</code></td>
+          <td>Training progress, then summary with parameter count, vocab size, final loss, corpus token count, checkpoint path, and corpus/vocabulary coverage; an HTML loss and coverage report when <code>--loss-graph</code> is given</td>
         </tr>
         <tr>
           <td><code>gpt complete</code></td>

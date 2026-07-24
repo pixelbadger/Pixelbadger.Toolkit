@@ -45,6 +45,7 @@ public static class GptCommand
         var resumeOption = new Option<bool>("--resume") { Description = "Resume training from the checkpoint in --out (architecture and tokenizer options are taken from the checkpoint)" };
         var tokenizerOption = new Option<TokenizerKind>("--tokenizer") { Description = "Tokenizer: bpe (byte-pair subwords) or char (one token per character)", DefaultValueFactory = _ => TokenizerKind.Bpe };
         var vocabSizeOption = new Option<int>("--vocab-size") { Description = "Target vocabulary size for the bpe tokenizer (>= 256; ignored for char)", DefaultValueFactory = _ => 512 };
+        var lossGraphOption = new Option<string?>("--loss-graph") { Description = "Path to write an HTML graph of the per-step training loss" };
 
         command.Add(sourceOption);
         command.Add(outOption);
@@ -59,6 +60,7 @@ public static class GptCommand
         command.Add(resumeOption);
         command.Add(tokenizerOption);
         command.Add(vocabSizeOption);
+        command.Add(lossGraphOption);
 
         command.SetAction(async (parseResult, cancellationToken) =>
         {
@@ -77,11 +79,12 @@ public static class GptCommand
                     Seed: parseResult.GetValue(seedOption),
                     Resume: parseResult.GetValue(resumeOption),
                     Tokenizer: parseResult.GetValue(tokenizerOption),
-                    VocabSize: parseResult.GetValue(vocabSizeOption));
+                    VocabSize: parseResult.GetValue(vocabSizeOption),
+                    LossGraphPath: parseResult.GetValue(lossGraphOption));
 
                 var corpus = await ResolveTextOrFilePath(source);
 
-                var component = new GptTrainComponent(new CheckpointService());
+                var component = new GptTrainComponent(new CheckpointService(), new LossGraphService());
                 var result = await component.TrainAsync(corpus, outDir, options, (step, loss) =>
                 {
                     if (step == 1 || step % 100 == 0 || step == options.Steps)
@@ -92,6 +95,18 @@ public static class GptCommand
                 AnsiConsole.MarkupLine(
                     $"[green]Trained[/] {result.ParameterCount:N0} params (vocab {result.VocabSize}) — final loss {result.FinalLoss:F4}. " +
                     $"Corpus: {result.CorpusTokenCount:N0} tokens ({charsPerToken:F2} chars/token). Checkpoint: {Markup.Escape(result.CheckpointPath)}");
+
+                var corpusCoverage = result.CorpusTokenCount > 0 ? 100d * result.TokensSeen / result.CorpusTokenCount : 0d;
+                var vocabCoverage = result.VocabSize > 0 ? 100d * result.VocabEntriesSeen / result.VocabSize : 0d;
+                var across = result.RunBoundaries.Count > 1
+                    ? $" across {result.RunBoundaries.Count} runs ({result.TotalSteps:N0} steps)"
+                    : string.Empty;
+                AnsiConsole.MarkupLine(
+                    $"[grey]Sampled[/] {result.TokensSeen:N0}/{result.CorpusTokenCount:N0} corpus tokens ({corpusCoverage:F1}%), " +
+                    $"{result.VocabEntriesSeen:N0}/{result.VocabSize:N0} vocab entries ({vocabCoverage:F1}%){across}");
+
+                if (result.LossGraphPath is not null)
+                    AnsiConsole.MarkupLine($"[green]Loss graph:[/] {Markup.Escape(Path.GetFullPath(result.LossGraphPath))}");
             }
             catch (Exception ex)
             {

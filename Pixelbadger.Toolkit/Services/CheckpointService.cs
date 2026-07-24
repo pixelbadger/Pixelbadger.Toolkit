@@ -11,6 +11,9 @@ public sealed class CheckpointService : ICheckpointService
     internal const string ConfigFileName = "config.json";
     internal const string WeightsFileName = "weights.bin";
     internal const string OptimizerFileName = "optimizer.bin";
+    internal const string HistoryFileName = "history.bin";
+
+    private const int HistoryFormatVersion = 1;
 
     private static readonly JsonSerializerOptions SerializerOptions = new() { WriteIndented = true };
 
@@ -116,5 +119,99 @@ public sealed class CheckpointService : ICheckpointService
         }
 
         return Task.FromResult<AdamWState?>(new AdamWState(step, m, v));
+    }
+
+    public Task SaveTrainingHistoryAsync(string directory, TrainingHistory history)
+    {
+        Directory.CreateDirectory(directory);
+
+        using var stream = File.Create(Path.Combine(directory, HistoryFileName));
+        using var writer = new BinaryWriter(stream);
+        writer.Write(HistoryFormatVersion);
+        writer.Write(history.CorpusTokenCount);
+
+        writer.Write(history.Losses.Length);
+        foreach (var loss in history.Losses)
+            writer.Write(loss);
+        foreach (var seen in history.TokensSeen)
+            writer.Write(seen);
+
+        writer.Write(history.RunBoundaries.Length);
+        foreach (var boundary in history.RunBoundaries)
+            writer.Write(boundary);
+
+        WriteBitmap(writer, history.PositionSeen);
+        WriteBitmap(writer, history.VocabSeen);
+
+        return Task.CompletedTask;
+    }
+
+    public Task<TrainingHistory?> TryLoadTrainingHistoryAsync(string directory)
+    {
+        var path = Path.Combine(directory, HistoryFileName);
+        if (!File.Exists(path))
+            return Task.FromResult<TrainingHistory?>(null);
+
+        using var stream = File.OpenRead(path);
+        using var reader = new BinaryReader(stream);
+
+        int version = reader.ReadInt32();
+        if (version != HistoryFormatVersion)
+            throw new InvalidDataException(
+                $"Unsupported training history format (version {version}) in '{directory}'.");
+
+        int corpusTokenCount = reader.ReadInt32();
+
+        int steps = reader.ReadInt32();
+        var losses = new float[steps];
+        for (int i = 0; i < steps; i++)
+            losses[i] = reader.ReadSingle();
+        var tokensSeen = new int[steps];
+        for (int i = 0; i < steps; i++)
+            tokensSeen[i] = reader.ReadInt32();
+
+        int boundaryCount = reader.ReadInt32();
+        var boundaries = new int[boundaryCount];
+        for (int i = 0; i < boundaryCount; i++)
+            boundaries[i] = reader.ReadInt32();
+
+        var positionSeen = ReadBitmap(reader);
+        var vocabSeen = ReadBitmap(reader);
+
+        return Task.FromResult<TrainingHistory?>(
+            new TrainingHistory(losses, tokensSeen, boundaries, corpusTokenCount, positionSeen, vocabSeen));
+    }
+
+    /// <summary>Packs a visited-set flag array eight entries to the byte.</summary>
+    private static void WriteBitmap(BinaryWriter writer, bool[] flags)
+    {
+        writer.Write(flags.Length);
+        byte packed = 0;
+        for (int i = 0; i < flags.Length; i++)
+        {
+            if (flags[i])
+                packed |= (byte)(1 << (i % 8));
+            if (i % 8 == 7)
+            {
+                writer.Write(packed);
+                packed = 0;
+            }
+        }
+        if (flags.Length % 8 != 0)
+            writer.Write(packed);
+    }
+
+    private static bool[] ReadBitmap(BinaryReader reader)
+    {
+        int length = reader.ReadInt32();
+        var flags = new bool[length];
+        byte packed = 0;
+        for (int i = 0; i < length; i++)
+        {
+            if (i % 8 == 0)
+                packed = reader.ReadByte();
+            flags[i] = (packed & (1 << (i % 8))) != 0;
+        }
+        return flags;
     }
 }

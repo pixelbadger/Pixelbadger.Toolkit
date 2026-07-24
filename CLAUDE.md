@@ -82,6 +82,7 @@ The project is .NET 9, and uses Microsoft's System.CommandLine library for build
   - `pbtk gpt train --source corpus.txt --out ./.gpt --tokenizer bpe --vocab-size 1024 --block-size 128`
   - `pbtk gpt train --source corpus.txt --out ./.gpt --tokenizer char`
   - `pbtk gpt train --source corpus.txt --out ./.gpt --steps 1000 --resume`
+  - `pbtk gpt train --source corpus.txt --out ./.gpt --loss-graph ./loss.html`
   - `pbtk gpt complete --model ./.gpt --prompt "ROMEO:" --max-tokens 200`
 
 ### Testing Requirements
