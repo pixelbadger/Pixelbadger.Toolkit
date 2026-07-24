@@ -42,16 +42,18 @@
     </p>
     <p>
       Training produces a checkpoint directory (default <code>./.gpt</code>) containing
-      <code>config.json</code> (model configuration and character vocabulary) and <code>weights.bin</code>
-      (the weight tensors). Train once, then call <code>complete</code> as many times as needed against the
-      same checkpoint.
+      <code>config.json</code> (model configuration and character vocabulary), <code>weights.bin</code>
+      (the weight tensors), and <code>optimizer.bin</code> (AdamW optimizer state). Train once, then call
+      <code>complete</code> as many times as needed against the same checkpoint — or continue training it
+      later with <code>--resume</code>.
     </p>
 
     <div class="diagram-wrap">
       <div class="mermaid">
 flowchart LR
     CORPUS["corpus.txt"] --> TRAIN["pbtk gpt train"]
-    TRAIN --> MODEL[".gpt/\nconfig.json + weights.bin"]
+    TRAIN --> MODEL[".gpt/\nconfig.json + weights.bin\n+ optimizer.bin"]
+    MODEL -->|"--resume"| TRAIN
     MODEL --> COMPLETE["pbtk gpt complete"]
     PROMPT["--prompt"] --> COMPLETE
     COMPLETE --> OUT(["stdout: generated text"])
@@ -152,7 +154,7 @@ flowchart TB
       <tbody>
         <tr><td>Embeddings</td><td>Learned token embedding table <code>wte</code> (vocab &times; n-embd) plus learned positional embedding <code>wpe</code> (block-size &times; n-embd), summed per position</td></tr>
         <tr><td>Block structure</td><td>Pre-LayerNorm: each block computes <code>x = x + Attn(LN(x))</code> then <code>x = x + MLP(LN(x))</code></td></tr>
-        <tr><td>Attention</td><td>Causal multi-head self-attention: per-head Q/K/V projections with bias, scores scaled by <code>1/&radic;head-dim</code>, upper-triangular positions masked to &minus;1e9 before row softmax, heads concatenated and passed through an output projection</td></tr>
+        <tr><td>Attention</td><td>Causal multi-head self-attention: Q/K/V projections with bias, then a fused <code>CausalSelfAttention</code> op — scores scaled by <code>1/&radic;head-dim</code>, causal masking, row softmax, and the value mix computed per (sequence, head) unit in parallel — followed by an output projection</td></tr>
         <tr><td>MLP</td><td>Two linear layers with a 4&times; hidden expansion and GELU activation (tanh approximation)</td></tr>
         <tr><td>Output head</td><td>Weight-tied with the token embedding: <code>logits = x &middot; wte&#7488;</code> — no separate unembedding matrix, reducing parameter count</td></tr>
         <tr><td>Initialization</td><td>Seeded Box-Muller normal N(0, 0.02) for weight matrices, zeros for biases, gamma=1/beta=0 for LayerNorms — reproducible for a given <code>--seed</code></td></tr>
@@ -197,8 +199,8 @@ flowchart LR
         <tr><td><code>Add</code>, <code>Scale</code></td><td>Residual connections; attention score scaling</td></tr>
         <tr><td><code>Gather</code></td><td>Token and positional embedding lookup</td></tr>
         <tr><td><code>LayerNorm</code>, <code>Gelu</code></td><td>Normalization and MLP activation</td></tr>
-        <tr><td><code>CausalMask</code>, <code>SoftmaxRows</code></td><td>Causal attention weights (max-subtracted softmax for numerical stability)</td></tr>
-        <tr><td><code>SliceRows</code>/<code>SliceCols</code>, <code>ConcatRows</code>/<code>ConcatCols</code></td><td>Splitting the batch into sequences and sequences into attention heads, then reassembling</td></tr>
+        <tr><td><code>CausalSelfAttention</code></td><td>Fused causal multi-head attention: scaled scores, causal masking, max-subtracted row softmax, and value mixing in a single op, parallel across (sequence, head) units</td></tr>
+        <tr><td><code>CausalMask</code>, <code>SoftmaxRows</code>, <code>SliceRows</code>/<code>SliceCols</code>, <code>ConcatRows</code>/<code>ConcatCols</code></td><td>Standalone primitives for masking, softmax, and splitting/reassembling matrices (attention itself now uses the fused op above)</td></tr>
         <tr><td><code>CrossEntropy</code></td><td>Fused softmax + mean negative log-likelihood loss with a simple <code>probs &minus; one-hot</code> backward</td></tr>
       </tbody>
     </table>
@@ -206,9 +208,12 @@ flowchart LR
     <p>
       Performance and determinism are balanced deliberately: hot kernels use
       <code>System.Numerics.Tensors.TensorPrimitives</code> (SIMD) for dot products and elementwise math,
-      and matrix multiplication parallelizes across independent output rows with <code>Parallel.For</code>.
-      Reductions inside a single dot product stay sequential, so results are bit-identical regardless of
-      thread count — which is what makes <code>--seed</code> fully reproducible.
+      and forward <em>and</em> backward passes parallelize with <code>Parallel.For</code> across independent
+      work units — matrix rows, (sequence, head) attention units, normalization rows — falling back to
+      sequential loops when a tensor is too small to justify thread-pool overhead. Parallelism is only
+      applied where each unit writes disjoint state, and reductions inside a unit stay sequential, so
+      results are bit-identical regardless of thread count — which is what makes <code>--seed</code> fully
+      reproducible.
     </p>
   </section>
 
@@ -231,16 +236,16 @@ flowchart TB
     FWD --> BWD["loss.Backward()\n(reverse-mode autograd)"]
     BWD --> ADAM["AdamW.Step()\n(decoupled weight decay)"]
     ADAM --> LOOP
-    LOOP --> SAVE["CheckpointService.SaveAsync\n(config.json + weights.bin)"]
+    LOOP --> SAVE["CheckpointService.SaveAsync\n(config.json + weights.bin\n+ optimizer.bin)"]
       </div>
     </div>
 
     <ol>
       <li><strong>Tokenize</strong> — <code>CharTokenizer.Build</code> derives the vocabulary from the sorted distinct characters of the corpus, then encodes the whole corpus into one integer array. The corpus must contain at least <code>block-size + 1</code> characters.</li>
-      <li><strong>Construct</strong> — a <code>GptModel</code> is built from the config and initialized from the seeded RNG; an <code>AdamW</code> instance is bound to the model's parameter list (learning rate from <code>--lr</code>; betas 0.9/0.95, weight decay 0.1).</li>
+      <li><strong>Construct</strong> — a <code>GptModel</code> is built from the config and initialized from the seeded RNG; an <code>AdamW</code> instance is bound to the model's parameter list (learning rate from <code>--lr</code>; betas 0.9/0.95, weight decay 0.1). With <code>--resume</code>, the model, vocabulary, and config are instead loaded from the checkpoint in <code>--out</code> (architecture options are ignored), and saved AdamW moments are restored so training continues without a loss spike.</li>
       <li><strong>Sample batches</strong> — each step draws <code>--batch-size</code> random windows of <code>--block-size</code> characters; the target sequence is the same window shifted one character right, so every position learns next-character prediction simultaneously.</li>
       <li><strong>Step</strong> — <code>ZeroGrad</code> &rarr; <code>Forward</code> (logits + loss) &rarr; <code>loss.Backward()</code> &rarr; <code>optimizer.Step()</code>. The command layer prints step/loss at step 1, every 100th step, and the final step.</li>
-      <li><strong>Persist</strong> — after the final step the checkpoint (config, vocabulary, and all weight tensors in construction order) is written via <code>CheckpointService</code>, and a summary (parameter count, vocab size, final loss, path) is reported.</li>
+      <li><strong>Persist</strong> — after the final step the checkpoint (config, vocabulary, and all weight tensors in construction order) plus the optimizer state is written via <code>CheckpointService</code>, and a summary (parameter count, vocab size, final loss, path) is reported.</li>
     </ol>
   </section>
 
@@ -286,7 +291,7 @@ flowchart TB
     <h2>Checkpoint Format</h2>
     <p>
       A checkpoint is a directory (default <code>./.gpt</code>) written by <code>CheckpointService</code>
-      containing two files:
+      containing three files:
     </p>
 
     <table>
@@ -302,6 +307,11 @@ flowchart TB
           <td>Little-endian binary</td>
           <td>Tensor count (int32), then for each tensor its length (int32) followed by its float32 values — written in the model's fixed parameter construction order</td>
         </tr>
+        <tr>
+          <td><code>optimizer.bin</code></td>
+          <td>Little-endian binary</td>
+          <td>AdamW state: step count (int32), tensor count (int32), then per tensor its length (int32) followed by the float32 first-moment then second-moment values. Used only by <code>--resume</code>; optional — a checkpoint without it resumes with a fresh optimizer</td>
+        </tr>
       </tbody>
     </table>
 
@@ -310,7 +320,7 @@ flowchart TB
       match what the config-constructed model expects, so a corrupted or mismatched checkpoint fails fast
       with a clear error rather than producing garbage output. Because the config fully determines the
       parameter shapes and ordering, the checkpoint is portable across machines — inference only needs
-      the two files.
+      <code>config.json</code> and <code>weights.bin</code>.
     </p>
 
     <div class="info-box">
@@ -328,6 +338,13 @@ flowchart TB
       completion the parameter count, vocabulary size, final loss, and checkpoint path are printed.
       <code>--source</code> accepts either a path to a corpus file or literal text.
     </p>
+    <p>
+      With <code>--resume</code>, training continues from the checkpoint already in <code>--out</code> for
+      a further <code>--steps</code> steps: weights, vocabulary, and architecture come from the checkpoint
+      (so <code>--block-size</code>, <code>--n-embd</code>, <code>--n-head</code>, and <code>--n-layer</code>
+      are ignored), and saved optimizer state is restored when present. The corpus may only contain
+      characters that were in the original training corpus, since the vocabulary is fixed at first training.
+    </p>
 
     <div class="cmd-block">
       <span class="prompt">$ </span><span class="cmd">pbtk gpt train</span>
@@ -343,6 +360,13 @@ flowchart TB
       <span class="opt"> --n-layer</span> <span class="val">3</span>
     </div>
 
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk gpt train</span>
+      <span class="opt"> --source</span> <span class="val">shakespeare.txt</span>
+      <span class="opt"> --steps</span> <span class="val">1000</span>
+      <span class="opt"> --resume</span>
+    </div>
+
     <table>
       <thead><tr><th>Option</th><th>Required</th><th>Default</th><th>Description</th></tr></thead>
       <tbody>
@@ -356,6 +380,7 @@ flowchart TB
         <tr><td><code>--n-layer</code></td><td>No</td><td><code>3</code></td><td>Number of transformer blocks</td></tr>
         <tr><td><code>--lr</code></td><td>No</td><td><code>0.0003</code></td><td>Learning rate</td></tr>
         <tr><td><code>--seed</code></td><td>No</td><td><code>1337</code></td><td>Random seed for reproducible runs</td></tr>
+        <tr><td><code>--resume</code></td><td>No</td><td><code>false</code></td><td>Resume training from the checkpoint in <code>--out</code> (architecture options are taken from the checkpoint)</td></tr>
       </tbody>
     </table>
   </section>
@@ -423,7 +448,7 @@ flowchart LR
         <tr>
           <td><code>gpt train</code></td>
           <td><code>--source</code></td>
-          <td><code>--out</code>, <code>--steps</code>, <code>--batch-size</code>, <code>--block-size</code>, <code>--n-embd</code>, <code>--n-head</code>, <code>--n-layer</code>, <code>--lr</code>, <code>--seed</code></td>
+          <td><code>--out</code>, <code>--steps</code>, <code>--batch-size</code>, <code>--block-size</code>, <code>--n-embd</code>, <code>--n-head</code>, <code>--n-layer</code>, <code>--lr</code>, <code>--seed</code>, <code>--resume</code></td>
           <td>Training progress, then summary with parameter count, vocab size, final loss, and checkpoint path</td>
         </tr>
         <tr>

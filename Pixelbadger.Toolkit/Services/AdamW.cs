@@ -1,5 +1,8 @@
 namespace Pixelbadger.Toolkit.Services;
 
+/// <summary>Snapshot of AdamW internals (step count and first/second moments) for checkpointing.</summary>
+public sealed record AdamWState(int Step, float[][] M, float[][] V);
+
 /// <summary>
 /// AdamW optimizer (decoupled weight decay) over a fixed set of parameter tensors.
 /// </summary>
@@ -35,13 +38,37 @@ public sealed class AdamW
         _v = parameters.Select(p => new float[p.Length]).ToArray();
     }
 
+    /// <summary>Copies the current optimizer state for persistence alongside a checkpoint.</summary>
+    public AdamWState ExportState()
+        => new(_step, _m.Select(a => a.ToArray()).ToArray(), _v.Select(a => a.ToArray()).ToArray());
+
+    /// <summary>Restores optimizer state captured by <see cref="ExportState"/> (shapes must match).</summary>
+    public void LoadState(AdamWState state)
+    {
+        if (state.M.Length != _parameters.Count || state.V.Length != _parameters.Count)
+            throw new ArgumentException(
+                $"Optimizer state has {state.M.Length} moment tensors but the model expects {_parameters.Count}.");
+
+        for (int pi = 0; pi < _parameters.Count; pi++)
+        {
+            if (state.M[pi].Length != _parameters[pi].Length || state.V[pi].Length != _parameters[pi].Length)
+                throw new ArgumentException(
+                    $"Optimizer state tensor {pi} length does not match parameter length {_parameters[pi].Length}.");
+            Array.Copy(state.M[pi], _m[pi], state.M[pi].Length);
+            Array.Copy(state.V[pi], _v[pi], state.V[pi].Length);
+        }
+
+        _step = state.Step;
+    }
+
     public void Step()
     {
         _step++;
         float biasCorr1 = 1f - MathF.Pow(_beta1, _step);
         float biasCorr2 = 1f - MathF.Pow(_beta2, _step);
 
-        for (int pi = 0; pi < _parameters.Count; pi++)
+        // Parameter tensors are disjoint, so the update parallelizes without affecting results.
+        Parallel.For(0, _parameters.Count, pi =>
         {
             var p = _parameters[pi];
             var m = _m[pi];
@@ -59,6 +86,6 @@ public sealed class AdamW
                 // Decoupled weight decay followed by the Adam step.
                 p.Data[i] -= _lr * (_weightDecay * p.Data[i] + mHat / (MathF.Sqrt(vHat) + _eps));
             }
-        }
+        });
     }
 }

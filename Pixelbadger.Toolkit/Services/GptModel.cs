@@ -185,39 +185,12 @@ public sealed class GptModel
 
     private Tensor Attention(Tensor a, Block block, int b, int t)
     {
-        int hd = Config.HeadDim;
-        int h = Config.NHead;
-        float scale = 1f / MathF.Sqrt(hd);
-
         var q = Tensor.AddBias(Tensor.MatMul(a, block.Wq), block.Bq);
         var k = Tensor.AddBias(Tensor.MatMul(a, block.Wk), block.Bk);
         var v = Tensor.AddBias(Tensor.MatMul(a, block.Wv), block.Bv);
 
-        var seqOutputs = new List<Tensor>(b);
-        for (int bi = 0; bi < b; bi++)
-        {
-            var qSeq = Tensor.SliceRows(q, bi * t, t);
-            var kSeq = Tensor.SliceRows(k, bi * t, t);
-            var vSeq = Tensor.SliceRows(v, bi * t, t);
-
-            var headOutputs = new List<Tensor>(h);
-            for (int hi = 0; hi < h; hi++)
-            {
-                var qh = Tensor.SliceCols(qSeq, hi * hd, hd);
-                var kh = Tensor.SliceCols(kSeq, hi * hd, hd);
-                var vh = Tensor.SliceCols(vSeq, hi * hd, hd);
-
-                var scores = Tensor.Scale(Tensor.MatMul(qh, Tensor.Transpose(kh)), scale);
-                scores = Tensor.CausalMask(scores);
-                var att = Tensor.SoftmaxRows(scores);
-                headOutputs.Add(Tensor.MatMul(att, vh));
-            }
-
-            seqOutputs.Add(Tensor.ConcatCols(headOutputs));
-        }
-
-        var attnConcat = Tensor.ConcatRows(seqOutputs);
-        return Tensor.AddBias(Tensor.MatMul(attnConcat, block.Wo), block.Bo);
+        var attn = Tensor.CausalSelfAttention(q, k, v, b, t, Config.NHead);
+        return Tensor.AddBias(Tensor.MatMul(attn, block.Wo), block.Bo);
     }
 
     private static Tensor Mlp(Tensor x, Block block)

@@ -6,4 +6,6 @@ public interface ICheckpointService
 {
     Task SaveAsync(string directory, GptConfig config, IReadOnlyList<char> vocabulary, IReadOnlyList<Tensor> parameters);
     Task<GptCheckpoint> LoadAsync(string directory);
+    Task SaveOptimizerStateAsync(string directory, AdamWState state);
+    Task<AdamWState?> TryLoadOptimizerStateAsync(string directory);
 }

@@ -79,6 +79,7 @@ The project is .NET 9, and uses Microsoft's System.CommandLine library for build
   - `pbtk llm corpospeak --source "API performance is great" --audience "csuite"`
   - `pbtk llm corpospeak --source "New feature deployed" --audience "engineering" --user-messages "Hey team" "Let's ship this"`
   - `pbtk gpt train --source corpus.txt --out ./.gpt --steps 2000`
+  - `pbtk gpt train --source corpus.txt --out ./.gpt --steps 1000 --resume`
   - `pbtk gpt complete --model ./.gpt --prompt "ROMEO:" --max-tokens 200`
 
 ### Testing Requirements
