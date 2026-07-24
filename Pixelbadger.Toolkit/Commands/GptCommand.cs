@@ -42,6 +42,7 @@ public static class GptCommand
         var nLayerOption = new Option<int>("--n-layer") { Description = "Number of transformer blocks", DefaultValueFactory = _ => 3 };
         var lrOption = new Option<float>("--lr") { Description = "Learning rate", DefaultValueFactory = _ => 3e-4f };
         var seedOption = new Option<int>("--seed") { Description = "Random seed for reproducible runs", DefaultValueFactory = _ => 1337 };
+        var resumeOption = new Option<bool>("--resume") { Description = "Resume training from the checkpoint in --out (architecture options are taken from the checkpoint)" };
 
         command.Add(sourceOption);
         command.Add(outOption);
@@ -53,6 +54,7 @@ public static class GptCommand
         command.Add(nLayerOption);
         command.Add(lrOption);
         command.Add(seedOption);
+        command.Add(resumeOption);
 
         command.SetAction(async (parseResult, cancellationToken) =>
         {
@@ -68,7 +70,8 @@ public static class GptCommand
                     NHead: parseResult.GetValue(nHeadOption),
                     NLayer: parseResult.GetValue(nLayerOption),
                     LearningRate: parseResult.GetValue(lrOption),
-                    Seed: parseResult.GetValue(seedOption));
+                    Seed: parseResult.GetValue(seedOption),
+                    Resume: parseResult.GetValue(resumeOption));
 
                 var corpus = await ResolveTextOrFilePath(source);
 

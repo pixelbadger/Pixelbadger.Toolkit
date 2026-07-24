@@ -12,10 +12,14 @@ public record GptTrainOptions(
     int NHead = 4,
     int NLayer = 3,
     float LearningRate = 3e-4f,
-    int Seed = 1337);
+    int Seed = 1337,
+    bool Resume = false);
 
 /// <summary>
 /// Trains a tiny char-level GPT from a text corpus by gradient descent and writes a checkpoint.
+/// With <see cref="GptTrainOptions.Resume"/> set, continues from the checkpoint in the output
+/// directory instead of initializing fresh weights (architecture options are then taken from
+/// the checkpoint, and saved optimizer state is restored when present).
 /// </summary>
 public class GptTrainComponent
 {
@@ -34,27 +38,49 @@ public class GptTrainComponent
     {
         if (string.IsNullOrEmpty(corpus))
             throw new ArgumentException("Training corpus is empty.", nameof(corpus));
-        if (options.NEmbd % options.NHead != 0)
-            throw new ArgumentException($"n-embd ({options.NEmbd}) must be divisible by n-head ({options.NHead}).");
 
-        var tokenizer = CharTokenizer.Build(corpus);
+        CharTokenizer tokenizer;
+        GptConfig config;
+        GptModel model;
+        AdamW optimizer;
+
+        if (options.Resume)
+        {
+            var checkpoint = await _checkpointService.LoadAsync(outputDirectory);
+            tokenizer = CharTokenizer.FromVocabulary(checkpoint.Vocabulary);
+            config = checkpoint.Config;
+            model = new GptModel(config);
+            model.LoadWeights(checkpoint.Weights);
+
+            optimizer = new AdamW(model.Parameters(), options.LearningRate);
+            var optimizerState = await _checkpointService.TryLoadOptimizerStateAsync(outputDirectory);
+            if (optimizerState is not null)
+                optimizer.LoadState(optimizerState);
+        }
+        else
+        {
+            if (options.NEmbd % options.NHead != 0)
+                throw new ArgumentException($"n-embd ({options.NEmbd}) must be divisible by n-head ({options.NHead}).");
+
+            tokenizer = CharTokenizer.Build(corpus);
+            config = new GptConfig(tokenizer.VocabSize, options.BlockSize, options.NEmbd, options.NHead, options.NLayer);
+            model = new GptModel(config);
+            model.InitWeights(options.Seed);
+            optimizer = new AdamW(model.Parameters(), options.LearningRate);
+        }
+
         var data = tokenizer.Encode(corpus);
 
-        if (data.Length < options.BlockSize + 1)
+        if (data.Length < config.BlockSize + 1)
             throw new ArgumentException(
-                $"Corpus is too short ({data.Length} chars) for block size {options.BlockSize}; need at least {options.BlockSize + 1}.");
+                $"Corpus is too short ({data.Length} chars) for block size {config.BlockSize}; need at least {config.BlockSize + 1}.");
 
-        var config = new GptConfig(tokenizer.VocabSize, options.BlockSize, options.NEmbd, options.NHead, options.NLayer);
-        var model = new GptModel(config);
-        model.InitWeights(options.Seed);
-
-        var optimizer = new AdamW(model.Parameters(), options.LearningRate);
         var rng = new Random(options.Seed);
 
         float lastLoss = 0f;
         for (int step = 1; step <= options.Steps; step++)
         {
-            var (inputs, targets) = SampleBatch(data, options.BatchSize, options.BlockSize, rng);
+            var (inputs, targets) = SampleBatch(data, options.BatchSize, config.BlockSize, rng);
 
             model.ZeroGrad();
             var (_, loss) = model.Forward(inputs, targets);
@@ -66,6 +92,7 @@ public class GptTrainComponent
         }
 
         await _checkpointService.SaveAsync(outputDirectory, config, tokenizer.Vocabulary, model.Parameters());
+        await _checkpointService.SaveOptimizerStateAsync(outputDirectory, optimizer.ExportState());
 
         return new GptTrainResult(options.Steps, lastLoss, outputDirectory, model.ParameterCount(), tokenizer.VocabSize);
     }

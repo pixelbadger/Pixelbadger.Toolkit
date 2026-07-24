@@ -42,4 +42,61 @@ public class AdamWTests
 
         p.Data[0].Should().BeLessThan(0f);
     }
+
+    [Fact]
+    public void ExportThenLoadState_ShouldReproduceIdenticalTrajectory()
+    {
+        // The same fixed gradient sequence drives a continuous optimizer and one that is
+        // snapshotted and restored into a fresh instance midway; results must match exactly.
+        var grads = new[]
+        {
+            new[] { 0.5f, -0.3f, 0.2f, 0.9f },
+            new[] { -0.1f, 0.4f, -0.7f, 0.3f },
+            new[] { 0.2f, 0.2f, 0.1f, -0.5f },
+            new[] { -0.6f, 0.1f, 0.8f, 0.4f },
+            new[] { 0.3f, -0.9f, 0.5f, -0.2f }
+        };
+        var initial = new[] { 0.5f, -0.3f, 0.2f, 0.9f };
+
+        var pA = Tensor.FromData(2, 2, (float[])initial.Clone(), requiresGrad: true);
+        var pB = Tensor.FromData(2, 2, (float[])initial.Clone(), requiresGrad: true);
+        var optA = new AdamW([pA], lr: 0.01f);
+        var optB = new AdamW([pB], lr: 0.01f);
+
+        static void ApplyStep(Tensor p, AdamW opt, float[] grad)
+        {
+            Array.Copy(grad, p.Grad, grad.Length);
+            opt.Step();
+        }
+
+        for (int s = 0; s < 3; s++)
+        {
+            ApplyStep(pA, optA, grads[s]);
+            ApplyStep(pB, optB, grads[s]);
+        }
+
+        var restored = new AdamW([pB], lr: 0.01f);
+        restored.LoadState(optB.ExportState());
+
+        for (int s = 3; s < 5; s++)
+        {
+            ApplyStep(pA, optA, grads[s]);
+            ApplyStep(pB, restored, grads[s]);
+        }
+
+        pB.Data.Should().Equal(pA.Data);
+    }
+
+    [Fact]
+    public void LoadState_ShouldThrow_WhenShapesDoNotMatch()
+    {
+        var p = Tensor.FromData(1, 2, new[] { 1f, 2f }, requiresGrad: true);
+        var optimizer = new AdamW([p]);
+
+        var wrongCount = () => optimizer.LoadState(new AdamWState(1, [], []));
+        wrongCount.Should().Throw<ArgumentException>().WithMessage("*moment tensors*");
+
+        var wrongLength = () => optimizer.LoadState(new AdamWState(1, [new float[3]], [new float[3]]));
+        wrongLength.Should().Throw<ArgumentException>().WithMessage("*length*");
+    }
 }

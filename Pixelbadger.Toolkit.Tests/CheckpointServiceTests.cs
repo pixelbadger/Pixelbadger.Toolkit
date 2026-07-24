@@ -67,4 +67,33 @@ public class CheckpointServiceTests : IDisposable
 
         await act.Should().ThrowAsync<FileNotFoundException>().WithMessage("*gpt train*");
     }
+
+    [Fact]
+    public async Task SaveThenLoadOptimizerState_ShouldRoundTripStepAndMoments()
+    {
+        var state = new AdamWState(
+            Step: 42,
+            M: [[1.5f, -2.5f], [3.25f]],
+            V: [[0.5f, 0.25f], [0.125f]]);
+        var dir = Path.Combine(_testDirectory, "ckpt");
+
+        await _service.SaveOptimizerStateAsync(dir, state);
+        var loaded = await _service.TryLoadOptimizerStateAsync(dir);
+
+        loaded.Should().NotBeNull();
+        loaded!.Step.Should().Be(42);
+        loaded.M.Length.Should().Be(2);
+        loaded.M[0].Should().Equal(1.5f, -2.5f);
+        loaded.M[1].Should().Equal(3.25f);
+        loaded.V[0].Should().Equal(0.5f, 0.25f);
+        loaded.V[1].Should().Equal(0.125f);
+    }
+
+    [Fact]
+    public async Task TryLoadOptimizerStateAsync_ShouldReturnNull_WhenFileAbsent()
+    {
+        var loaded = await _service.TryLoadOptimizerStateAsync(Path.Combine(_testDirectory, "no-optimizer"));
+
+        loaded.Should().BeNull();
+    }
 }

@@ -232,6 +232,83 @@ public class TensorTests
         scores.Grad[1 * 3 + 2].Should().Be(0f);
     }
 
+    /// <summary>Reference attention built from the primitive ops (the pre-fusion GptModel formulation).</summary>
+    private static Tensor ComposedCausalAttention(Tensor q, Tensor k, Tensor v, int batch, int seqLen, int nHead)
+    {
+        int hd = q.Cols / nHead;
+        float scale = 1f / MathF.Sqrt(hd);
+
+        var seqOutputs = new List<Tensor>(batch);
+        for (int bi = 0; bi < batch; bi++)
+        {
+            var qSeq = Tensor.SliceRows(q, bi * seqLen, seqLen);
+            var kSeq = Tensor.SliceRows(k, bi * seqLen, seqLen);
+            var vSeq = Tensor.SliceRows(v, bi * seqLen, seqLen);
+
+            var headOutputs = new List<Tensor>(nHead);
+            for (int hi = 0; hi < nHead; hi++)
+            {
+                var qh = Tensor.SliceCols(qSeq, hi * hd, hd);
+                var kh = Tensor.SliceCols(kSeq, hi * hd, hd);
+                var vh = Tensor.SliceCols(vSeq, hi * hd, hd);
+
+                var scores = Tensor.CausalMask(Tensor.Scale(Tensor.MatMul(qh, Tensor.Transpose(kh)), scale));
+                headOutputs.Add(Tensor.MatMul(Tensor.SoftmaxRows(scores), vh));
+            }
+
+            seqOutputs.Add(Tensor.ConcatCols(headOutputs));
+        }
+
+        return Tensor.ConcatRows(seqOutputs);
+    }
+
+    [Fact]
+    public void CausalSelfAttention_ShouldMatchComposedOpForward()
+    {
+        var rng = new Random(18);
+        int batch = 2, seqLen = 3, nHead = 2, c = 4;
+        var q = RandomTensor(batch * seqLen, c, rng);
+        var k = RandomTensor(batch * seqLen, c, rng);
+        var v = RandomTensor(batch * seqLen, c, rng);
+
+        var fused = Tensor.CausalSelfAttention(q, k, v, batch, seqLen, nHead);
+        var reference = ComposedCausalAttention(q, k, v, batch, seqLen, nHead);
+
+        fused.Rows.Should().Be(batch * seqLen);
+        fused.Cols.Should().Be(c);
+        for (int i = 0; i < fused.Length; i++)
+            fused.Data[i].Should().BeApproximately(reference.Data[i], 1e-5f);
+    }
+
+    [Fact]
+    public void CausalSelfAttention_ShouldGradientCheck()
+    {
+        var rng = new Random(19);
+        int batch = 2, seqLen = 3, nHead = 2, c = 4;
+        var q = RandomTensor(batch * seqLen, c, rng);
+        var k = RandomTensor(batch * seqLen, c, rng);
+        var v = RandomTensor(batch * seqLen, c, rng);
+
+        GradCheckOp([q, k, v], () => Tensor.CausalSelfAttention(q, k, v, batch, seqLen, nHead), rng);
+    }
+
+    [Fact]
+    public void CausalSelfAttention_ShouldThrow_OnInvalidShapes()
+    {
+        var q = new Tensor(4, 4);
+        var k = new Tensor(4, 4);
+        var v = new Tensor(4, 4);
+
+        var badRows = () => Tensor.CausalSelfAttention(q, k, v, batch: 3, seqLen: 2, nHead: 2);
+        badRows.Should().Throw<ArgumentException>().WithMessage("*rows*");
+
+        var badHeads = () => Tensor.CausalSelfAttention(q, k, v, batch: 2, seqLen: 2, nHead: 3);
+        badHeads.Should().Throw<ArgumentException>().WithMessage("*divisible*");
+
+        var badShape = () => Tensor.CausalSelfAttention(q, new Tensor(4, 2), v, batch: 2, seqLen: 2, nHead: 2);
+        badShape.Should().Throw<ArgumentException>().WithMessage("*shape*");
+    }
+
     [Fact]
     public void Backward_ShouldAccumulateGradientsThroughSharedInput()
     {

@@ -10,6 +10,7 @@ public sealed class CheckpointService : ICheckpointService
 {
     internal const string ConfigFileName = "config.json";
     internal const string WeightsFileName = "weights.bin";
+    internal const string OptimizerFileName = "optimizer.bin";
 
     private static readonly JsonSerializerOptions SerializerOptions = new() { WriteIndented = true };
 
@@ -67,5 +68,51 @@ public sealed class CheckpointService : ICheckpointService
         }
 
         return new GptCheckpoint(config, dto.Vocabulary.ToCharArray(), weights);
+    }
+
+    public Task SaveOptimizerStateAsync(string directory, AdamWState state)
+    {
+        Directory.CreateDirectory(directory);
+
+        using var stream = File.Create(Path.Combine(directory, OptimizerFileName));
+        using var writer = new BinaryWriter(stream);
+        writer.Write(state.Step);
+        writer.Write(state.M.Length);
+        for (int p = 0; p < state.M.Length; p++)
+        {
+            writer.Write(state.M[p].Length);
+            for (int i = 0; i < state.M[p].Length; i++)
+                writer.Write(state.M[p][i]);
+            for (int i = 0; i < state.V[p].Length; i++)
+                writer.Write(state.V[p][i]);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task<AdamWState?> TryLoadOptimizerStateAsync(string directory)
+    {
+        var path = Path.Combine(directory, OptimizerFileName);
+        if (!File.Exists(path))
+            return Task.FromResult<AdamWState?>(null);
+
+        using var stream = File.OpenRead(path);
+        using var reader = new BinaryReader(stream);
+        int step = reader.ReadInt32();
+        int count = reader.ReadInt32();
+        var m = new float[count][];
+        var v = new float[count][];
+        for (int p = 0; p < count; p++)
+        {
+            int length = reader.ReadInt32();
+            m[p] = new float[length];
+            v[p] = new float[length];
+            for (int i = 0; i < length; i++)
+                m[p][i] = reader.ReadSingle();
+            for (int i = 0; i < length; i++)
+                v[p][i] = reader.ReadSingle();
+        }
+
+        return Task.FromResult<AdamWState?>(new AdamWState(step, m, v));
     }
 }

@@ -57,4 +57,54 @@ public class GptCommandIntegrationTests : IDisposable
 
         completeExit.Should().Be(0);
     }
+
+    [Fact]
+    public async Task GptCommand_ShouldResumeTrainingFromExistingCheckpoint()
+    {
+        var corpusPath = Path.Combine(_testDirectory, "corpus.txt");
+        await File.WriteAllTextAsync(corpusPath, string.Concat(Enumerable.Repeat("resume me please. ", 30)));
+        var modelDir = Path.Combine(_testDirectory, "model");
+
+        var trainExit = await GptCommand.Create().Parse(new[]
+        {
+            "train",
+            "--source", corpusPath,
+            "--out", modelDir,
+            "--steps", "5",
+            "--batch-size", "4",
+            "--block-size", "8",
+            "--n-embd", "16",
+            "--n-head", "2",
+            "--n-layer", "1",
+            "--seed", "1"
+        }).InvokeAsync();
+
+        trainExit.Should().Be(0);
+        File.Exists(Path.Combine(modelDir, "optimizer.bin")).Should().BeTrue();
+
+        // Resume picks up the saved weights, config, and optimizer state and keeps training.
+        var resumeExit = await GptCommand.Create().Parse(new[]
+        {
+            "train",
+            "--source", corpusPath,
+            "--out", modelDir,
+            "--steps", "5",
+            "--batch-size", "4",
+            "--seed", "2",
+            "--resume"
+        }).InvokeAsync();
+
+        resumeExit.Should().Be(0);
+
+        var completeExit = await GptCommand.Create().Parse(new[]
+        {
+            "complete",
+            "--model", modelDir,
+            "--prompt", "resume",
+            "--max-tokens", "10",
+            "--temperature", "0"
+        }).InvokeAsync();
+
+        completeExit.Should().Be(0);
+    }
 }
