@@ -116,4 +116,69 @@ public class CheckpointServiceTests : IDisposable
 
         loaded.Should().BeNull();
     }
+
+    [Fact]
+    public async Task SaveThenLoadTrainingHistory_ShouldRoundTripSeriesBoundariesAndVisitedSets()
+    {
+        // Deliberately not a multiple of 8, to exercise the partial trailing byte of the packed bitmaps.
+        var positionSeen = new bool[13];
+        foreach (var i in new[] { 0, 3, 7, 8, 12 })
+            positionSeen[i] = true;
+        var vocabSeen = new[] { true, false, false, true };
+        var history = new TrainingHistory(
+            Losses: [3.5f, 2.25f, 1.125f],
+            TokensSeen: [4, 9, 13],
+            RunBoundaries: [2, 3],
+            CorpusTokenCount: 13,
+            PositionSeen: positionSeen,
+            VocabSeen: vocabSeen);
+        var dir = Path.Combine(_testDirectory, "ckpt");
+
+        await _service.SaveTrainingHistoryAsync(dir, history);
+        var loaded = await _service.TryLoadTrainingHistoryAsync(dir);
+
+        loaded.Should().NotBeNull();
+        loaded!.Losses.Should().Equal(3.5f, 2.25f, 1.125f);
+        loaded.TokensSeen.Should().Equal(4, 9, 13);
+        loaded.RunBoundaries.Should().Equal(2, 3);
+        loaded.CorpusTokenCount.Should().Be(13);
+        loaded.PositionSeen.Should().Equal(positionSeen);
+        loaded.VocabSeen.Should().Equal(vocabSeen);
+    }
+
+    [Fact]
+    public async Task SaveThenLoadTrainingHistory_ShouldRoundTripEmptySeries()
+    {
+        var history = new TrainingHistory([], [], [], CorpusTokenCount: 0, PositionSeen: [], VocabSeen: []);
+        var dir = Path.Combine(_testDirectory, "ckpt");
+
+        await _service.SaveTrainingHistoryAsync(dir, history);
+        var loaded = await _service.TryLoadTrainingHistoryAsync(dir);
+
+        loaded.Should().NotBeNull();
+        loaded!.Losses.Should().BeEmpty();
+        loaded.TokensSeen.Should().BeEmpty();
+        loaded.RunBoundaries.Should().BeEmpty();
+        loaded.PositionSeen.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task TryLoadTrainingHistoryAsync_ShouldReturnNull_WhenFileAbsent()
+    {
+        var loaded = await _service.TryLoadTrainingHistoryAsync(Path.Combine(_testDirectory, "no-history"));
+
+        loaded.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task TryLoadTrainingHistoryAsync_ShouldThrow_WhenFormatVersionIsUnknown()
+    {
+        var dir = Path.Combine(_testDirectory, "ckpt");
+        Directory.CreateDirectory(dir);
+        await File.WriteAllBytesAsync(Path.Combine(dir, "history.bin"), BitConverter.GetBytes(99));
+
+        var act = async () => await _service.TryLoadTrainingHistoryAsync(dir);
+
+        await act.Should().ThrowAsync<InvalidDataException>().WithMessage("*version 99*");
+    }
 }
