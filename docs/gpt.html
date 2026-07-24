@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pixelbadger Toolkit — GPT</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header>
+  <h1>GPT <span class="badge">gpt</span></h1>
+  <div class="subtitle">Tiny from-scratch char-level GPT — train a transformer on a text corpus, then sample completions</div>
+  <div class="meta">Pixelbadger Toolkit &mdash; <code>pbtk gpt</code> &mdash; <a href="index.html" style="color:#60a5fa">&#8592; all topics</a></div>
+</header>
+
+<nav>
+  <a href="#overview">Overview</a>
+  <a href="#train">train</a>
+  <a href="#complete">complete</a>
+  <a href="#command-ref">Command Reference</a>
+</nav>
+
+<div class="content">
+
+  <!-- OVERVIEW -->
+  <section id="overview">
+    <h2>Overview</h2>
+    <p>
+      The <code>gpt</code> topic implements a tiny character-level GPT trained from scratch — a decoder-only
+      transformer with token and positional embeddings, multi-head self-attention, and feed-forward blocks.
+      Train it on any text corpus with <code>train</code>, then generate continuations of a prompt with
+      <code>complete</code>. Unlike the <a href="llm.html"><code>llm</code></a> topic, no API key or network
+      access is required — everything runs locally on the CPU.
+    </p>
+    <p>
+      Training produces a checkpoint directory (default <code>./.gpt</code>) containing
+      <code>config.json</code> (model configuration and character vocabulary) and <code>weights.bin</code>
+      (the weight tensors). Train once, then call <code>complete</code> as many times as needed against the
+      same checkpoint.
+    </p>
+
+    <div class="diagram-wrap">
+      <div class="mermaid">
+flowchart LR
+    CORPUS["corpus.txt"] --> TRAIN["pbtk gpt train"]
+    TRAIN --> MODEL[".gpt/\nconfig.json + weights.bin"]
+    MODEL --> COMPLETE["pbtk gpt complete"]
+    PROMPT["--prompt"] --> COMPLETE
+    COMPLETE --> OUT(["stdout: generated text"])
+      </div>
+    </div>
+
+    <div class="info-box">
+      This is an educational toy model, not a production LLM. With the default hyperparameters it trains a
+      model of roughly half a million parameters — enough to pick up the character-level style of a corpus
+      (e.g. Shakespeare) in a couple of minutes, not to produce coherent long-form text.
+    </div>
+  </section>
+
+  <!-- TRAIN -->
+  <section id="train">
+    <h2>train</h2>
+    <p>
+      Trains a char-level GPT on a text corpus and saves a checkpoint. The vocabulary is built from the
+      unique characters in the corpus. Training progress (step and loss) is reported periodically, and on
+      completion the parameter count, vocabulary size, final loss, and checkpoint path are printed.
+      <code>--source</code> accepts either a path to a corpus file or literal text.
+    </p>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk gpt train</span>
+      <span class="opt"> --source</span> <span class="val">corpus.txt</span>
+    </div>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk gpt train</span>
+      <span class="opt"> --source</span> <span class="val">shakespeare.txt</span>
+      <span class="opt"> --out</span> <span class="val">./.gpt</span>
+      <span class="opt"> --steps</span> <span class="val">2000</span>
+      <span class="opt"> --n-embd</span> <span class="val">128</span>
+      <span class="opt"> --n-layer</span> <span class="val">3</span>
+    </div>
+
+    <table>
+      <thead><tr><th>Option</th><th>Required</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--source</code></td><td>Yes</td><td>&mdash;</td><td>Path to a training corpus file (or literal text)</td></tr>
+        <tr><td><code>--out</code></td><td>No</td><td><code>./.gpt</code></td><td>Checkpoint output directory</td></tr>
+        <tr><td><code>--steps</code></td><td>No</td><td><code>2000</code></td><td>Number of training steps</td></tr>
+        <tr><td><code>--batch-size</code></td><td>No</td><td><code>16</code></td><td>Sequences per training step</td></tr>
+        <tr><td><code>--block-size</code></td><td>No</td><td><code>64</code></td><td>Context length in characters</td></tr>
+        <tr><td><code>--n-embd</code></td><td>No</td><td><code>128</code></td><td>Embedding dimension</td></tr>
+        <tr><td><code>--n-head</code></td><td>No</td><td><code>4</code></td><td>Number of attention heads</td></tr>
+        <tr><td><code>--n-layer</code></td><td>No</td><td><code>3</code></td><td>Number of transformer blocks</td></tr>
+        <tr><td><code>--lr</code></td><td>No</td><td><code>0.0003</code></td><td>Learning rate</td></tr>
+        <tr><td><code>--seed</code></td><td>No</td><td><code>1337</code></td><td>Random seed for reproducible runs</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- COMPLETE -->
+  <section id="complete">
+    <h2>complete</h2>
+    <p>
+      Generates text from a trained GPT checkpoint by continuing the given prompt one character at a time.
+      The checkpoint must have been produced with <a href="#train"><code>gpt train</code></a> first.
+      Sampling is controlled by <code>--temperature</code> — higher values are more random, and
+      <code>0</code> is greedy/deterministic — and <code>--seed</code> makes sampled runs reproducible.
+    </p>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk gpt complete</span>
+      <span class="opt"> --prompt</span> <span class="val">"ROMEO:"</span>
+    </div>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk gpt complete</span>
+      <span class="opt"> --model</span> <span class="val">./.gpt</span>
+      <span class="opt"> --prompt</span> <span class="val">"ROMEO:"</span>
+      <span class="opt"> --max-tokens</span> <span class="val">200</span>
+      <span class="opt"> --temperature</span> <span class="val">0.8</span>
+    </div>
+
+    <div class="diagram-wrap">
+      <div class="mermaid">
+flowchart LR
+    PROMPT["--prompt"] --> ENC["Encode chars with\ncheckpoint vocabulary"]
+    ENC --> FWD["Transformer forward pass\n(last block-size chars)"]
+    FWD --> SAMPLE["Sample next char\n(temperature)"]
+    SAMPLE -->|"repeat --max-tokens times"| FWD
+    SAMPLE --> OUT(["stdout: prompt + generated text"])
+      </div>
+    </div>
+
+    <table>
+      <thead><tr><th>Option</th><th>Required</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--prompt</code></td><td>Yes</td><td>&mdash;</td><td>Prompt to continue</td></tr>
+        <tr><td><code>--model</code></td><td>No</td><td><code>./.gpt</code></td><td>Checkpoint directory</td></tr>
+        <tr><td><code>--max-tokens</code></td><td>No</td><td><code>200</code></td><td>Number of characters to generate</td></tr>
+        <tr><td><code>--temperature</code></td><td>No</td><td><code>0.8</code></td><td>Sampling temperature (0 = greedy/deterministic)</td></tr>
+        <tr><td><code>--seed</code></td><td>No</td><td><code>1337</code></td><td>Random seed for sampling</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- COMMAND REFERENCE -->
+  <section id="command-ref">
+    <h2>Command Reference</h2>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Command</th>
+          <th>Required options</th>
+          <th>Optional options</th>
+          <th>Output</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>gpt train</code></td>
+          <td><code>--source</code></td>
+          <td><code>--out</code>, <code>--steps</code>, <code>--batch-size</code>, <code>--block-size</code>, <code>--n-embd</code>, <code>--n-head</code>, <code>--n-layer</code>, <code>--lr</code>, <code>--seed</code></td>
+          <td>Training progress, then summary with parameter count, vocab size, final loss, and checkpoint path</td>
+        </tr>
+        <tr>
+          <td><code>gpt complete</code></td>
+          <td><code>--prompt</code></td>
+          <td><code>--model</code>, <code>--max-tokens</code>, <code>--temperature</code>, <code>--seed</code></td>
+          <td>Generated text to stdout</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+</div>
+
+<footer>
+  Pixelbadger Toolkit &mdash; GPT Documentation
+</footer>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'dark',
+    themeVariables: {
+      background: '#0f172a',
+      primaryColor: '#1e3a5f',
+      primaryTextColor: '#e2e8f0',
+      primaryBorderColor: '#3b82f6',
+      lineColor: '#475569',
+      secondaryColor: '#1e293b',
+      tertiaryColor: '#0f172a',
+      edgeLabelBackground: '#1e293b',
+      clusterBkg: '#1e293b',
+      titleColor: '#f1f5f9',
+      nodeTextColor: '#e2e8f0',
+    }
+  });
+</script>
+</body>
+</html>
