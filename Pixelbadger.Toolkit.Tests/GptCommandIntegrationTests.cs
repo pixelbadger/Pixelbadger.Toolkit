@@ -58,6 +58,46 @@ public class GptCommandIntegrationTests : IDisposable
         completeExit.Should().Be(0);
     }
 
+    [Theory]
+    [InlineData("bpe")]
+    [InlineData("char")]
+    public async Task GptCommand_ShouldTrainAndGenerate_ForEitherTokenizer(string tokenizer)
+    {
+        var corpusPath = Path.Combine(_testDirectory, "corpus.txt");
+        await File.WriteAllTextAsync(corpusPath, string.Concat(Enumerable.Repeat("hello gpt world. ", 40)));
+        var modelDir = Path.Combine(_testDirectory, "model");
+
+        var trainExit = await GptCommand.Create().Parse(new[]
+        {
+            "train",
+            "--source", corpusPath,
+            "--out", modelDir,
+            "--tokenizer", tokenizer,
+            "--vocab-size", "300",
+            "--steps", "5",
+            "--batch-size", "4",
+            "--block-size", "8",
+            "--n-embd", "16",
+            "--n-head", "2",
+            "--n-layer", "1",
+            "--seed", "1"
+        }).InvokeAsync();
+
+        trainExit.Should().Be(0);
+        File.Exists(Path.Combine(modelDir, "config.json")).Should().BeTrue();
+
+        var completeExit = await GptCommand.Create().Parse(new[]
+        {
+            "complete",
+            "--model", modelDir,
+            "--prompt", "hello",
+            "--max-tokens", "10",
+            "--temperature", "0"
+        }).InvokeAsync();
+
+        completeExit.Should().Be(0);
+    }
+
     [Fact]
     public async Task GptCommand_ShouldResumeTrainingFromExistingCheckpoint()
     {

@@ -4,7 +4,7 @@ namespace Pixelbadger.Toolkit.Services;
 /// Character-level tokenizer. The vocabulary is the sorted set of distinct characters in the
 /// training corpus, mirroring the approach used in Karpathy's char-level demos.
 /// </summary>
-public sealed class CharTokenizer
+public sealed class CharTokenizer : ITokenizer
 {
     private readonly Dictionary<char, int> _stoi;
     private readonly char[] _itos;
@@ -31,6 +31,16 @@ public sealed class CharTokenizer
 
     public static CharTokenizer FromVocabulary(IEnumerable<char> vocabulary)
         => new(vocabulary.ToArray());
+
+    public static CharTokenizer FromState(TokenizerState state)
+    {
+        if (state.Vocabulary is null)
+            throw new ArgumentException("Char tokenizer state is missing its vocabulary.", nameof(state));
+        return new CharTokenizer(state.Vocabulary.ToCharArray());
+    }
+
+    public TokenizerState ExportState()
+        => new(TokenizerKind.Char, new string(_itos), Merges: null);
 
     public int[] Encode(string text)
     {
