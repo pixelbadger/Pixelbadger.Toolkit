@@ -10,7 +10,7 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>pbtk</ToolCommandName>
     <PackageId>Pixelbadger.Toolkit</PackageId>
-    <Version>6.11.1</Version>
+    <Version>6.12.0</Version>
     <Authors>Pixelbadger</Authors>
     <Description>A CLI toolkit exposing varied functionality organized by topic, including string manipulation, distance calculations, esoteric programming language interpreters, image steganography, web serving, LLM integration, homomorphic encryption, Markov chain text generation, and Amiga demoscene effects.</Description>
     <PackageTags>cli;toolkit;strings;interpreters;steganography;llm;openai;crypto;homomorphic-encryption;markov;text-generation;demoscene;amiga</PackageTags>
@@ -37,8 +37,9 @@
     <PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="10.6.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.8" />
     <PackageReference Include="OpenAI" Version="2.10.0" />
-    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.11" />
-    <PackageReference Include="Spectre.Console" Version="0.57.0" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
+    <PackageReference Include="Spectre.Console" Version="0.57.2" />
+    <PackageReference Include="Spectre.Console.ImageSharp" Version="0.57.2" />
     <PackageReference Include="System.CommandLine" Version="2.0.8" />
     <PackageReference Include="System.Numerics.Tensors" Version="10.0.8" />
   </ItemGroup>

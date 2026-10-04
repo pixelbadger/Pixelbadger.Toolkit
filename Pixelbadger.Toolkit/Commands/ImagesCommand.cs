@@ -11,6 +11,31 @@ public static class ImagesCommand
         var command = new Command("images", "Image processing and manipulation utilities");
 
         command.Add(CreateSteganographyCommand());
+        command.Add(CreateDisplayCommand());
+
+        return command;
+    }
+
+    private static Command CreateDisplayCommand()
+    {
+        var command = new Command("display", "Render an image in the terminal");
+
+        var fileArgument = new Argument<string>("file") { Description = "Input image file path" };
+        command.Add(fileArgument);
+
+        command.SetAction((parseResult) =>
+        {
+            try
+            {
+                var file = parseResult.GetValue(fileArgument)!;
+                new ImageDisplayComponent(AnsiConsole.Console).Display(file);
+            }
+            catch (Exception ex)
+            {
+                AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
+                Environment.Exit(1);
+            }
+        });
 
         return command;
     }
