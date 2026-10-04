@@ -13,7 +13,7 @@
   <h1>Pixelbadger Toolkit — Benchmark Report <span class="badge">ShortRun</span></h1>
   <div class="meta">
     <span>Date: 2026-05-24</span>
-    <span>Runtime: .NET 9.0.16 · Arm64 RyuJIT</span>
+    <span>Runtime: .NET 9.0.16 · Arm64 RyuJIT (baseline) — see .NET 9 vs .NET 10 comparison below</span>
     <span>Hardware: Cortex-A520 / X4 / A725 · 6 physical cores</span>
     <span>BenchmarkDotNet v0.15.8</span>
   </div>
@@ -195,6 +195,49 @@
       </tbody>
     </table>
     <p class="note">Slice/substring operations on encrypted data are O(1) pointer slices (~30–55 ns) — no decryption occurs. Encrypt/decrypt cost scales linearly with character count due to per-character Paillier operations.</p>
+  </section>
+
+  <!-- ──────────────────────── .NET 9 vs .NET 10 ──────────────────────── -->
+  <section>
+    <h2>.NET 9 vs .NET 10</h2>
+    <p class="note">The toolkit now targets .NET 10. The .NET 10 numbers were re-run with the same ShortRun job (BenchmarkDotNet v0.15.8, 2026-10-04) on a different machine (AMD EPYC 7763 x64, 2 physical cores, Ubuntu 24.04, .NET SDK 10.0.401) from the .NET 9 baseline above (Arm64). Because hardware and architecture differ, treat the deltas as indicative only, not as a pure runtime comparison. Negative deltas are faster. Allocations are effectively unchanged between the two runs (within ~1–10%), apart from small per-call differences.</p>
+    <table>
+      <thead><tr>
+        <th>Benchmark</th><th>.NET 9 (Arm64)</th><th>.NET 10 (x64)</th><th>Change</th>
+      </tr></thead>
+      <tbody>
+        <tr><td>Abjadify · ShortText</td><td class="num">2.54 µs</td><td class="num">2.617 µs</td><td class="num ">+3%</td></tr>
+        <tr><td>Abjadify · Paragraph</td><td class="num">14 µs</td><td class="num">14.2 µs</td><td class="num ">+1%</td></tr>
+        <tr><td>Abjadify · Document</td><td class="num">291 µs</td><td class="num">286.3 µs</td><td class="num ">-2%</td></tr>
+        <tr><td>Levenshtein · EmptyVsLong</td><td class="num">3.93 µs</td><td class="num">4.133 µs</td><td class="num slow">+5%</td></tr>
+        <tr><td>Levenshtein · ShortStrings</td><td class="num">6.81 µs</td><td class="num">7.477 µs</td><td class="num slow">+10%</td></tr>
+        <tr><td>Levenshtein · MediumStrings</td><td class="num">10.7 µs</td><td class="num">14.31 µs</td><td class="num slow">+34%</td></tr>
+        <tr><td>Levenshtein · IdenticalStrings</td><td class="num">168 µs</td><td class="num">190.3 µs</td><td class="num slow">+13%</td></tr>
+        <tr><td>Levenshtein · LongStrings</td><td class="num">173 µs</td><td class="num">195.8 µs</td><td class="num slow">+13%</td></tr>
+        <tr><td>Brainfuck · Tiny</td><td class="num">1.2 µs</td><td class="num">1.328 µs</td><td class="num slow">+11%</td></tr>
+        <tr><td>Brainfuck · HelloWorld</td><td class="num">1.79 µs</td><td class="num">2.316 µs</td><td class="num slow">+29%</td></tr>
+        <tr><td>Brainfuck · MultiplyIntensive</td><td class="num">5.19 µs</td><td class="num">7.032 µs</td><td class="num slow">+36%</td></tr>
+        <tr><td>Ook · BF→Ook (Short)</td><td class="num">1.29 µs</td><td class="num">1.745 µs</td><td class="num slow">+35%</td></tr>
+        <tr><td>Ook · BF→Ook (HelloWorld)</td><td class="num">2.13 µs</td><td class="num">2.393 µs</td><td class="num slow">+12%</td></tr>
+        <tr><td>Ook · Ook→BF (Short)</td><td class="num">9.15 µs</td><td class="num">6.001 µs</td><td class="num fast">-34%</td></tr>
+        <tr><td>Ook · Ook→BF (HelloWorld)</td><td class="num">9.59 µs</td><td class="num">9.342 µs</td><td class="num ">-3%</td></tr>
+        <tr><td>Ook · Execute (Short)</td><td class="num">12.7 µs</td><td class="num">7.505 µs</td><td class="num fast">-41%</td></tr>
+        <tr><td>Ook · Execute (HelloWorld)</td><td class="num">22.2 µs</td><td class="num">11.95 µs</td><td class="num fast">-46%</td></tr>
+        <tr><td>Steganography · Encode short msg, 200×200</td><td class="num">2.44 ms</td><td class="num">1.472 ms</td><td class="num fast">-40%</td></tr>
+        <tr><td>Steganography · Decode 200×200</td><td class="num">2.19 ms</td><td class="num">0.6109 ms</td><td class="num fast">-72%</td></tr>
+        <tr><td>Steganography · Encode long msg, 800×800</td><td class="num">22.2 ms</td><td class="num">17.22 ms</td><td class="num fast">-23%</td></tr>
+        <tr><td>Steganography · Decode 800×800</td><td class="num">25.3 ms</td><td class="num">8.568 ms</td><td class="num fast">-66%</td></tr>
+        <tr><td>Paillier · SubstringEncrypted FromStart</td><td class="num">29.5 ns</td><td class="num">26.61 ns</td><td class="num fast">-10%</td></tr>
+        <tr><td>Paillier · SubstringEncrypted FromMiddle</td><td class="num">36.4 ns</td><td class="num">32.85 ns</td><td class="num fast">-10%</td></tr>
+        <tr><td>Paillier · SubstringEncrypted ToEnd</td><td class="num">53.4 ns</td><td class="num">39.92 ns</td><td class="num fast">-25%</td></tr>
+        <tr><td>Paillier · ReplaceInString SingleChar</td><td class="num">154 ms</td><td class="num">80.53 ms</td><td class="num fast">-48%</td></tr>
+        <tr><td>Paillier · ReplaceInString Word</td><td class="num">305 ms</td><td class="num">317.4 ms</td><td class="num ">+4%</td></tr>
+        <tr><td>Paillier · EncryptString Short</td><td class="num">656 ms</td><td class="num">395.7 ms</td><td class="num fast">-40%</td></tr>
+        <tr><td>Paillier · DecryptString Short</td><td class="num">677 ms</td><td class="num">396.3 ms</td><td class="num fast">-41%</td></tr>
+        <tr><td>Paillier · EncryptString Long</td><td class="num">4.21e+03 ms</td><td class="num">4,587 ms</td><td class="num slow">+9%</td></tr>
+        <tr><td>Paillier · DecryptString Long</td><td class="num">7.53e+03 ms</td><td class="num">4,541 ms</td><td class="num fast">-40%</td></tr>
+      </tbody>
+    </table>
   </section>
 
   <!-- ──────────────────────── CROSS-TOPIC OVERVIEW ──────────────────────── -->
