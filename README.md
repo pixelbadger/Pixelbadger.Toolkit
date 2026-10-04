@@ -1,3 +1,5 @@
+<p align="center"><img src="https://raw.githubusercontent.com/pixelbadger/Pixelbadger.Toolkit/master/docs/images/badger.png" alt="Pixel-art badger wearing a toolbelt" width="200"></p>
+
 # Pixelbadger.Toolkit
 
 A CLI toolkit exposing varied functionality organized by topic. The CLI uses [Spectre.Console](https://spectreconsole.net/) for rich terminal output — colour-coded success and error messages, formatted tables for data-heavy commands, and styled interactive prompts for secure input.
