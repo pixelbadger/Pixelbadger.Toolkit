@@ -111,40 +111,8 @@ public class MarkovCommandTests : IDisposable
         (stdout + stderr).Should().Contain("--text");
     }
 
-    private static async Task<(int ExitCode, string StandardOutput, string StandardError)> RunToolkitCommandAsync(
+    private static Task<(int ExitCode, string StandardOutput, string StandardError)> RunToolkitCommandAsync(
         string workingDirectory,
-        params string[] args)
-    {
-        var projectPath = GetToolkitProjectPath();
-        var startInfo = new ProcessStartInfo("dotnet")
-        {
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            WorkingDirectory = workingDirectory
-        };
-
-        startInfo.ArgumentList.Add("run");
-        startInfo.ArgumentList.Add("--project");
-        startInfo.ArgumentList.Add(projectPath);
-        startInfo.ArgumentList.Add("-c");
-        startInfo.ArgumentList.Add(TestBuildConfiguration.Name);
-        startInfo.ArgumentList.Add("--no-build");
-        startInfo.ArgumentList.Add("--");
-
-        foreach (var arg in args)
-            startInfo.ArgumentList.Add(arg);
-
-        using var process = Process.Start(startInfo)!;
-        var standardOutput = await process.StandardOutput.ReadToEndAsync();
-        var standardError = await process.StandardError.ReadToEndAsync();
-        await process.WaitForExitAsync();
-
-        return (process.ExitCode, standardOutput, standardError);
-    }
-
-    private static string GetToolkitProjectPath() =>
-        Path.GetFullPath(Path.Combine(
-            AppContext.BaseDirectory,
-            "../../../../Pixelbadger.Toolkit/Pixelbadger.Toolkit.csproj"));
+        params string[] args) =>
+        ToolkitProcess.RunAsync(workingDirectory, args);
 }

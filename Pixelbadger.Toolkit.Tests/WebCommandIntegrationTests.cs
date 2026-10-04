@@ -53,28 +53,8 @@ public class WebCommandIntegrationTests : IDisposable
         }
     }
 
-    private static Process StartToolkitCommand(params string[] args)
-    {
-        var startInfo = new ProcessStartInfo("dotnet")
-        {
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false
-        };
-
-        startInfo.ArgumentList.Add("run");
-        startInfo.ArgumentList.Add("--project");
-        startInfo.ArgumentList.Add(GetToolkitProjectPath());
-        startInfo.ArgumentList.Add("-c");
-        startInfo.ArgumentList.Add(TestBuildConfiguration.Name);
-        startInfo.ArgumentList.Add("--no-build");
-        startInfo.ArgumentList.Add("--");
-
-        foreach (var arg in args)
-            startInfo.ArgumentList.Add(arg);
-
-        return Process.Start(startInfo)!;
-    }
+    private static Process StartToolkitCommand(params string[] args) =>
+        ToolkitProcess.Start(null, args);
 
     private static async Task WaitForServerAsync(HttpClient httpClient, int port, Process process)
     {
@@ -112,9 +92,4 @@ public class WebCommandIntegrationTests : IDisposable
         listener.Stop();
         return port;
     }
-
-    private static string GetToolkitProjectPath() =>
-        Path.GetFullPath(Path.Combine(
-            AppContext.BaseDirectory,
-            "../../../../Pixelbadger.Toolkit/Pixelbadger.Toolkit.csproj"));
 }

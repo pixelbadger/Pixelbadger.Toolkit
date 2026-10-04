@@ -482,39 +482,8 @@ public class CryptoCommandIntegrationTests : IDisposable
         stdout.Should().Contain("Error:");
     }
 
-    private static async Task<(int ExitCode, string StandardOutput, string StandardError)> RunToolkitCommandAsync(params string[] args)
-    {
-        var projectPath = GetToolkitProjectPath();
-        var startInfo = new ProcessStartInfo("dotnet")
-        {
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false
-        };
-
-        startInfo.ArgumentList.Add("run");
-        startInfo.ArgumentList.Add("--project");
-        startInfo.ArgumentList.Add(projectPath);
-        startInfo.ArgumentList.Add("-c");
-        startInfo.ArgumentList.Add(TestBuildConfiguration.Name);
-        startInfo.ArgumentList.Add("--no-build");
-        startInfo.ArgumentList.Add("--");
-
-        foreach (var arg in args)
-            startInfo.ArgumentList.Add(arg);
-
-        using var process = Process.Start(startInfo)!;
-        var standardOutput = await process.StandardOutput.ReadToEndAsync();
-        var standardError = await process.StandardError.ReadToEndAsync();
-        await process.WaitForExitAsync();
-
-        return (process.ExitCode, standardOutput, standardError);
-    }
-
-    private static string GetToolkitProjectPath() =>
-        Path.GetFullPath(Path.Combine(
-            AppContext.BaseDirectory,
-            "../../../../Pixelbadger.Toolkit/Pixelbadger.Toolkit.csproj"));
+    private static Task<(int ExitCode, string StandardOutput, string StandardError)> RunToolkitCommandAsync(params string[] args) =>
+        ToolkitProcess.RunAsync(null, args);
 
     private static async Task WriteKeyFilesAsync(string publicKeyFile, string privateKeyFile)
     {
