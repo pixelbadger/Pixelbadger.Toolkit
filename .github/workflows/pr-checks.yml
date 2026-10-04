@@ -245,8 +245,10 @@ jobs:
               {
                 echo "## Failed job: $JOB_NAME"
                 echo '```'
-                gh api "repos/${{ github.repository }}/actions/jobs/$JOB_ID/logs" 2>/dev/null \
-                  | sed -E 's/^[0-9T:.-]+Z //' | grep -vE '^\s*Passed ' | tail -150
+                # --log-failed prints only the failed steps as "job<TAB>step<TAB>line".
+                gh run view --job "$JOB_ID" --log-failed --repo "${{ github.repository }}" \
+                  | cut -f3- | sed -E 's/^[0-9T:.-]+Z //' | grep -vE '^\s*Passed ' | tail -200 \
+                  || echo "(could not fetch logs for job $JOB_ID)"
                 echo '```'
                 echo
               } >> "$OUT"
