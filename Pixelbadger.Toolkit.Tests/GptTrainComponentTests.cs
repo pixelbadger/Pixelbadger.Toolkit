@@ -91,9 +91,9 @@ public class GptTrainComponentTests
     {
         var corpus = string.Concat(Enumerable.Repeat("the quick brown fox. ", 30));
         var saved = CaptureSavedWeights();
-        // A huge learning rate makes later steps diverge, so best and final validation losses differ.
+        // An oversized learning rate makes later steps diverge, so best and final validation losses differ.
         var options = new GptTrainOptions(
-            Steps: 12, BatchSize: 4, BlockSize: 8, NEmbd: 16, NHead: 2, NLayer: 1, LearningRate: 5f,
+            Steps: 12, BatchSize: 4, BlockSize: 8, NEmbd: 16, NHead: 2, NLayer: 1, LearningRate: 2f,
             Seed: 1, Tokenizer: TokenizerKind.Char, ValidationSplit: 0.25f, EvalInterval: 3);
 
         var result = await _component.TrainAsync(corpus, "out", options);
