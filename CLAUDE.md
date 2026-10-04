@@ -6,7 +6,7 @@ This project is a CLI toolkit exposing varied functionality organized by topic.
 CLI arguments follow a topic-action pattern: `[topic] [action] [options]`.
 For example, the CLI arguments "strings reverse --in-file hw.txt --out-file hw-reversed.txt" would read the content of in-file and output the reversed string to the path of out-file.
 
-The project is .NET 9, and uses Microsoft's System.CommandLine library for building argument sets.
+The project is .NET 10, and uses Microsoft's System.CommandLine library for building argument sets.
 
 ## Development Workflow
 

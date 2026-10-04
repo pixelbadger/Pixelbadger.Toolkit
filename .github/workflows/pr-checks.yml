@@ -149,7 +149,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '9.0.x'
+          dotnet-version: '10.0.x'
       - name: Check version increment
         shell: pwsh
         run: |
@@ -164,7 +164,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '9.0.x'
+          dotnet-version: '10.0.x'
       - name: Restore dependencies
         run: dotnet restore
       - name: Build
@@ -398,7 +398,7 @@ jobs:
         if: steps.limit.outputs.stop != 'true'
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '9.0.x'
+          dotnet-version: '10.0.x'
 
       - name: Run Claude Code Agent (review → iteration)
         if: steps.limit.outputs.stop != 'true'
