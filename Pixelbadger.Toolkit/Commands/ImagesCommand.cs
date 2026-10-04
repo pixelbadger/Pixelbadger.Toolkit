@@ -20,14 +20,14 @@ public static class ImagesCommand
     {
         var command = new Command("display", "Render an image in the terminal");
 
-        var fileArgument = new Argument<string>("file") { Description = "Input image file path" };
-        command.Add(fileArgument);
+        var fileOption = new Option<string>("--file") { Description = "Input image file path", Required = true };
+        command.Add(fileOption);
 
         command.SetAction((parseResult) =>
         {
             try
             {
-                var file = parseResult.GetValue(fileArgument)!;
+                var file = parseResult.GetValue(fileOption)!;
                 new ImageDisplayComponent(AnsiConsole.Console).Display(file);
             }
             catch (Exception ex)

@@ -68,7 +68,7 @@ The project is .NET 9, and uses Microsoft's System.CommandLine library for build
 - **Run with examples**:
   - `pbtk strings reverse --in-file hello.txt --out-file hello-reversed.txt`
   - `pbtk strings levenshtein-distance --string1 "hello" --string2 "world"`
-  - `pbtk images display ./ship.png`
+  - `pbtk images display --file ./ship.png`
   - `pbtk interpreters brainfuck --file hello.bf`
   - `pbtk interpreters ook --file hello.ook`
   - `pbtk interpreters bf-to-ook --source hello.bf --output hello.ook`
