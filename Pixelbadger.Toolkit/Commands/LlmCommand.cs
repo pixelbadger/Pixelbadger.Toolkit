@@ -15,6 +15,7 @@ public static class LlmCommand
         command.Add(CreateTranslateCommand());
         command.Add(CreateOcaaarCommand());
         command.Add(CreateCorpospeakCommand());
+        command.Add(CreateGenerateImageCommand());
         command.Add(CreateHistoryCommand());
 
         return command;
@@ -191,6 +192,44 @@ public static class LlmCommand
                 var result = await corpospeakComponent.CorpospeakAsync(source, audience, userMessages);
 
                 AnsiConsole.WriteLine(result);
+            }
+            catch (Exception ex)
+            {
+                AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
+                Environment.Exit(1);
+            }
+        });
+
+        return command;
+    }
+
+    internal static Command CreateGenerateImageCommand()
+    {
+        var command = new Command("generate-image", "Generate an image from a text prompt using OpenAI");
+
+        var promptOption = new Option<string>("--prompt") { Description = "The prompt describing the image to generate", Required = true };
+        var outFileOption = new Option<string>("--out-file") { Description = "Path to write the generated image to", Required = true };
+        var modelOption = new Option<string>("--model") { Description = "The image model to use", DefaultValueFactory = _ => OpenAiImageGenerationService.DefaultModel };
+
+        var overwriteOption = new Option<bool>("--overwrite") { Description = "Replace --out-file if it already exists" };
+
+        command.Add(promptOption);
+        command.Add(outFileOption);
+        command.Add(modelOption);
+        command.Add(overwriteOption);
+
+        command.SetAction(async (parseResult, cancellationToken) =>
+        {
+            try
+            {
+                var prompt = parseResult.GetValue(promptOption)!;
+                var outFile = parseResult.GetValue(outFileOption)!;
+                var model = parseResult.GetValue(modelOption)!;
+
+                var component = new GenerateImageComponent(new OpenAiImageGenerationService(model));
+                var path = await component.GenerateImageAsync(prompt, outFile, parseResult.GetValue(overwriteOption));
+
+                AnsiConsole.MarkupLine($"[green]Image written to {Markup.Escape(path)}[/]");
             }
             catch (Exception ex)
             {

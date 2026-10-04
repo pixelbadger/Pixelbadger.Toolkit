@@ -76,6 +76,7 @@ The project is .NET 9, and uses Microsoft's System.CommandLine library for build
   - `pbtk llm chat --message "Solve this hard problem" --reasoning-effort high`
   - `pbtk llm translate --text "Hello, how are you?" --target-language "Spanish"`
   - `pbtk llm ocaaar --image-path ./image.jpg`
+  - `pbtk llm generate-image --prompt "A pirate ship at sunset" --out-file ./ship.png`
   - `pbtk llm corpospeak --source "API performance is great" --audience "csuite"`
   - `pbtk llm corpospeak --source "New feature deployed" --audience "engineering" --user-messages "Hey team" "Let's ship this"`
   - `pbtk gpt train --source corpus.txt --out ./.gpt --steps 2000`
@@ -257,7 +258,7 @@ Available topics and actions:
 - **interpreters**: brainfuck, ook, bf-to-ook
 - **images**: steganography
 - **web**: serve-html
-- **llm**: chat, translate, ocaaar, corpospeak
+- **llm**: chat, translate, ocaaar, corpospeak, generate-image
 - **gpt**: train, complete
 
 ## Dependencies

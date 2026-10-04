@@ -22,6 +22,7 @@
   <a href="#translate">translate</a>
   <a href="#ocaaar">ocaaar</a>
   <a href="#corpospeak">corpospeak</a>
+  <a href="#generate-image">generate-image</a>
   <a href="#history-list">history list</a>
   <a href="#history-delete">history delete</a>
   <a href="#command-ref">Command Reference</a>
@@ -262,6 +263,32 @@ flowchart LR
     </table>
   </section>
 
+  <!-- GENERATE-IMAGE -->
+  <section id="generate-image">
+    <h2>generate-image</h2>
+    <p>
+      Generates an image from a text prompt using the OpenAI image API (<code>gpt-image-1</code> by default)
+      and writes it to the given file. Uses the <code>OPENAI_API_KEY</code> environment variable. This
+      command does not create a history session.
+    </p>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk llm generate-image</span>
+      <span class="opt"> --prompt</span> <span class="val">"A pirate ship at sunset"</span>
+      <span class="opt"> --out-file</span> <span class="val">./ship.png</span>
+    </div>
+
+    <table>
+      <thead><tr><th>Option</th><th>Required</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--prompt</code></td><td>Yes</td><td>&mdash;</td><td>Prompt describing the image to generate</td></tr>
+        <tr><td><code>--out-file</code></td><td>Yes</td><td>&mdash;</td><td>Path to write the generated image to</td></tr>
+        <tr><td><code>--model</code></td><td>No</td><td><code>gpt-image-1</code></td><td>Image model to use</td></tr>
+        <tr><td><code>--overwrite</code></td><td>No</td><td>off</td><td>Replace <code>--out-file</code> if it already exists (otherwise the command fails)</td></tr>
+      </tbody>
+    </table>
+  </section>
+
   <!-- HISTORY LIST -->
   <section id="history-list">
     <h2>history list</h2>
@@ -345,6 +372,12 @@ flowchart LR
           <td><code>--source</code> <code>--audience</code></td>
           <td><code>--user-messages</code> <code>--model</code></td>
           <td>Rewritten text to stdout</td>
+        </tr>
+        <tr>
+          <td><code>llm generate-image</code></td>
+          <td><code>--prompt</code> <code>--out-file</code></td>
+          <td><code>--model</code> <code>--overwrite</code></td>
+          <td>Image file written to <code>--out-file</code></td>
         </tr>
         <tr>
           <td><code>llm history list</code></td>
