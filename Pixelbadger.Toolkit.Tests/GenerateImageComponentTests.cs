@@ -83,4 +83,29 @@ public class GenerateImageComponentTests : IDisposable
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("boom");
         File.Exists(outFile).Should().BeFalse();
     }
+
+    [Fact]
+    public async Task GenerateImageAsync_ShouldThrowWithoutCallingService_WhenFileExistsAndNoOverwrite()
+    {
+        var outFile = Path.Combine(_testDirectory, "exists.png");
+        await File.WriteAllBytesAsync(outFile, new byte[] { 7 });
+
+        var act = () => _component.GenerateImageAsync("p", outFile);
+
+        await act.Should().ThrowAsync<IOException>().WithMessage("*already exists*");
+        (await File.ReadAllBytesAsync(outFile)).Should().Equal(new byte[] { 7 });
+        _mockService.Verify(x => x.GenerateImageAsync(It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GenerateImageAsync_ShouldReplaceFile_WhenFileExistsAndOverwrite()
+    {
+        _mockService.Setup(x => x.GenerateImageAsync("p")).ReturnsAsync(new byte[] { 5, 6 });
+        var outFile = Path.Combine(_testDirectory, "exists.png");
+        await File.WriteAllBytesAsync(outFile, new byte[] { 7 });
+
+        await _component.GenerateImageAsync("p", outFile, overwrite: true);
+
+        (await File.ReadAllBytesAsync(outFile)).Should().Equal(new byte[] { 5, 6 });
+    }
 }

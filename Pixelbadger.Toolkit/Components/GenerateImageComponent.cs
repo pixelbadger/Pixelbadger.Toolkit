@@ -11,7 +11,7 @@ public class GenerateImageComponent
         _imageGenerationService = imageGenerationService;
     }
 
-    public async Task<string> GenerateImageAsync(string prompt, string outFile)
+    public async Task<string> GenerateImageAsync(string prompt, string outFile, bool overwrite = false)
     {
         if (string.IsNullOrWhiteSpace(prompt))
             throw new ArgumentException("Prompt must not be empty.", nameof(prompt));
@@ -19,6 +19,9 @@ public class GenerateImageComponent
             throw new ArgumentException("Output file path must not be empty.", nameof(outFile));
 
         var resolvedPath = Path.GetFullPath(outFile);
+        if (!overwrite && File.Exists(resolvedPath))
+            throw new IOException($"Output file already exists: {resolvedPath}. Use --overwrite to replace it.");
+
         var imageBytes = await _imageGenerationService.GenerateImageAsync(prompt);
 
         var directory = Path.GetDirectoryName(resolvedPath);

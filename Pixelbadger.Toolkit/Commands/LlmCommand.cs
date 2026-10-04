@@ -203,7 +203,7 @@ public static class LlmCommand
         return command;
     }
 
-    private static Command CreateGenerateImageCommand()
+    internal static Command CreateGenerateImageCommand()
     {
         var command = new Command("generate-image", "Generate an image from a text prompt using OpenAI");
 
@@ -211,9 +211,12 @@ public static class LlmCommand
         var outFileOption = new Option<string>("--out-file") { Description = "Path to write the generated image to", Required = true };
         var modelOption = new Option<string>("--model") { Description = "The image model to use", DefaultValueFactory = _ => OpenAiImageGenerationService.DefaultModel };
 
+        var overwriteOption = new Option<bool>("--overwrite") { Description = "Replace --out-file if it already exists" };
+
         command.Add(promptOption);
         command.Add(outFileOption);
         command.Add(modelOption);
+        command.Add(overwriteOption);
 
         command.SetAction(async (parseResult, cancellationToken) =>
         {
@@ -224,7 +227,7 @@ public static class LlmCommand
                 var model = parseResult.GetValue(modelOption)!;
 
                 var component = new GenerateImageComponent(new OpenAiImageGenerationService(model));
-                var path = await component.GenerateImageAsync(prompt, outFile);
+                var path = await component.GenerateImageAsync(prompt, outFile, parseResult.GetValue(overwriteOption));
 
                 AnsiConsole.MarkupLine($"[green]Image written to {Markup.Escape(path)}[/]");
             }
