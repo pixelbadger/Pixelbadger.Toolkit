@@ -47,9 +47,14 @@ public static class GptCommand
         var vocabSizeOption = new Option<int>("--vocab-size") { Description = "Target vocabulary size for the bpe tokenizer (>= 256; ignored for char)", DefaultValueFactory = _ => 512 };
         var lossGraphOption = new Option<string?>("--loss-graph") { Description = "Path to write an HTML graph of the per-step training loss" };
 
+        var valSplitOption = new Option<float>("--validation-split") { Description = "Fraction of the corpus (taken from the end) held out for validation; 0 disables (default)", DefaultValueFactory = _ => 0f };
+        var evalIntervalOption = new Option<int>("--eval-interval") { Description = "Run validation every N steps (and at the final step)", DefaultValueFactory = _ => 100 };
+
         command.Add(sourceOption);
         command.Add(outOption);
         command.Add(stepsOption);
+        command.Add(valSplitOption);
+        command.Add(evalIntervalOption);
         command.Add(batchSizeOption);
         command.Add(blockSizeOption);
         command.Add(nEmbdOption);
@@ -80,7 +85,9 @@ public static class GptCommand
                     Resume: parseResult.GetValue(resumeOption),
                     Tokenizer: parseResult.GetValue(tokenizerOption),
                     VocabSize: parseResult.GetValue(vocabSizeOption),
-                    LossGraphPath: parseResult.GetValue(lossGraphOption));
+                    LossGraphPath: parseResult.GetValue(lossGraphOption),
+                    ValidationSplit: parseResult.GetValue(valSplitOption),
+                    EvalInterval: parseResult.GetValue(evalIntervalOption));
 
                 var corpus = await ResolveTextOrFilePath(source);
 
@@ -89,7 +96,8 @@ public static class GptCommand
                 {
                     if (step == 1 || step % 100 == 0 || step == options.Steps)
                         AnsiConsole.MarkupLine($"[grey]step[/] {step}/{options.Steps}  [yellow]loss[/] {loss:F4}");
-                });
+                }, (step, loss, valLoss) =>
+                    AnsiConsole.MarkupLine($"[grey]step[/] {step}/{options.Steps}  [yellow]train loss[/] {loss:F4}  [cyan]val loss[/] {valLoss:F4}"));
 
                 var charsPerToken = result.CorpusTokenCount > 0 ? (double)corpus.Length / result.CorpusTokenCount : 0d;
                 AnsiConsole.MarkupLine(
@@ -104,6 +112,14 @@ public static class GptCommand
                 AnsiConsole.MarkupLine(
                     $"[grey]Sampled[/] {result.TokensSeen:N0}/{result.CorpusTokenCount:N0} corpus tokens ({corpusCoverage:F1}%), " +
                     $"{result.VocabEntriesSeen:N0}/{result.VocabSize:N0} vocab entries ({vocabCoverage:F1}%){across}");
+
+                if (options.ValidationSplit > 0f && result.ValidationTokenCount == 0)
+                    AnsiConsole.MarkupLine("[yellow]Warning:[/] corpus too short for the requested validation split; validation was skipped.");
+
+                if (result.BestValidationLoss is not null)
+                    AnsiConsole.MarkupLine(
+                        $"[grey]Validation[/] ({result.ValidationTokenCount:N0} held-out tokens): final {result.FinalValidationLoss:F4}, " +
+                        $"best {result.BestValidationLoss:F4} at step {result.BestValidationStep} — checkpoint holds the best weights");
 
                 if (result.LossGraphPath is not null)
                     AnsiConsole.MarkupLine($"[green]Loss graph:[/] {Markup.Escape(Path.GetFullPath(result.LossGraphPath))}");
