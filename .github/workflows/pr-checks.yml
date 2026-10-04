@@ -254,7 +254,7 @@ jobs:
             - If issues found: `gh pr review ${{ github.event.pull_request.number }} --request-changes --body "<summary>"`
             Do not finish without running one of these two commands.
 
-          claude_args: '--model claude-sonnet-4-6 --max-turns 30 --allowed-tools "Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*),Bash(gh pr review:*),Bash(gh pr checks:*),Bash(gh api:*)"'
+          claude_args: '--model claude-sonnet-5-5 --max-turns 30 --allowed-tools "Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*),Bash(gh pr review:*),Bash(gh pr checks:*),Bash(gh api:*)"'
 
       - name: Follow-up review (latest commit only)
         if: steps.review-type.outputs.type == 'followup'
@@ -278,4 +278,4 @@ jobs:
             - If issues remain or new problems found: `gh pr review ${{ github.event.pull_request.number }} --request-changes --body "<summary>"`
             Do not finish without running one of these two commands.
 
-          claude_args: '--model claude-sonnet-4-6 --max-turns 20 --allowed-tools "Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*),Bash(gh pr review:*),Bash(gh pr checks:*),Bash(gh api:*)"'
+          claude_args: '--model claude-sonnet-5-5 --max-turns 20 --allowed-tools "Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*),Bash(gh pr review:*),Bash(gh pr checks:*),Bash(gh api:*)"'
