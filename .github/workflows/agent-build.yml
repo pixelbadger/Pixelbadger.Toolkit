@@ -160,7 +160,8 @@ jobs:
             --body-file "$RUNNER_TEMP/fallback-pr-body.md"
 
   agent-build-review:
-    if: "github.event_name == 'pull_request_review' && github.event.review.state != 'approved' && contains(github.event.review.user.login, 'claude')"
+    # Automated reviews are handled by the claude-fix job in pr-checks.yml; this job responds to humans.
+    if: "github.event_name == 'pull_request_review' && github.event.review.state == 'changes_requested' && github.event.review.user.type != 'Bot'"
     concurrency:
       group: agent-build-pr-${{ github.event.pull_request.number }}
       cancel-in-progress: true
@@ -192,6 +193,7 @@ jobs:
             PR #${{ github.event.pull_request.number }} has received a review requesting changes.
 
             1. Read the review comments: `gh pr view ${{ github.event.pull_request.number }} --comments`
+               and the inline comments: `gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments`
             2. Read the full diff to understand context: `gh pr diff ${{ github.event.pull_request.number }}`
             3. Address every issue raised in the review — fix the code, tests, or documentation as needed
             4. Verify: `dotnet build && dotnet test`
@@ -199,4 +201,4 @@ jobs:
             6. Push: `git push`
 
             Do not open a new PR. Push to the existing branch only. Follow all instructions in CLAUDE.md.
-          claude_args: '--model claude-sonnet-5-5 --max-turns 40 --dangerously-skip-permissions'
+          claude_args: '--model claude-sonnet-5-5 --max-turns 40 --permission-mode auto'
