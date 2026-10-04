@@ -10,7 +10,7 @@
 
 <header>
   <h1>Demoscene <span class="badge">demoscene</span></h1>
-  <div class="subtitle">Classic Amiga demoscene effects rendered in the terminal using half-block ANSI characters</div>
+  <div class="subtitle">Classic Amiga and IBM PC demoscene effects rendered in the terminal using half-block ANSI characters</div>
   <div class="meta">Pixelbadger Toolkit &mdash; <code>pbtk demoscene</code> &mdash; <a href="index.html" style="color:#60a5fa">&#8592; all topics</a></div>
 </header>
 
@@ -18,6 +18,10 @@
   <a href="#overview">Overview</a>
   <a href="#kefrens">kefrens</a>
   <a href="#boing">boing</a>
+  <a href="#plasma">plasma</a>
+  <a href="#fire">fire</a>
+  <a href="#copper">copper</a>
+  <a href="#showcase">showcase</a>
   <a href="#command-ref">Command Reference</a>
 </nav>
 
@@ -27,13 +31,13 @@
   <section id="overview">
     <h2>Overview</h2>
     <p>
-      The <code>demoscene</code> topic renders classic Amiga demoscene effects directly in your terminal.
+      The <code>demoscene</code> topic renders classic Amiga and IBM PC demoscene effects directly in your terminal.
       It uses the Unicode upper half block character <code>&#x2580;</code> (U+2580) with 24-bit ANSI colour codes
       to double the effective pixel density: the foreground colour paints the top half of each character cell
       and the background colour paints the bottom half, giving two pixel rows per terminal row.
     </p>
     <p>
-      Both effects animate in real time, running for a configurable number of frames at ~20 fps before returning
+      All effects animate in real time, running for a configurable number of frames at ~20 fps before returning
       to the shell. Press <kbd>Ctrl+C</kbd> at any time to stop early.
     </p>
 
@@ -106,6 +110,102 @@
     </table>
   </section>
 
+  <!-- PLASMA -->
+  <section id="plasma">
+    <h2>plasma</h2>
+    <p>
+      Renders the classic IBM PC plasma — several sine fields are summed per pixel and looked up in a smoothly cycling rainbow palette.
+    </p>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk demoscene plasma</span>
+    </div>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk demoscene plasma</span>
+      <span class="opt"> --frames</span> <span class="val">400</span>
+    </div>
+
+    <table>
+      <thead><tr><th>Option</th><th>Required</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--frames</code></td><td>No</td><td>200</td><td>Number of animation frames to render before exiting</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- FIRE -->
+  <section id="fire">
+    <h2>fire</h2>
+    <p>
+      Renders the classic IBM PC fire effect — random embers on the bottom row are averaged upward each frame and cooled, mapped through a black-red-yellow-white palette.
+    </p>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk demoscene fire</span>
+    </div>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk demoscene fire</span>
+      <span class="opt"> --frames</span> <span class="val">400</span>
+    </div>
+
+    <table>
+      <thead><tr><th>Option</th><th>Required</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--frames</code></td><td>No</td><td>200</td><td>Number of animation frames to render before exiting</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- COPPER -->
+  <section id="copper">
+    <h2>copper</h2>
+    <p>
+      Renders classic Amiga copper bars — shaded horizontal raster bars with metallic highlights that weave in front of and behind each other.
+    </p>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk demoscene copper</span>
+    </div>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk demoscene copper</span>
+      <span class="opt"> --frames</span> <span class="val">400</span>
+    </div>
+
+    <table>
+      <thead><tr><th>Option</th><th>Required</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--frames</code></td><td>No</td><td>200</td><td>Number of animation frames to render before exiting</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- SHOWCASE -->
+  <section id="showcase">
+    <h2>showcase</h2>
+    <p>
+      Plays every demoscene effect in sequence (boing, plasma, kefrens, fire, copper), alternating Amiga and IBM PC classics.
+    </p>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk demoscene showcase</span>
+    </div>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk demoscene showcase</span>
+      <span class="opt"> --frames</span> <span class="val">300</span>
+    </div>
+
+    <table>
+      <thead><tr><th>Option</th><th>Required</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--frames</code></td><td>No</td><td>200</td><td>Number of animation frames to render for each effect</td></tr>
+      </tbody>
+    </table>
+  </section>
+
   <!-- COMMAND REFERENCE -->
   <section id="command-ref">
     <h2>Command Reference</h2>
@@ -119,6 +219,22 @@
         <tr>
           <td><code>pbtk demoscene boing [--frames N]</code></td>
           <td>Animate the classic Amiga Boing Ball bouncing on a grey grid</td>
+        </tr>
+        <tr>
+          <td><code>pbtk demoscene plasma [--frames N]</code></td>
+          <td>Animate the IBM PC sine-field plasma</td>
+        </tr>
+        <tr>
+          <td><code>pbtk demoscene fire [--frames N]</code></td>
+          <td>Animate the IBM PC fire effect</td>
+        </tr>
+        <tr>
+          <td><code>pbtk demoscene copper [--frames N]</code></td>
+          <td>Animate Amiga copper raster bars</td>
+        </tr>
+        <tr>
+          <td><code>pbtk demoscene showcase [--frames N]</code></td>
+          <td>Play all demoscene effects in sequence</td>
         </tr>
       </tbody>
     </table>

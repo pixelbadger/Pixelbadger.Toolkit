@@ -66,7 +66,7 @@ dotnet tool install --global --add-source ./bin/Release Pixelbadger.Toolkit
 | `oauth` | OAuth token management — acquire tokens, manage connection profiles |
 | `crypto` | Paillier homomorphic encryption — encrypt, decrypt, and perform arithmetic on ciphertext |
 | `markov` | Markov chain text generation — train a model from a corpus, generate completions |
-| `demoscene` | Classic Amiga demoscene effects — Kefrens bars and Boing Ball rendered in the terminal |
+| `demoscene` | Classic Amiga and IBM PC demoscene effects — Kefrens bars, Boing Ball, plasma, fire, copper bars and a showcase mode rendered in the terminal |
 
 ### gpt
 

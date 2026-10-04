@@ -55,6 +55,8 @@ public class PixelBuffer
 
     // Returns an ANSI string rendering the pixel buffer using ▀ (U+2580 UPPER HALF BLOCK).
     // Each terminal row represents 2 pixel rows: top pixel = foreground, bottom pixel = background.
+    // Colour escapes are only emitted when the colour changes from the previous cell in the row,
+    // which substantially reduces the bytes written per frame on flat regions.
     public string Render()
     {
         var sb = new System.Text.StringBuilder(Width * (Height / 2) * 40);
@@ -62,13 +64,19 @@ public class PixelBuffer
 
         for (int row = 0; row < terminalRows; row++)
         {
+            PixelColor? lastTop = null, lastBottom = null;
             for (int x = 0; x < Width; x++)
             {
                 var top = _pixels[row * 2 * Width + x];
                 var bottom = _pixels[(row * 2 + 1) * Width + x];
 
-                // foreground = top pixel, background = bottom pixel
-                sb.Append($"\x1b[38;2;{top.R};{top.G};{top.B}m\x1b[48;2;{bottom.R};{bottom.G};{bottom.B}m▀");
+                if (lastTop != top)
+                    sb.Append("\x1b[38;2;").Append(top.R).Append(';').Append(top.G).Append(';').Append(top.B).Append('m');
+                if (lastBottom != bottom)
+                    sb.Append("\x1b[48;2;").Append(bottom.R).Append(';').Append(bottom.G).Append(';').Append(bottom.B).Append('m');
+                sb.Append('▀');
+                lastTop = top;
+                lastBottom = bottom;
             }
             sb.Append("\x1b[0m\n");
         }

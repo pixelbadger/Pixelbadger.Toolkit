@@ -1,6 +1,6 @@
 namespace Pixelbadger.Toolkit.Components;
 
-public class KefrensBarsComponent
+public class KefrensBarsComponent : IDemoEffect
 {
     private static readonly PixelColor Background = new(10, 10, 20);
 

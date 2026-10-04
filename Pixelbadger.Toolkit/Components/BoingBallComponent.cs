@@ -1,6 +1,6 @@
 namespace Pixelbadger.Toolkit.Components;
 
-public class BoingBallComponent
+public class BoingBallComponent : IDemoEffect
 {
     private static readonly PixelColor BackgroundColor = new(180, 180, 180);
     private static readonly PixelColor GridColor = new(120, 120, 120);
