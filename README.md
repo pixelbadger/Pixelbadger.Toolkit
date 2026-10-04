@@ -60,7 +60,7 @@ dotnet tool install --global --add-source ./bin/Release Pixelbadger.Toolkit
 |---|---|
 | `strings` | String manipulation — reverse, Levenshtein distance, abjadify, Flesch reading ease, report |
 | `interpreters` | Esoteric language interpreters — Brainfuck, Ook, bf-to-ook |
-| `images` | Image steganography — hide and recover messages in PNG files |
+| `images` | Image steganography and terminal image display |
 | `web` | Local web server — serve a single HTML file over HTTP |
 | `llm` | LLM utilities — chat, translate, OCR, corpospeak, session history |
 | `oauth` | OAuth token management — acquire tokens, manage connection profiles |

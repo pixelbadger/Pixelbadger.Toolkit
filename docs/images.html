@@ -20,6 +20,7 @@
   <a href="#how-it-works">How It Works</a>
   <a href="#encode">Encode</a>
   <a href="#decode">Decode</a>
+  <a href="#display">Display</a>
   <a href="#command-ref">Command Reference</a>
 </nav>
 
@@ -148,6 +149,25 @@ flowchart TD
     </table>
   </section>
 
+  <!-- DISPLAY -->
+  <section id="display">
+    <h2>Display</h2>
+    <p>Render an image in the terminal using Spectre.Console's <code>CanvasImage</code>. The image is
+    scaled down to fit the terminal width. Handy for previewing the output of <code>llm generate-image</code>.</p>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk images display</span>
+      <span class="opt"> --file</span><span class="val"> ship.png</span>
+    </div>
+
+    <table>
+      <thead><tr><th>Option</th><th>Required</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--file</code></td><td>Yes</td><td>Path to the image file to render (any format supported by ImageSharp)</td></tr>
+      </tbody>
+    </table>
+  </section>
+
   <!-- COMMAND REFERENCE -->
   <section id="command-ref">
     <h2>Command Reference</h2>
@@ -173,6 +193,12 @@ flowchart TD
           <td><code>--image</code></td>
           <td>&mdash;</td>
           <td>Recovered message printed to stdout</td>
+        </tr>
+        <tr>
+          <td><code>images display</code></td>
+          <td><code>--file</code></td>
+          <td>&mdash;</td>
+          <td>Image rendered in the terminal</td>
         </tr>
       </tbody>
     </table>
