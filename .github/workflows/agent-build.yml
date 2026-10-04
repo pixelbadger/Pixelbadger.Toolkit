@@ -28,6 +28,7 @@ jobs:
           dotnet-version: '9.0.x'
 
       - name: Run Claude Code Agent (issue → implementation)
+        id: claude
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -61,6 +62,18 @@ jobs:
 
             Follow all instructions in CLAUDE.md. Do what has been asked; nothing more, nothing less.
           claude_args: '--model claude-sonnet-5-5 --dangerously-skip-permissions'
+
+      # Diagnostic: on failure, print only the error fields from the result
+      # message (not the full transcript, which show_full_output would expose).
+      - name: Show Claude error on failure
+        if: failure()
+        env:
+          EXECUTION_FILE: ${{ steps.claude.outputs.execution_file }}
+        run: |
+          f="${EXECUTION_FILE:-$RUNNER_TEMP/claude-execution-output.json}"
+          if [ ! -f "$f" ]; then echo "No execution file at $f"; exit 0; fi
+          jq '[.[] | select(.type == "result") | {subtype, is_error, api_error_status, result, errors}]' "$f" \
+            || jq -c '.[-1] | {type, subtype, is_error, result, errors}' "$f"
 
   agent-build-review:
     if: "github.event_name == 'pull_request_review' && github.event.review.state != 'approved' && contains(github.event.review.user.login, 'claude')"
