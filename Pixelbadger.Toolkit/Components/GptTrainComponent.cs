@@ -6,6 +6,10 @@ namespace Pixelbadger.Toolkit.Components;
 /// <param name="LossHistory">Loss for every training step of every run against this checkpoint, in order.</param>
 /// <param name="TokensSeenHistory">Cumulative count of distinct corpus positions sampled, per step.</param>
 /// <param name="RunBoundaries">Cumulative step counts at the end of each run, including this one.</param>
+/// <param name="FinalValidationLoss">Validation loss at the last step, or null when no validation set was held out.</param>
+/// <param name="BestValidationLoss">Lowest validation loss seen; the saved checkpoint holds the weights from that step.</param>
+/// <param name="BestValidationStep">Step of this run at which the best validation loss occurred.</param>
+/// <param name="ValidationTokenCount">Tokens held out from the end of the corpus for validation.</param>
 /// <param name="TokensSeen">Distinct corpus positions sampled so far, out of <paramref name="CorpusTokenCount"/>.</param>
 /// <param name="VocabEntriesSeen">Distinct vocabulary entries sampled so far, out of <paramref name="VocabSize"/>.</param>
 public record GptTrainResult(
@@ -20,7 +24,11 @@ public record GptTrainResult(
     IReadOnlyList<int> RunBoundaries,
     int TokensSeen,
     int VocabEntriesSeen,
-    string? LossGraphPath = null)
+    string? LossGraphPath = null,
+    float? FinalValidationLoss = null,
+    float? BestValidationLoss = null,
+    int BestValidationStep = 0,
+    int ValidationTokenCount = 0)
 {
     /// <summary>Steps accumulated across every run that has trained this checkpoint.</summary>
     public int TotalSteps => LossHistory.Count;
@@ -38,7 +46,9 @@ public record GptTrainOptions(
     bool Resume = false,
     TokenizerKind Tokenizer = TokenizerKind.Bpe,
     int VocabSize = 512,
-    string? LossGraphPath = null);
+    string? LossGraphPath = null,
+    float ValidationSplit = 0.1f,
+    int EvalInterval = 100);
 
 /// <summary>
 /// Trains a tiny char-level GPT from a text corpus by gradient descent and writes a checkpoint.
@@ -63,7 +73,8 @@ public class GptTrainComponent
         string corpus,
         string outputDirectory,
         GptTrainOptions options,
-        Action<int, float>? onProgress = null)
+        Action<int, float>? onProgress = null,
+        Action<int, float, float>? onValidation = null)
     {
         if (string.IsNullOrEmpty(corpus))
             throw new ArgumentException("Training corpus is empty.", nameof(corpus));
@@ -104,6 +115,24 @@ public class GptTrainComponent
             throw new ArgumentException(
                 $"Corpus is too short ({data.Length} chars) for block size {config.BlockSize}; need at least {config.BlockSize + 1}.");
 
+        // The tail of the corpus is held out for validation; batches are only drawn from the head.
+        int validationLength = 0;
+        if (options.ValidationSplit > 0f)
+        {
+            if (options.ValidationSplit >= 1f)
+                throw new ArgumentException("validation-split must be less than 1.");
+            validationLength = (int)(data.Length * options.ValidationSplit);
+            // Too little text to form a validation window or leave a training window: skip validation.
+            if (validationLength < config.BlockSize + 1 || data.Length - validationLength < config.BlockSize + 1)
+                validationLength = 0;
+        }
+        var trainData = validationLength > 0 ? data[..^validationLength] : data;
+        var validationData = validationLength > 0 ? data[^validationLength..] : null;
+        float bestValidationLoss = float.PositiveInfinity;
+        int bestValidationStep = 0;
+        float[][]? bestWeights = null;
+        float? lastValidationLoss = null;
+
         var rng = new Random(options.Seed);
 
         // Resuming picks up the checkpoint's recorded history so the graph spans every run, not just this one.
@@ -138,7 +167,7 @@ public class GptTrainComponent
         float lastLoss = 0f;
         for (int step = 1; step <= options.Steps; step++)
         {
-            var (inputs, targets, starts) = SampleBatch(data, options.BatchSize, config.BlockSize, rng);
+            var (inputs, targets, starts) = SampleBatch(trainData, options.BatchSize, config.BlockSize, rng);
 
             foreach (int start in starts)
             {
@@ -170,7 +199,25 @@ public class GptTrainComponent
             lossHistory.Add(lastLoss);
             tokensSeenHistory.Add(positionsSeen);
             onProgress?.Invoke(step, lastLoss);
+
+            if (validationData is not null
+                && (step == options.Steps || (options.EvalInterval > 0 && step % options.EvalInterval == 0)))
+            {
+                var validationLoss = EvaluateLoss(model, validationData, config.BlockSize, options.BatchSize);
+                lastValidationLoss = validationLoss;
+                if (validationLoss < bestValidationLoss)
+                {
+                    bestValidationLoss = validationLoss;
+                    bestValidationStep = step;
+                    bestWeights = model.Parameters().Select(p => (float[])p.Data.Clone()).ToArray();
+                }
+                onValidation?.Invoke(step, lastLoss, validationLoss);
+            }
         }
+
+        // Keep the checkpoint with the lowest validation loss rather than whatever the last step produced.
+        if (bestWeights is not null)
+            model.LoadWeights(bestWeights);
 
         runBoundaries.Add(lossHistory.Count);
 
@@ -193,7 +240,27 @@ public class GptTrainComponent
 
         return new GptTrainResult(
             options.Steps, lastLoss, outputDirectory, parameterCount, tokenizer.VocabSize, data.Length,
-            lossHistory, tokensSeenHistory, runBoundaries, positionsSeen, vocabEntriesSeen, lossGraphPath);
+            lossHistory, tokensSeenHistory, runBoundaries, positionsSeen, vocabEntriesSeen, lossGraphPath,
+            lastValidationLoss,
+            validationData is null || bestWeights is null ? null : bestValidationLoss,
+            bestValidationStep, validationLength);
+    }
+
+    /// <summary>Mean loss over evenly spaced, deterministic windows of the held-out data.</summary>
+    internal static float EvaluateLoss(GptModel model, int[] data, int blockSize, int batchSize)
+    {
+        int maxStart = data.Length - blockSize - 1;
+        int windows = Math.Min(batchSize * 4, maxStart + 1);
+        var inputs = new int[windows][];
+        var targets = new int[windows][];
+        for (int w = 0; w < windows; w++)
+        {
+            int start = windows == 1 ? 0 : (int)((long)maxStart * w / (windows - 1));
+            inputs[w] = data[start..(start + blockSize)];
+            targets[w] = data[(start + 1)..(start + blockSize + 1)];
+        }
+        var (_, loss) = model.Forward(inputs, targets);
+        return loss!.Data[0];
     }
 
     private static int CountSet(bool[] flags)

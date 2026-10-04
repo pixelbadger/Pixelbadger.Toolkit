@@ -439,6 +439,8 @@ flowchart TB
         <tr><td><code>--lr</code></td><td>No</td><td><code>0.0003</code></td><td>Learning rate</td></tr>
         <tr><td><code>--seed</code></td><td>No</td><td><code>1337</code></td><td>Random seed for reproducible runs</td></tr>
         <tr><td><code>--resume</code></td><td>No</td><td><code>false</code></td><td>Resume training from the checkpoint in <code>--out</code> (architecture, tokenizer options, and recorded training history are taken from the checkpoint)</td></tr>
+        <tr><td><code>--validation-split</code></td><td>No</td><td><code>0.1</code></td><td>Fraction of the corpus (taken from the end) held out for validation and never trained on; <code>0</code> disables. Validation is skipped if the held-out text is shorter than <code>block-size + 1</code> tokens</td></tr>
+        <tr><td><code>--eval-interval</code></td><td>No</td><td><code>100</code></td><td>Compute validation loss every N steps and at the final step. The checkpoint saved is the one with the lowest validation loss, and the console reports final and best validation loss</td></tr>
         <tr><td><code>--loss-graph</code></td><td>No</td><td>&mdash;</td><td>Path to write an HTML report graphing per-step training loss and corpus coverage</td></tr>
       </tbody>
     </table>

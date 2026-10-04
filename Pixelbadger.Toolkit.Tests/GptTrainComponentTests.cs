@@ -37,6 +37,48 @@ public class GptTrainComponentTests
     }
 
     [Fact]
+    public async Task TrainAsync_ShouldReportValidationLoss_WhenSplitEnabled()
+    {
+        var corpus = string.Concat(Enumerable.Repeat("the quick brown fox. ", 30));
+        var options = new GptTrainOptions(
+            Steps: 20, BatchSize: 4, BlockSize: 16, NEmbd: 16, NHead: 2, NLayer: 1, LearningRate: 3e-3f,
+            Seed: 1, ValidationSplit: 0.2f, EvalInterval: 10);
+
+        var evals = new List<int>();
+        var result = await _component.TrainAsync(corpus, "ignored", options, null, (step, _, _) => evals.Add(step));
+
+        evals.Should().Equal(10, 20);
+        result.ValidationTokenCount.Should().BeGreaterThan(0);
+        result.FinalValidationLoss.Should().NotBeNull();
+        result.BestValidationLoss.Should().NotBeNull().And.BeLessThanOrEqualTo(result.FinalValidationLoss!.Value);
+        result.BestValidationStep.Should().BeOneOf(10, 20);
+    }
+
+    [Fact]
+    public async Task TrainAsync_ShouldSkipValidation_WhenSplitIsZero()
+    {
+        var corpus = string.Concat(Enumerable.Repeat("the quick brown fox. ", 30));
+        var options = new GptTrainOptions(
+            Steps: 3, BatchSize: 2, BlockSize: 8, NEmbd: 8, NHead: 2, NLayer: 1, Seed: 1, ValidationSplit: 0f);
+
+        var result = await _component.TrainAsync(corpus, "ignored", options);
+
+        result.FinalValidationLoss.Should().BeNull();
+        result.BestValidationLoss.Should().BeNull();
+        result.ValidationTokenCount.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task TrainAsync_ShouldThrow_WhenSplitIsOneOrMore()
+    {
+        var options = new GptTrainOptions(Steps: 1, BlockSize: 8, Tokenizer: TokenizerKind.Char, ValidationSplit: 1f);
+
+        var act = () => _component.TrainAsync(new string('a', 200), "ignored", options);
+
+        await act.Should().ThrowAsync<ArgumentException>().WithMessage("*validation-split*");
+    }
+
+    [Fact]
     public async Task TrainAsync_ShouldSaveCheckpointWithModelParameters()
     {
         var corpus = string.Concat(Enumerable.Repeat("abcde ", 20));
@@ -312,7 +354,7 @@ public class GptTrainComponentTests
     {
         var corpus = string.Concat(Enumerable.Repeat("abcde ", 20)); // 120 tokens, 6 distinct chars
         var options = new GptTrainOptions(
-            Steps: 200, BatchSize: 8, BlockSize: 8, NEmbd: 8, NHead: 2, NLayer: 1, Seed: 3, Tokenizer: TokenizerKind.Char);
+            Steps: 200, BatchSize: 8, BlockSize: 8, NEmbd: 8, NHead: 2, NLayer: 1, Seed: 3, Tokenizer: TokenizerKind.Char, ValidationSplit: 0f);
 
         var result = await _component.TrainAsync(corpus, "out", options);
 
