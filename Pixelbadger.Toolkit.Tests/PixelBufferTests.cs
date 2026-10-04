@@ -163,4 +163,31 @@ public class PixelBufferTests
 
         buffer.GetPixel(x, y).Should().Be(color);
     }
+
+    [Fact]
+    public void Render_ShouldReemitColourCodes_WhenAdjacentPixelsDiffer()
+    {
+        var buffer = new PixelBuffer(2, 2);
+        buffer.SetPixel(0, 0, new PixelColor(1, 2, 3));
+        buffer.SetPixel(1, 0, new PixelColor(4, 5, 6));
+        buffer.SetPixel(0, 1, new PixelColor(7, 8, 9));
+        buffer.SetPixel(1, 1, new PixelColor(10, 11, 12));
+
+        var result = buffer.Render();
+
+        result.Should().Contain("38;2;1;2;3m").And.Contain("38;2;4;5;6m")
+            .And.Contain("48;2;7;8;9m").And.Contain("48;2;10;11;12m");
+    }
+
+    [Fact]
+    public void Render_ShouldOmitRedundantColourCodes_WhenAdjacentPixelsMatch()
+    {
+        var buffer = new PixelBuffer(10, 2);
+        buffer.Clear(new PixelColor(1, 2, 3));
+
+        var result = buffer.Render();
+
+        System.Text.RegularExpressions.Regex.Matches(result, "38;2;1;2;3m").Count.Should().Be(1);
+        System.Text.RegularExpressions.Regex.Matches(result, "48;2;1;2;3m").Count.Should().Be(1);
+    }
 }

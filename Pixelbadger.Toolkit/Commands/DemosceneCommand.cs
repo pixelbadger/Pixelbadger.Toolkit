@@ -5,99 +5,84 @@ namespace Pixelbadger.Toolkit.Commands;
 
 public static class DemosceneCommand
 {
+    private const int DefaultFrames = 200;
+
     public static Command Create()
     {
-        var command = new Command("demoscene", "Classic Amiga demoscene effects rendered in the terminal using half-block ANSI characters");
+        var command = new Command("demoscene", "Classic Amiga and IBM PC demoscene effects rendered in the terminal using half-block ANSI characters");
 
-        command.Add(CreateKefrensBarsCommand());
-        command.Add(CreateBoingCommand());
+        command.Add(CreateEffectCommand("kefrens", "Kefrens-style sine wave colour bars scrolling across the screen", () => new KefrensBarsComponent()));
+        command.Add(CreateEffectCommand("boing", "Classic Amiga Boing Ball — a red-and-white checkered ball bouncing on a grey grid", () => new BoingBallComponent()));
+        command.Add(CreateEffectCommand("plasma", "Classic IBM PC plasma — cycling palette driven by summed sine fields", () => new PlasmaComponent()));
+        command.Add(CreateEffectCommand("fire", "Classic IBM PC fire — heat propagating upward through a fire palette", () => new FireComponent()));
+        command.Add(CreateEffectCommand("copper", "Classic Amiga copper bars — shaded raster bars weaving across the screen", () => new CopperBarsComponent()));
+        command.Add(CreateShowcaseCommand());
 
         return command;
     }
 
-    private static Command CreateKefrensBarsCommand()
+    private static Command CreateEffectCommand(string name, string description, Func<IDemoEffect> factory)
     {
-        var command = new Command("kefrens", "Kefrens-style sine wave colour bars scrolling across the screen");
+        var command = new Command(name, description);
 
-        var framesOption = new Option<int>("--frames") { Description = "Number of frames to animate (default: 200)", DefaultValueFactory = _ => 200 };
+        var framesOption = new Option<int>("--frames") { Description = $"Number of frames to animate (default: {DefaultFrames})", DefaultValueFactory = _ => DefaultFrames };
         command.Add(framesOption);
 
         command.SetAction((parseResult, cancellationToken) =>
         {
-            int frames = parseResult.GetValue(framesOption);
-            int width = Console.WindowWidth > 0 ? Console.WindowWidth : 80;
-            int height = (Console.WindowHeight > 0 ? Console.WindowHeight - 1 : 24) * 2;
-
-            var buffer = new PixelBuffer(width, height);
-            var component = new KefrensBarsComponent();
-
-            Console.CursorVisible = false;
-            Console.Clear();
-
-            try
-            {
-                for (int frame = 0; frame < frames; frame++)
-                {
-                    if (cancellationToken.IsCancellationRequested) break;
-
-                    component.RenderFrame(buffer, frame);
-                    Console.SetCursorPosition(0, 0);
-                    Console.Write(buffer.Render());
-                    Thread.Sleep(50);
-                }
-            }
-            finally
-            {
-                Console.CursorVisible = true;
-                Console.Write("\x1b[0m");
-            }
-
+            Play(factory(), parseResult.GetValue(framesOption), cancellationToken);
             return Task.FromResult(0);
         });
 
         return command;
     }
 
-    private static Command CreateBoingCommand()
+    private static Command CreateShowcaseCommand()
     {
-        var command = new Command("boing", "Classic Amiga Boing Ball — a red-and-white checkered ball bouncing on a grey grid");
+        var command = new Command("showcase", "Play every demoscene effect in sequence");
 
-        var framesOption = new Option<int>("--frames") { Description = "Number of frames to animate (default: 200)", DefaultValueFactory = _ => 200 };
+        var framesOption = new Option<int>("--frames") { Description = $"Number of frames to animate per effect (default: {DefaultFrames})", DefaultValueFactory = _ => DefaultFrames };
         command.Add(framesOption);
 
         command.SetAction((parseResult, cancellationToken) =>
         {
             int frames = parseResult.GetValue(framesOption);
-            int width = Console.WindowWidth > 0 ? Console.WindowWidth : 80;
-            int height = (Console.WindowHeight > 0 ? Console.WindowHeight - 1 : 24) * 2;
-
-            var buffer = new PixelBuffer(width, height);
-            var component = new BoingBallComponent();
-
-            Console.CursorVisible = false;
-            Console.Clear();
-
-            try
+            foreach (var effect in Showcase.CreateEffects())
             {
-                for (int frame = 0; frame < frames; frame++)
-                {
-                    if (cancellationToken.IsCancellationRequested) break;
-
-                    component.RenderFrame(buffer, frame);
-                    Console.SetCursorPosition(0, 0);
-                    Console.Write(buffer.Render());
-                    Thread.Sleep(50);
-                }
+                if (cancellationToken.IsCancellationRequested) break;
+                Play(effect, frames, cancellationToken);
             }
-            finally
-            {
-                Console.CursorVisible = true;
-                Console.Write("\x1b[0m");
-            }
-
             return Task.FromResult(0);
         });
 
         return command;
+    }
+
+    private static void Play(IDemoEffect effect, int frames, CancellationToken cancellationToken)
+    {
+        int width = Console.WindowWidth > 0 ? Console.WindowWidth : 80;
+        int height = (Console.WindowHeight > 0 ? Console.WindowHeight - 1 : 24) * 2;
+        var buffer = new PixelBuffer(width, height);
+
+        Console.CursorVisible = false;
+        Console.Clear();
+
+        try
+        {
+            for (int frame = 0; frame < frames; frame++)
+            {
+                if (cancellationToken.IsCancellationRequested) break;
+
+                effect.RenderFrame(buffer, frame);
+                Console.SetCursorPosition(0, 0);
+                Console.Write(buffer.Render());
+                Thread.Sleep(50);
+            }
+        }
+        finally
+        {
+            Console.CursorVisible = true;
+            Console.Write("\x1b[0m");
+        }
     }
 }
