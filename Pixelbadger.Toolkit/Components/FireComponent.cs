@@ -24,6 +24,8 @@ public class FireComponent : IDemoEffect
 
     public void RenderFrame(PixelBuffer buffer, int frame)
     {
+        if (buffer.Width <= 0 || buffer.Height <= 0) return;
+
         if (_width != buffer.Width || _height != buffer.Height)
         {
             _width = buffer.Width;
