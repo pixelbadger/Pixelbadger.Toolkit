@@ -424,7 +424,7 @@ jobs:
 
   auto-merge:
     runs-on: ubuntu-latest
-    needs: [mechanical-checks, build-and-test, claude-review]
+    needs: [check-changes, mechanical-checks, build-and-test, claude-review]
     if: |
       needs.claude-review.outputs.verdict == 'APPROVE' &&
       needs.mechanical-checks.result == 'success' && needs.build-and-test.result == 'success' &&
@@ -432,12 +432,14 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      actions: write
 
     steps:
       - name: Squash-merge
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
+          MAIN_CODE_CHANGED: ${{ needs.check-changes.outputs.main-code-changed }}
         run: |
           PR=${{ github.event.pull_request.number }}
           # A human may have requested changes since; their block wins.
@@ -447,3 +449,11 @@ jobs:
             exit 0
           fi
           gh pr merge "$PR" --squash --delete-branch --match-head-commit "${{ github.event.pull_request.head.sha }}"
+
+          # A merge made with GITHUB_TOKEN doesn't fire push or pull_request events, so the post-merge
+          # workflows never start on their own. workflow_dispatch is exempt from that rule. The publish
+          # run then waits for a human to approve it in the nuget-publish environment.
+          gh workflow run project-automation.yml --ref master -f pr_number="$PR"
+          if [ "$MAIN_CODE_CHANGED" = "true" ]; then
+            gh workflow run publish-to-nuget.yml --ref master
+          fi
