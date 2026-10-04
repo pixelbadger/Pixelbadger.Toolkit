@@ -57,20 +57,13 @@ jobs:
           REVIEW_DECISION=$(echo "$PR_JSON" | jq -r '.reviewDecision')
           echo "Review decision: $REVIEW_DECISION"
 
-          # Latest review from a Claude reviewer decides; reviewDecision is empty
-          # when branch protection does not require reviews.
-          LATEST_CLAUDE=$(gh api "repos/${{ github.repository }}/pulls/$PR_NUMBER/reviews" \
-            --jq '[.[] | select(.user.login | contains("claude")) | select(.state != "PENDING" and .state != "COMMENTED")] | last | .state // ""')
-          echo "Latest Claude review: $LATEST_CLAUDE"
-
-          if [ "$REVIEW_DECISION" != "APPROVED" ] && [ "$LATEST_CLAUDE" != "APPROVED" ]; then
+          if [ "$REVIEW_DECISION" != "APPROVED" ]; then
             echo "PR is not approved yet. Waiting."
             exit 0
           fi
 
           # Check that all status checks are passing
-          # Exclude the review job (which is still running when it submits its approval) and this job
-          CHECKS=$(echo "$PR_JSON" | jq -r '.statusCheckRollup[]? | select((.name // "") | test("claude-review|auto-merge") | not) | .conclusion // .status')
+          CHECKS=$(echo "$PR_JSON" | jq -r '.statusCheckRollup[]? | .conclusion // .status')
           PENDING=$(echo "$CHECKS" | grep -E '^(PENDING|IN_PROGRESS|QUEUED|WAITING|null)$' || true)
           FAILING=$(echo "$CHECKS" | grep -E '^(FAILURE|ERROR|TIMED_OUT|ACTION_REQUIRED|CANCELLED|STARTUP_FAILURE)$' || true)
 
@@ -85,4 +78,4 @@ jobs:
           fi
 
           echo "All checks passed and review approved. Squash-merging PR #$PR_NUMBER."
-          gh pr merge "$PR_NUMBER" --squash --delete-branch --admin
+          gh pr merge "$PR_NUMBER" --squash --delete-branch
