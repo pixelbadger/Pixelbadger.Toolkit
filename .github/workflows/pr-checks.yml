@@ -22,19 +22,15 @@ jobs:
       - uses: dorny/paths-filter@v3
         id: changes
         with:
+          # paths-filter ORs the patterns in a filter, so a negated pattern such as '!docs/**' matches every
+          # file outside docs/ and would flag workflow-only PRs. 'Pixelbadger.Toolkit/**' already excludes the
+          # Tests, Benchmarks, docs and .github trees.
           filters: |
             main-code:
               - 'Pixelbadger.Toolkit/**'
-              - '!Pixelbadger.Toolkit.Tests/**'
-              - '!Pixelbadger.Toolkit.Benchmarks/**'
-              - '!docs/**'
-              - '!.github/**'
             main-any:
               - 'Pixelbadger.Toolkit/**'
               - 'Pixelbadger.Toolkit.Tests/**'
-              - '!Pixelbadger.Toolkit.Benchmarks/**'
-              - '!docs/**'
-              - '!.github/**'
 
   mechanical-checks:
     runs-on: ubuntu-latest
@@ -178,6 +174,15 @@ jobs:
       - name: Pack (validation only)
         run: dotnet pack --no-build --configuration Release --output ./artifacts
 
+  # Review → fix → review loop
+  #
+  # The reviewer and the fixer both run as the Claude GitHub App, which also authored most PRs.
+  # GitHub won't let an author approve or request changes on their own PR, so the reviewer only
+  # writes a verdict file. A plain step then submits the formal review as github-actions[bot].
+  # Reviews made with GITHUB_TOKEN don't fire workflow events, so the fixer and the merge run as
+  # jobs in this workflow rather than in response to a review event. A fixer push fires
+  # `synchronize`, which re-runs this workflow, so the loop continues until approval or the
+  # round limit.
   claude-review:
     runs-on: ubuntu-latest
     needs: [mechanical-checks, build-and-test]
@@ -186,7 +191,11 @@ jobs:
       contents: read
       pull-requests: write
       issues: read
+      actions: read
       id-token: write
+    outputs:
+      verdict: ${{ steps.submit.outputs.verdict }}
+      rounds: ${{ steps.review-type.outputs.rounds }}
 
     steps:
       - name: Checkout repository
@@ -200,12 +209,48 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           PR=${{ github.event.pull_request.number }}
-          PRIOR=$(gh api repos/${{ github.repository }}/pulls/$PR/reviews \
-            --jq '[.[] | select(.state != "PENDING")] | length')
+          REVIEWS=$(gh api "repos/${{ github.repository }}/pulls/$PR/reviews?per_page=100")
+          PRIOR=$(echo "$REVIEWS" | jq '[.[] | select(.state != "PENDING")] | length')
+          ROUNDS=$(echo "$REVIEWS" | jq '[.[] | select(.user.login == "github-actions[bot]" and .state == "CHANGES_REQUESTED")] | length')
+          echo "rounds=$ROUNDS" >> "$GITHUB_OUTPUT"
           if [ "$PRIOR" -gt 0 ]; then
             echo "type=followup" >> "$GITHUB_OUTPUT"
           else
             echo "type=primary" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Fetch failing-job logs here so neither agent has to dig for them.
+      - name: Collect CI results
+        id: ci
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MECHANICAL: ${{ needs.mechanical-checks.result }}
+          BUILD: ${{ needs.build-and-test.result }}
+        run: |
+          mkdir -p .ci-review
+          OUT=.ci-review/ci-failures.md
+          : > "$OUT"
+          FAILED=false
+          [ "$MECHANICAL" = "failure" ] && FAILED=true
+          [ "$BUILD" = "failure" ] && FAILED=true
+          echo "failed=$FAILED" >> "$GITHUB_OUTPUT"
+          if [ "$FAILED" = true ]; then
+            gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?per_page=100" \
+              --jq '.jobs[] | select(.conclusion == "failure") | "\(.id)\t\(.name)"' |
+            while IFS=$'\t' read -r JOB_ID JOB_NAME; do
+              {
+                echo "## Failed job: $JOB_NAME"
+                echo '```'
+                # --log-failed prints only the failed steps as "job<TAB>step<TAB>line".
+                gh run view --job "$JOB_ID" --log-failed --repo "${{ github.repository }}" \
+                  | cut -f3- | sed -E 's/^[0-9T:.-]+Z //' | grep -vE '^\s*Passed ' | tail -200 \
+                  || echo "(could not fetch logs for job $JOB_ID)"
+                echo '```'
+                echo
+              } >> "$OUT"
+            done
+            echo "CI failures collected:"
+            cat "$OUT"
           fi
 
       - name: Primary review (full diff)
@@ -215,67 +260,190 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           allowed_bots: '*'
           prompt: |
-            Review this pull request thoroughly. Read the full diff. Be concise — flag issues only, don't praise.
+            Review pull request #${{ github.event.pull_request.number }} thoroughly. Read the full diff with `gh pr diff ${{ github.event.pull_request.number }}`. Be concise. Flag issues only; don't praise.
 
-            FIRST: Check CI status with `gh pr checks ${{ github.event.pull_request.number }}`. If any required check is failing, that is an immediate blocker — include the failure in your findings and request changes regardless of code quality.
+            FIRST, check CI. Mechanical checks: ${{ needs.mechanical-checks.result }}. Build and test: ${{ needs.build-and-test.result }}.
+            If either failed, read `.ci-review/ci-failures.md` (failing-job logs). A failing check blocks approval. Identify the root cause from the log and say exactly what is failing and why, so the implementor can fix it.
 
             Then evaluate the diff across all five dimensions:
 
-            **Correctness** — Flag:
-            - Logic errors, off-by-ones, incorrect conditionals
-            - Edge cases that are unhandled or produce wrong results
-            - Unhandled nulls in critical paths
-
-            **Test quality** — Flag:
-            - Coverage gaps: success paths, error conditions, or edge cases missing tests
-            - Weak assertions (testing the wrong thing, or asserting too little)
-            - Missing error-path tests
-
-            **Architecture** — Flag:
-            - Violations of the component-per-command pattern (each command action must have its own dedicated component class)
-            - Single Responsibility Principle violations
-            - Shared logic that should be extracted into a service with an interface
-
-            **Security** — Flag:
-            - Prompt injection: user-controlled strings passed directly into LLM calls without sanitisation
-            - Path traversal: user-supplied file paths used in file operations without validation
-            - Any other OWASP top-10 risks
-
-            **Consistency** — Flag:
-            - Naming or style inconsistencies with the rest of the codebase
-            - README examples that don't match the actual implementation
-            - CLAUDE.md patterns that are violated
+            **Correctness**: logic errors, off-by-ones, wrong conditionals, unhandled edge cases, unhandled nulls in critical paths.
+            **Test quality**: coverage gaps (success paths, error conditions, edge cases), weak assertions, missing error-path tests.
+            **Architecture**: component-per-command violations, SRP violations, shared logic that should be a service with an interface.
+            **Security**: prompt injection, path traversal, other OWASP top-10 risks.
+            **Consistency**: naming/style inconsistencies, docs or examples that don't match the implementation, CLAUDE.md patterns violated.
 
             Where an issue is tied to a specific line, post an inline comment using:
-            `gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments` with `path`, `line`, and `body`.
+            `gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments` with `commit_id` (`${{ github.event.pull_request.head.sha }}`), `path`, `line`, and `body`.
 
-            MANDATORY FINAL STEP — you MUST do this:
-            - If no issues found: `gh pr review ${{ github.event.pull_request.number }} --approve --body "LGTM."`
-            - If issues found: `gh pr review ${{ github.event.pull_request.number }} --request-changes --body "<summary>"`
-            Do not finish without running one of these two commands.
+            MANDATORY FINAL STEP: write your verdict with the Write tool to `${{ github.workspace }}/.ci-review/verdict.md`.
+            - Line 1 must be exactly `APPROVE` or `REQUEST_CHANGES`.
+            - The remaining lines are the review body: a numbered list of every issue the implementor must fix, or `LGTM.` when approving.
+            Do NOT run `gh pr review`. A later step submits your verdict as the formal review.
 
-          claude_args: '--model claude-sonnet-5-5 --max-turns 30 --allowed-tools "Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*),Bash(gh pr review:*),Bash(gh pr checks:*),Bash(gh api:*)"'
+          claude_args: '--model claude-sonnet-5-5 --max-turns 30 --allowed-tools "Read,Write,Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*),Bash(gh pr checks:*),Bash(gh api:*)"'
 
-      - name: Follow-up review (latest commit only)
+      - name: Follow-up review (changes since last review)
         if: steps.review-type.outputs.type == 'followup'
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           allowed_bots: '*'
           prompt: |
-            This is a follow-up review after the author addressed previous feedback.
+            This is a follow-up review of PR #${{ github.event.pull_request.number }} after the implementor pushed changes.
 
-            FIRST: Check CI status with `gh pr checks ${{ github.event.pull_request.number }}`. Failing checks are an immediate blocker.
+            FIRST, check CI. Mechanical checks: ${{ needs.mechanical-checks.result }}. Build and test: ${{ needs.build-and-test.result }}.
+            If either failed, read `.ci-review/ci-failures.md` (failing-job logs). A failing check blocks approval. Identify the root cause from the log and say exactly what is failing and why.
 
-            Then: read only the latest commit's changes with `gh pr diff ${{ github.event.pull_request.number }}` filtered to what changed since the last review. Focus solely on:
-            1. Whether the issues raised in prior review comments have been properly addressed
-            2. Any new bugs or regressions introduced by the fixes
+            Then:
+            1. Read the prior reviews and comments: `gh pr view ${{ github.event.pull_request.number }} --comments` and `gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments`.
+            2. Read the commits since the last review (`gh pr view ${{ github.event.pull_request.number }} --json commits`) and the current diff (`gh pr diff ${{ github.event.pull_request.number }}`).
+            3. Check whether every issue raised in prior reviews has been properly addressed, and whether the fixes introduced new bugs or regressions.
 
-            Do not re-review code that was already approved. Be brief.
+            Don't re-review code that was already accepted. Be brief.
 
-            MANDATORY FINAL STEP — you MUST do this:
-            - If all prior issues resolved and no new problems: `gh pr review ${{ github.event.pull_request.number }} --approve --body "LGTM."`
-            - If issues remain or new problems found: `gh pr review ${{ github.event.pull_request.number }} --request-changes --body "<summary>"`
-            Do not finish without running one of these two commands.
+            MANDATORY FINAL STEP: write your verdict with the Write tool to `${{ github.workspace }}/.ci-review/verdict.md`.
+            - Line 1 must be exactly `APPROVE` or `REQUEST_CHANGES`.
+            - The remaining lines are the review body: a numbered list of every issue still outstanding, or `LGTM.` when approving.
+            Do NOT run `gh pr review`. A later step submits your verdict as the formal review.
 
-          claude_args: '--model claude-sonnet-5-5 --max-turns 20 --allowed-tools "Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*),Bash(gh pr review:*),Bash(gh pr checks:*),Bash(gh api:*)"'
+          claude_args: '--model claude-sonnet-5-5 --max-turns 20 --allowed-tools "Read,Write,Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*),Bash(gh pr checks:*),Bash(gh api:*)"'
+
+      - name: Submit review
+        id: submit
+        if: always() && steps.review-type.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          CI_FAILED: ${{ steps.ci.outputs.failed }}
+        run: |
+          FILE=.ci-review/verdict.md
+          VERDICT=""
+          BODY=""
+          if [ -f "$FILE" ]; then
+            VERDICT=$(head -1 "$FILE" | tr -d '[:space:]')
+            BODY=$(tail -n +2 "$FILE")
+          fi
+
+          if [ "$VERDICT" != "APPROVE" ] && [ "$VERDICT" != "REQUEST_CHANGES" ]; then
+            if [ "$CI_FAILED" = "true" ]; then
+              # The reviewer didn't produce a verdict, but red CI alone is enough to send the PR back.
+              VERDICT=REQUEST_CHANGES
+              BODY=$(printf 'CI is failing. Fix the failing checks below.\n\n%s' "$(cat .ci-review/ci-failures.md)")
+            else
+              echo "::error::Reviewer did not write a valid verdict to $FILE."
+              exit 1
+            fi
+          fi
+
+          # Never approve over red CI, whatever the reviewer concluded.
+          if [ "$VERDICT" = "APPROVE" ] && [ "$CI_FAILED" = "true" ]; then
+            VERDICT=REQUEST_CHANGES
+            BODY=$(printf '%s\n\nCI is failing, so this cannot be approved:\n\n%s' "$BODY" "$(cat .ci-review/ci-failures.md)")
+          fi
+
+          [ -n "$BODY" ] || BODY="LGTM."
+          printf '%s\n\n---\n_Automated review of %s_\n' "$BODY" "${{ github.event.pull_request.head.sha }}" > .ci-review/body.md
+
+          if [ "$VERDICT" = "APPROVE" ]; then
+            if ! gh pr review "$PR" --approve --body-file .ci-review/body.md; then
+              echo "::error::Could not approve as github-actions[bot]. Enable 'Allow GitHub Actions to create and approve pull requests' under Settings → Actions → General."
+              gh pr comment "$PR" --body-file .ci-review/body.md || true
+              exit 1
+            fi
+          else
+            gh pr review "$PR" --request-changes --body-file .ci-review/body.md
+          fi
+          echo "verdict=$VERDICT" >> "$GITHUB_OUTPUT"
+
+  claude-fix:
+    runs-on: ubuntu-latest
+    needs: [claude-review]
+    if: |
+      always() && needs.claude-review.outputs.verdict == 'REQUEST_CHANGES' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      actions: read
+      id-token: write
+    env:
+      MAX_ROUNDS: 6
+
+    steps:
+      - name: Check round limit
+        id: limit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          ROUNDS: ${{ needs.claude-review.outputs.rounds }}
+        run: |
+          # ROUNDS counts change requests made before this run's review.
+          if [ "$((ROUNDS + 1))" -ge "$MAX_ROUNDS" ]; then
+            echo "Reached $MAX_ROUNDS review rounds; handing over to a human."
+            gh pr comment ${{ github.event.pull_request.number }} --body "$(printf 'The automated review loop has requested changes %s times without reaching approval, so it has stopped. A human needs to take a look.\n\n---\n_Generated by the PR Checks workflow_' "$MAX_ROUNDS")"
+            echo "stop=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout PR branch
+        if: steps.limit.outputs.stop != 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Setup .NET
+        if: steps.limit.outputs.stop != 'true'
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Run Claude Code Agent (review → iteration)
+        if: steps.limit.outputs.stop != 'true'
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          allowed_bots: '*'
+          prompt: |
+            The reviewer requested changes on PR #${{ github.event.pull_request.number }}. You are the implementor; fix everything it raised.
+
+            1. Read the latest review and all earlier feedback: `gh pr view ${{ github.event.pull_request.number }} --comments`
+               and the inline comments: `gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments`
+            2. If CI failed, the review includes the failing logs. Reproduce the failure locally (`dotnet build -c Release && dotnet test --no-build -c Release`) before fixing it. Fix the root cause. Never skip, disable, or delete a test to get green.
+            3. Read the diff for context: `gh pr diff ${{ github.event.pull_request.number }}`
+            4. Address every outstanding issue: code, tests, or documentation.
+            5. Verify: `dotnet build -c Release && dotnet test --no-build -c Release`. Everything must pass.
+            6. Commit with a clear message describing what was fixed.
+            7. Push exactly once, at the very end: `git push`. Each push restarts the review workflow, so don't push intermediate work.
+
+            If you disagree with a review point, or a point can't be fixed in this PR, don't ignore it. Explain why in a PR comment (`gh pr comment`) so the next review round sees your reasoning.
+            Do not open a new PR. Push to the existing branch only. Follow all instructions in CLAUDE.md.
+          claude_args: '--model claude-sonnet-5-5 --max-turns 60 --permission-mode auto'
+
+  auto-merge:
+    runs-on: ubuntu-latest
+    needs: [mechanical-checks, build-and-test, claude-review]
+    if: |
+      needs.claude-review.outputs.verdict == 'APPROVE' &&
+      needs.mechanical-checks.result == 'success' && needs.build-and-test.result == 'success' &&
+      startsWith(github.head_ref, 'feature/')
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Squash-merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          PR=${{ github.event.pull_request.number }}
+          # A human may have requested changes since; their block wins.
+          DECISION=$(gh pr view "$PR" --json reviewDecision --jq '.reviewDecision')
+          if [ "$DECISION" = "CHANGES_REQUESTED" ]; then
+            echo "A reviewer still has changes requested. Not merging."
+            exit 0
+          fi
+          gh pr merge "$PR" --squash --delete-branch --match-head-commit "${{ github.event.pull_request.head.sha }}"
