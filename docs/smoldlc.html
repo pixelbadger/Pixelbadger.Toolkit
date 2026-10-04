@@ -288,7 +288,7 @@
       ever edits a file or sits at a terminal waiting for a build.
     </p>
     <div class="info-box">
-      This page describes the as-built system as of June 2026. The workflows are in
+      This page describes the as-built system as of October 2026. The workflows are in
       <code>.github/workflows/</code>; the autonomous agent instructions live in
       <code>CLAUDE.md</code>.
     </div>
@@ -399,6 +399,7 @@
             <span class="tag">plan phase (auto-accepted)</span>
             <span class="tag">gh pr create</span>
             <span class="tag">dotnet build / test</span>
+            <span class="tag">--permission-mode auto</span>
           </div>
         </div>
       </div>
@@ -409,7 +410,7 @@
       <div class="pipeline-row">
         <div class="stage automation">
           <div class="stage-label">GitHub Actions — pr-checks.yml</div>
-          <h3>PR checks — three sequential jobs</h3>
+          <h3>PR checks — build, test, and review</h3>
           <div class="check-jobs">
 
             <div class="check-job">
@@ -427,9 +428,9 @@
             </div>
 
             <div class="check-job">
-              <div class="check-job-name">3 · claude-review — runs after jobs 1 &amp; 2 pass</div>
+              <div class="check-job-name">3 · claude-review — runs after jobs 1 &amp; 2 finish</div>
               <p style="font-size:0.82rem; color:var(--text2); margin:0 0 0.5rem; line-height:1.5;">
-                Checks CI status first — a failing check is an immediate blocker. Reads the diff, posts inline comments on specific lines, and submits a formal GitHub review. Behaviour differs by push number:
+                Collects the logs of any failing job first and hands them to the reviewer — a failing check always blocks approval. Claude reads the diff, posts inline comments on specific lines, and writes a verdict (<code>APPROVE</code> or <code>REQUEST_CHANGES</code>) to a file. A plain step then submits it as a formal GitHub review from <code>github-actions[bot]</code>, because the Claude app authored the PR and GitHub won't let an author approve or request changes on their own PR. Behaviour differs by push number:
               </p>
               <div class="review-modes">
                 <div class="review-mode">
@@ -438,7 +439,7 @@
                 </div>
                 <div class="review-mode">
                   <div class="review-mode-label">Subsequent pushes — follow-up review</div>
-                  <p>Verifies each prior comment was addressed. Checks for new regressions introduced by the fixes. Does not re-review already-approved code.</p>
+                  <p>Verifies each prior comment was addressed. Checks for new regressions introduced by the fixes. Does not re-review already-accepted code.</p>
                 </div>
               </div>
             </div>
@@ -446,13 +447,13 @@
           </div>
           <div class="tag-row" style="margin-top:0.75rem;">
             <span class="tag">pr-checks.yml</span>
-            <span class="tag">claude-sonnet-4-6</span>
-            <span class="tag">gh pr review --approve / --request-changes</span>
+            <span class="tag">claude-sonnet-5-5</span>
+            <span class="tag">review as github-actions[bot]</span>
           </div>
         </div>
       </div>
 
-      <div class="arrow-down">↓ claude-review submits decision</div>
+      <div class="arrow-down">↓ github-actions[bot] submits the review decision</div>
 
       <!-- Stage 5: iterate — fires only when changes requested, loops back to stage 4 -->
       <div class="pipeline-row">
@@ -460,18 +461,28 @@
           <div class="stage-label">Claude (Sonnet) — autonomous iteration · only when changes requested</div>
           <h3>Fix &amp; push</h3>
           <p>
-            When claude-review requests changes, <code>agent-build.yml</code> re-fires automatically.
-            Claude reads every review comment, addresses each one, and pushes a new commit — no human in the loop.
+            When claude-review requests changes, the <code>claude-fix</code> job in the same
+            <code>pr-checks.yml</code> run fires. Claude reads the review, the inline comments, and any
+            failing CI logs, reproduces and fixes each issue, runs the tests, and pushes once at the end.
+            It runs with <code>--permission-mode auto</code>, so a safety classifier checks its actions
+            rather than skipping permission checks. Points it disagrees with get a PR comment so the next
+            review round sees its reasoning.
+          </p>
+          <p style="margin-top:0.5rem;">
+            The fix runs as a job rather than reacting to a review event because reviews submitted with
+            <code>GITHUB_TOKEN</code> don't trigger other workflows. A change request from a human reviewer
+            still fires <code>agent-build.yml</code>, which iterates the same way.
           </p>
           <div class="loop-note">
             ↺ &nbsp;The push re-triggers <code>pr-checks.yml</code> from the top. claude-review now runs in
             <strong>follow-up mode</strong> — it verifies prior feedback was addressed and checks for new
-            regressions only. This cycle repeats until the review approves.
+            regressions only. This cycle repeats until the review approves. After 6 change requests without
+            approval the loop stops and comments on the PR asking for a human.
           </div>
           <div class="tag-row" style="margin-top:0.6rem;">
-            <span class="tag">agent-build.yml</span>
-            <span class="tag">on: pull_request_review (non-approval by Claude)</span>
-            <span class="tag">claude-sonnet-4-6</span>
+            <span class="tag">pr-checks.yml — claude-fix</span>
+            <span class="tag">--permission-mode auto</span>
+            <span class="tag">claude-sonnet-5-5</span>
           </div>
         </div>
       </div>
@@ -484,13 +495,15 @@
           <div class="stage-label">GitHub Actions — auto-merge</div>
           <h3>Squash merge to master</h3>
           <p>
-            Once the PR has a formal GitHub approval and all checks are green, it is automatically
-            squash-merged via <code>gh pr merge --squash --delete-branch</code>.
-            The feature branch is deleted. No human action required.
+            When claude-review approves and the mechanical checks and build are green, the
+            <code>auto-merge</code> job in <code>pr-checks.yml</code> squash-merges the
+            <code>feature/</code> branch via <code>gh pr merge --squash --delete-branch</code>,
+            pinned to the reviewed commit. A human's outstanding change request blocks the merge.
+            <code>auto-merge.yml</code> still handles PRs approved by a human.
           </p>
           <div class="tag-row">
-            <span class="tag">auto-merge.yml</span>
-            <span class="tag">on: pull_request_review; check_suite</span>
+            <span class="tag">pr-checks.yml — auto-merge</span>
+            <span class="tag">auto-merge.yml (human approvals)</span>
             <span class="tag">gh pr merge --squash</span>
           </div>
         </div>
@@ -587,15 +600,27 @@
       <tbody>
         <tr>
           <td><code>agent-build.yml</code></td>
-          <td>Issue labeled <code>status: to-do</code>; or PR review submitted by Claude that is not an approval</td>
+          <td>Issue labeled <code>status: to-do</code>; or a human reviewer requests changes on a PR</td>
           <td><span class="wf-actor claude-tag">Claude Sonnet</span></td>
-          <td>Invokes Claude Code headlessly. Claude enters a plan phase (auto-accepted), then claims the ticket, creates a branch, implements the feature, and opens (or updates) a PR. Re-runs on review feedback to iterate autonomously.</td>
+          <td>Invokes Claude Code headlessly with <code>--permission-mode auto</code>. Claude claims the ticket, creates a branch, implements the feature, and opens a PR. Also iterates on change requests from human reviewers; automated reviews are handled by <code>claude-fix</code>.</td>
         </tr>
         <tr>
           <td><code>pr-checks.yml</code> — <code>claude-review</code> job</td>
           <td>PR opened or synchronised (runs after mechanical checks and build pass)</td>
           <td><span class="wf-actor claude-tag">Claude Sonnet</span></td>
-          <td>Reviews the full diff on the first push; on subsequent pushes focuses on whether prior feedback was addressed and checks for new regressions. Posts inline comments, then submits a formal GitHub review — approve or request changes. Cancels in-progress runs when a new commit arrives.</td>
+          <td>Reviews the full diff on the first push; on subsequent pushes focuses on whether prior feedback was addressed and checks for new regressions. Gets failing-job logs up front. Posts inline comments and writes a verdict, which is submitted as a formal review from <code>github-actions[bot]</code>. Never approves over red CI. Cancels in-progress runs when a new commit arrives.</td>
+        </tr>
+        <tr>
+          <td><code>pr-checks.yml</code> — <code>claude-fix</code> job</td>
+          <td>claude-review requested changes (same-repo PRs only)</td>
+          <td><span class="wf-actor claude-tag">Claude Sonnet</span></td>
+          <td>Runs Claude Code with <code>--permission-mode auto</code> to address every review point and CI failure, then pushes once, which re-runs <code>pr-checks.yml</code>. Stops after 6 rounds and asks for a human.</td>
+        </tr>
+        <tr>
+          <td><code>pr-checks.yml</code> — <code>auto-merge</code> job</td>
+          <td>claude-review approved and all checks green (<code>feature/</code> branches)</td>
+          <td><span class="wf-actor actions-tag">GitHub Actions (bash)</span></td>
+          <td>Squash-merges the reviewed commit and deletes the branch, unless a human still has changes requested.</td>
         </tr>
         <tr>
           <td><code>pr-checks.yml</code> — <code>mechanical-checks</code> job</td>
@@ -611,9 +636,9 @@
         </tr>
         <tr>
           <td><code>auto-merge.yml</code></td>
-          <td>PR review submitted (any); or check suite completed</td>
+          <td>PR review submitted by a human</td>
           <td><span class="wf-actor actions-tag">GitHub Actions (bash)</span></td>
-          <td>Squash-merges the PR and deletes the feature branch automatically once the PR has a formal GitHub approval and all required checks are green.</td>
+          <td>Squash-merges the PR and deletes the feature branch once a human has approved it and all required checks are green. Reviews made with <code>GITHUB_TOKEN</code> don't trigger it, so automated approvals merge through the <code>auto-merge</code> job instead.</td>
         </tr>
         <tr>
           <td><code>project-automation.yml</code></td>
@@ -676,8 +701,14 @@
     <div class="info-box">
       The <code>pr-checks.yml</code> workflow cancels an in-flight review job when a new
       commit arrives, so a fast iteration cycle does not stack up multiple simultaneous
-      review runs. The agent build workflow uses a per-PR concurrency group on the
-      review-iteration job, so only one agent is ever iterating on a branch at a time.
+      review runs. The fix agent pushes only once, at the end of its work, so it never
+      cancels its own run mid-fix. The human-review iteration job in <code>agent-build.yml</code>
+      uses a per-PR concurrency group, so only one agent iterates on a branch at a time.
+    </div>
+    <div class="info-box">
+      <strong>Repository settings.</strong> Automated approval needs
+      <em>Allow GitHub Actions to create and approve pull requests</em> enabled under
+      Settings → Actions → General.
     </div>
   </section>
 
