@@ -128,7 +128,7 @@ public class MarkovCommandTests : IDisposable
         startInfo.ArgumentList.Add("--project");
         startInfo.ArgumentList.Add(projectPath);
         startInfo.ArgumentList.Add("-c");
-        startInfo.ArgumentList.Add("Release");
+        startInfo.ArgumentList.Add(TestBuildConfiguration.Name);
         startInfo.ArgumentList.Add("--no-build");
         startInfo.ArgumentList.Add("--");
 
