@@ -4,10 +4,17 @@ on:
   pull_request:
     types: [closed]
     branches: [master]
+  # The PR Checks auto-merge job merges with GITHUB_TOKEN, which doesn't fire pull_request events,
+  # so it dispatches this workflow with the merged PR's number.
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Number of the merged PR whose linked issues should be closed
+        required: true
 
 jobs:
   close-linked-issues:
-    if: github.event.pull_request.merged == true
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -20,7 +27,13 @@ jobs:
       - name: Label and close linked issues
         env:
           GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pr_number || github.event.pull_request.number }}
         run: |
+          if [ -z "$(gh pr view "$PR_NUMBER" --json mergedAt --jq '.mergedAt // empty')" ]; then
+            echo "::error::PR #$PR_NUMBER is not merged."
+            exit 1
+          fi
+
           VERSION=$(grep -oP '(?<=<Version>)[^<]+' Pixelbadger.Toolkit/Pixelbadger.Toolkit.csproj)
           RELEASE_LABEL="release/v${VERSION}"
 
@@ -29,7 +42,7 @@ jobs:
             --description "Released in v${VERSION}" \
             2>/dev/null || true
 
-          PR_BODY=$(gh pr view ${{ github.event.pull_request.number }} --json body -q '.body')
+          PR_BODY=$(gh pr view "$PR_NUMBER" --json body -q '.body')
 
           ISSUE_NUMBERS=$(echo "$PR_BODY" | grep -oiP '(?:closes|fixes|resolves)\s+#\K\d+' || true)
 
@@ -46,6 +59,6 @@ jobs:
               --remove-label "status: in-progress" \
               2>/dev/null || true
             gh issue close "$ISSUE_NUM" \
-              --comment "Closed by PR #${{ github.event.pull_request.number }}. Released in v${VERSION}." \
+              --comment "Closed by PR #${PR_NUMBER}. Released in v${VERSION}." \
               2>/dev/null || true
           done
