@@ -91,18 +91,28 @@ public class GptTrainComponentTests
     {
         var corpus = string.Concat(Enumerable.Repeat("the quick brown fox. ", 30));
         var saved = CaptureSavedWeights();
-        // An oversized learning rate makes later steps diverge, so best and final validation losses differ.
+        // An oversized learning rate makes the loss jump around, so the best evaluation is usually not the last.
+        // Which evaluation wins depends on floating-point rounding that varies by CPU, so the assertions below
+        // hold for any trajectory rather than assuming a particular one.
         var options = new GptTrainOptions(
             Steps: 12, BatchSize: 4, BlockSize: 8, NEmbd: 16, NHead: 2, NLayer: 1, LearningRate: 2f,
             Seed: 1, Tokenizer: TokenizerKind.Char, ValidationSplit: 0.25f, EvalInterval: 3);
+        var evaluations = new List<(int Step, float Loss)>();
 
-        var result = await _component.TrainAsync(corpus, "out", options);
+        var result = await _component.TrainAsync(corpus, "out", options,
+            onValidation: (step, _, validationLoss) => evaluations.Add((step, validationLoss)));
 
+        evaluations.Select(e => e.Step).Should().Equal(3, 6, 9, 12);
+        var best = evaluations.MinBy(e => e.Loss);
+        result.BestValidationLoss.Should().Be(best.Loss);
+        result.BestValidationStep.Should().Be(best.Step);
+        result.FinalValidationLoss.Should().Be(evaluations[^1].Loss);
+
+        // The checkpoint must reproduce the best evaluation, not the last one.
         var data = CharTokenizer.Build(corpus).Encode(corpus);
         var validationData = data[^result.ValidationTokenCount..];
         var config = new GptConfig(CharTokenizer.Build(corpus).VocabSize, 8, 16, 2, 1);
-        SavedWeightsValidationLoss(config, saved, validationData, 4).Should().Be(result.BestValidationLoss!.Value);
-        result.BestValidationLoss.Should().BeLessThan(result.FinalValidationLoss!.Value);
+        SavedWeightsValidationLoss(config, saved, validationData, 4).Should().Be(best.Loss);
     }
 
     [Fact]
