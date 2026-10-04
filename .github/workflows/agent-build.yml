@@ -67,7 +67,7 @@ jobs:
             Finish with a short summary of the outcome; it is shown to a human if no PR could be opened.
 
             Follow all instructions in CLAUDE.md. Do what has been asked; nothing more, nothing less.
-          claude_args: '--model claude-sonnet-5-5 --dangerously-skip-permissions'
+          claude_args: '--model claude-sonnet-5-5 --permission-mode auto'
 
       # Print only the result fields from the final message (not the full
       # transcript, which show_full_output would expose). Runs on success too:
