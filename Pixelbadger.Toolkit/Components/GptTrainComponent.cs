@@ -8,7 +8,7 @@ namespace Pixelbadger.Toolkit.Components;
 /// <param name="RunBoundaries">Cumulative step counts at the end of each run, including this one.</param>
 /// <param name="FinalValidationLoss">Validation loss at the last step, or null when no validation set was held out.</param>
 /// <param name="BestValidationLoss">Lowest validation loss seen; the saved checkpoint holds the weights from that step.</param>
-/// <param name="BestValidationStep">Step of this run at which the best validation loss occurred.</param>
+/// <param name="BestValidationStep">Step of this run (0 = the resumed checkpoint itself) at which the best validation loss occurred.</param>
 /// <param name="ValidationTokenCount">Tokens held out from the end of the corpus for validation.</param>
 /// <param name="TokensSeen">Distinct corpus positions sampled so far, out of <paramref name="CorpusTokenCount"/>.</param>
 /// <param name="VocabEntriesSeen">Distinct vocabulary entries sampled so far, out of <paramref name="VocabSize"/>.</param>
@@ -47,7 +47,7 @@ public record GptTrainOptions(
     TokenizerKind Tokenizer = TokenizerKind.Bpe,
     int VocabSize = 512,
     string? LossGraphPath = null,
-    float ValidationSplit = 0.1f,
+    float ValidationSplit = 0f,
     int EvalInterval = 100);
 
 /// <summary>
@@ -78,6 +78,10 @@ public class GptTrainComponent
     {
         if (string.IsNullOrEmpty(corpus))
             throw new ArgumentException("Training corpus is empty.", nameof(corpus));
+        if (options.ValidationSplit < 0f || options.ValidationSplit >= 1f)
+            throw new ArgumentException("validation-split must be at least 0 and less than 1.");
+        if (options.ValidationSplit > 0f && options.EvalInterval <= 0)
+            throw new ArgumentException("eval-interval must be greater than 0 when validation-split is enabled.");
 
         ITokenizer tokenizer;
         GptConfig config;
@@ -119,19 +123,18 @@ public class GptTrainComponent
         int validationLength = 0;
         if (options.ValidationSplit > 0f)
         {
-            if (options.ValidationSplit >= 1f)
-                throw new ArgumentException("validation-split must be less than 1.");
             validationLength = (int)(data.Length * options.ValidationSplit);
             // Too little text to form a validation window or leave a training window: skip validation.
             if (validationLength < config.BlockSize + 1 || data.Length - validationLength < config.BlockSize + 1)
                 validationLength = 0;
         }
         var trainData = validationLength > 0 ? data[..^validationLength] : data;
-        var validationData = validationLength > 0 ? data[^validationLength..] : null;
-        float bestValidationLoss = float.PositiveInfinity;
-        int bestValidationStep = 0;
-        float[][]? bestWeights = null;
-        float? lastValidationLoss = null;
+        var validation = validationLength > 0
+            ? new ValidationTracker(data[^validationLength..], config.BlockSize, options.BatchSize)
+            : null;
+        // A resumed run starts from an already-trained checkpoint, which must not be overwritten by worse weights.
+        if (options.Resume)
+            validation?.Observe(model, 0);
 
         var rng = new Random(options.Seed);
 
@@ -200,24 +203,15 @@ public class GptTrainComponent
             tokensSeenHistory.Add(positionsSeen);
             onProgress?.Invoke(step, lastLoss);
 
-            if (validationData is not null
-                && (step == options.Steps || (options.EvalInterval > 0 && step % options.EvalInterval == 0)))
+            if (validation is not null && (step == options.Steps || step % options.EvalInterval == 0))
             {
-                var validationLoss = EvaluateLoss(model, validationData, config.BlockSize, options.BatchSize);
-                lastValidationLoss = validationLoss;
-                if (validationLoss < bestValidationLoss)
-                {
-                    bestValidationLoss = validationLoss;
-                    bestValidationStep = step;
-                    bestWeights = model.Parameters().Select(p => (float[])p.Data.Clone()).ToArray();
-                }
+                var validationLoss = validation.Observe(model, step);
                 onValidation?.Invoke(step, lastLoss, validationLoss);
             }
         }
 
         // Keep the checkpoint with the lowest validation loss rather than whatever the last step produced.
-        if (bestWeights is not null)
-            model.LoadWeights(bestWeights);
+        validation?.RestoreBest(model);
 
         runBoundaries.Add(lossHistory.Count);
 
@@ -241,9 +235,35 @@ public class GptTrainComponent
         return new GptTrainResult(
             options.Steps, lastLoss, outputDirectory, parameterCount, tokenizer.VocabSize, data.Length,
             lossHistory, tokensSeenHistory, runBoundaries, positionsSeen, vocabEntriesSeen, lossGraphPath,
-            lastValidationLoss,
-            validationData is null || bestWeights is null ? null : bestValidationLoss,
-            bestValidationStep, validationLength);
+            validation?.LastLoss, validation?.BestLoss, validation?.BestStep ?? 0, validationLength);
+    }
+
+    /// <summary>Tracks held-out loss and snapshots the weights that achieved the lowest one.</summary>
+    private sealed class ValidationTracker(int[] data, int blockSize, int batchSize)
+    {
+        private float[][]? _bestWeights;
+        public float? LastLoss { get; private set; }
+        public float? BestLoss { get; private set; }
+        public int BestStep { get; private set; }
+
+        public float Observe(GptModel model, int step)
+        {
+            var loss = EvaluateLoss(model, data, blockSize, batchSize);
+            LastLoss = loss;
+            if (BestLoss is null || loss < BestLoss)
+            {
+                BestLoss = loss;
+                BestStep = step;
+                _bestWeights = model.Parameters().Select(p => (float[])p.Data.Clone()).ToArray();
+            }
+            return loss;
+        }
+
+        public void RestoreBest(GptModel model)
+        {
+            if (_bestWeights is not null)
+                model.LoadWeights(_bestWeights);
+        }
     }
 
     /// <summary>Mean loss over evenly spaced, deterministic windows of the held-out data.</summary>

@@ -58,6 +58,39 @@ public class GptCommandIntegrationTests : IDisposable
         completeExit.Should().Be(0);
     }
 
+    [Fact]
+    public async Task GptCommand_ShouldTrainWithValidationOptions()
+    {
+        var corpusPath = Path.Combine(_testDirectory, "corpus.txt");
+        await File.WriteAllTextAsync(corpusPath, string.Concat(Enumerable.Repeat("hello gpt world. ", 40)));
+        var modelDir = Path.Combine(_testDirectory, "model");
+
+        var exit = await GptCommand.Create().Parse(new[]
+        {
+            "train", "--source", corpusPath, "--out", modelDir, "--steps", "4", "--batch-size", "2",
+            "--block-size", "8", "--n-embd", "16", "--n-head", "2", "--n-layer", "1", "--tokenizer", "char",
+            "--validation-split", "0.2", "--eval-interval", "2"
+        }).InvokeAsync();
+
+        exit.Should().Be(0);
+        File.Exists(Path.Combine(modelDir, "weights.bin")).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task GptCommand_ShouldFail_WhenValidationSplitOutOfRange()
+    {
+        var corpusPath = Path.Combine(_testDirectory, "corpus.txt");
+        await File.WriteAllTextAsync(corpusPath, string.Concat(Enumerable.Repeat("hello gpt world. ", 40)));
+
+        var exit = await GptCommand.Create().Parse(new[]
+        {
+            "train", "--source", corpusPath, "--out", Path.Combine(_testDirectory, "model"), "--steps", "1",
+            "--validation-split", "-0.5"
+        }).InvokeAsync();
+
+        exit.Should().NotBe(0);
+    }
+
     [Theory]
     [InlineData("bpe")]
     [InlineData("char")]

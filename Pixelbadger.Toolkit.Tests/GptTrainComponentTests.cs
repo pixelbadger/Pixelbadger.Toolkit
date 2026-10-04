@@ -68,14 +68,131 @@ public class GptTrainComponentTests
         result.ValidationTokenCount.Should().Be(0);
     }
 
-    [Fact]
-    public async Task TrainAsync_ShouldThrow_WhenSplitIsOneOrMore()
+    private static float SavedWeightsValidationLoss(GptConfig config, IReadOnlyList<float[]> weights, int[] validationData, int batchSize)
     {
-        var options = new GptTrainOptions(Steps: 1, BlockSize: 8, Tokenizer: TokenizerKind.Char, ValidationSplit: 1f);
+        var model = new GptModel(config);
+        model.LoadWeights(weights);
+        return GptTrainComponent.EvaluateLoss(model, validationData, config.BlockSize, batchSize);
+    }
 
-        var act = () => _component.TrainAsync(new string('a', 200), "ignored", options);
+    private IReadOnlyList<float[]> CaptureSavedWeights()
+    {
+        var saved = new List<float[]>();
+        _mockCheckpoint
+            .Setup(x => x.SaveAsync(It.IsAny<string>(), It.IsAny<GptConfig>(), It.IsAny<TokenizerState>(), It.IsAny<IReadOnlyList<Tensor>>()))
+            .Callback<string, GptConfig, TokenizerState, IReadOnlyList<Tensor>>((_, _, _, ps) =>
+                saved.AddRange(ps.Select(p => p.Data.ToArray())))
+            .Returns(Task.CompletedTask);
+        return saved;
+    }
+
+    [Fact]
+    public async Task TrainAsync_ShouldSaveBestValidationWeights_NotFinalWeights()
+    {
+        var corpus = string.Concat(Enumerable.Repeat("the quick brown fox. ", 30));
+        var saved = CaptureSavedWeights();
+        // A huge learning rate makes later steps diverge, so best and final validation losses differ.
+        var options = new GptTrainOptions(
+            Steps: 12, BatchSize: 4, BlockSize: 8, NEmbd: 16, NHead: 2, NLayer: 1, LearningRate: 5f,
+            Seed: 1, Tokenizer: TokenizerKind.Char, ValidationSplit: 0.25f, EvalInterval: 3);
+
+        var result = await _component.TrainAsync(corpus, "out", options);
+
+        var data = CharTokenizer.Build(corpus).Encode(corpus);
+        var validationData = data[^result.ValidationTokenCount..];
+        var config = new GptConfig(CharTokenizer.Build(corpus).VocabSize, 8, 16, 2, 1);
+        SavedWeightsValidationLoss(config, saved, validationData, 4).Should().Be(result.BestValidationLoss!.Value);
+        result.BestValidationLoss.Should().BeLessThan(result.FinalValidationLoss!.Value);
+    }
+
+    [Fact]
+    public async Task TrainAsync_ShouldNotOverwriteBetterCheckpoint_WhenResumedRunGetsWorse()
+    {
+        var corpus = string.Concat(Enumerable.Repeat("abcde ", 40));
+        var checkpoint = CreateCheckpoint(corpus);
+        _mockCheckpoint.Setup(x => x.LoadAsync("ckpt")).ReturnsAsync(checkpoint);
+        _mockCheckpoint.Setup(x => x.TryLoadOptimizerStateAsync("ckpt")).ReturnsAsync((AdamWState?)null);
+        var saved = CaptureSavedWeights();
+
+        var options = new GptTrainOptions(
+            Steps: 4, BatchSize: 2, LearningRate: 1e4f, Resume: true, ValidationSplit: 0.25f, EvalInterval: 2);
+        var result = await _component.TrainAsync(corpus, "ckpt", options);
+
+        var data = CharTokenizer.Build(corpus).Encode(corpus);
+        var validationData = data[^result.ValidationTokenCount..];
+        var initial = SavedWeightsValidationLoss(checkpoint.Config, checkpoint.Weights, validationData, 2);
+        var savedLoss = SavedWeightsValidationLoss(checkpoint.Config, saved, validationData, 2);
+
+        result.BestValidationLoss.Should().BeLessThanOrEqualTo(initial);
+        savedLoss.Should().Be(result.BestValidationLoss!.Value);
+        savedLoss.Should().BeLessThanOrEqualTo(initial);
+    }
+
+    [Fact]
+    public async Task TrainAsync_ShouldSkipValidation_WhenCorpusTooShortForSplit()
+    {
+        var options = new GptTrainOptions(
+            Steps: 2, BatchSize: 2, BlockSize: 8, NEmbd: 8, NHead: 2, NLayer: 1, Tokenizer: TokenizerKind.Char, ValidationSplit: 0.1f);
+
+        var result = await _component.TrainAsync(new string('a', 40) + new string('b', 20), "out", options);
+
+        result.ValidationTokenCount.Should().Be(0);
+        result.FinalValidationLoss.Should().BeNull();
+        result.BestValidationLoss.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData(-0.1f)]
+    [InlineData(1f)]
+    [InlineData(1.5f)]
+    public async Task TrainAsync_ShouldThrowBeforeTokenizing_WhenSplitOutOfRange(float split)
+    {
+        var options = new GptTrainOptions(Steps: 1, ValidationSplit: split);
+
+        var act = () => _component.TrainAsync("some corpus text", "out", options);
 
         await act.Should().ThrowAsync<ArgumentException>().WithMessage("*validation-split*");
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-5)]
+    public async Task TrainAsync_ShouldThrow_WhenEvalIntervalNotPositiveAndValidationEnabled(int interval)
+    {
+        var options = new GptTrainOptions(Steps: 1, ValidationSplit: 0.2f, EvalInterval: interval);
+
+        var act = () => _component.TrainAsync("some corpus text", "out", options);
+
+        await act.Should().ThrowAsync<ArgumentException>().WithMessage("*eval-interval*");
+    }
+
+    [Fact]
+    public void EvaluateLoss_ShouldBeDeterministicAndFinite_WhenOnlyOneWindowFits()
+    {
+        var config = new GptConfig(5, BlockSize: 4, NEmbd: 8, NHead: 2, NLayer: 1);
+        var model = new GptModel(config);
+        model.InitWeights(3);
+        var data = new[] { 0, 1, 2, 3, 4 }; // blockSize + 1 tokens => exactly one window
+
+        var first = GptTrainComponent.EvaluateLoss(model, data, config.BlockSize, batchSize: 4);
+        var second = GptTrainComponent.EvaluateLoss(model, data, config.BlockSize, batchSize: 4);
+
+        float.IsFinite(first).Should().BeTrue();
+        first.Should().Be(second);
+    }
+
+    [Fact]
+    public void EvaluateLoss_ShouldCoverMultipleWindows_WhenDataIsLonger()
+    {
+        var config = new GptConfig(5, BlockSize: 4, NEmbd: 8, NHead: 2, NLayer: 1);
+        var model = new GptModel(config);
+        model.InitWeights(3);
+        var data = Enumerable.Range(0, 40).Select(i => i % 5).ToArray();
+
+        var loss = GptTrainComponent.EvaluateLoss(model, data, config.BlockSize, batchSize: 2);
+
+        float.IsFinite(loss).Should().BeTrue();
+        loss.Should().BeGreaterThan(0f);
     }
 
     [Fact]

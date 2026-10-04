@@ -47,7 +47,7 @@ public static class GptCommand
         var vocabSizeOption = new Option<int>("--vocab-size") { Description = "Target vocabulary size for the bpe tokenizer (>= 256; ignored for char)", DefaultValueFactory = _ => 512 };
         var lossGraphOption = new Option<string?>("--loss-graph") { Description = "Path to write an HTML graph of the per-step training loss" };
 
-        var valSplitOption = new Option<float>("--validation-split") { Description = "Fraction of the corpus (taken from the end) held out for validation; 0 disables", DefaultValueFactory = _ => 0.1f };
+        var valSplitOption = new Option<float>("--validation-split") { Description = "Fraction of the corpus (taken from the end) held out for validation; 0 disables (default)", DefaultValueFactory = _ => 0f };
         var evalIntervalOption = new Option<int>("--eval-interval") { Description = "Run validation every N steps (and at the final step)", DefaultValueFactory = _ => 100 };
 
         command.Add(sourceOption);
@@ -112,6 +112,9 @@ public static class GptCommand
                 AnsiConsole.MarkupLine(
                     $"[grey]Sampled[/] {result.TokensSeen:N0}/{result.CorpusTokenCount:N0} corpus tokens ({corpusCoverage:F1}%), " +
                     $"{result.VocabEntriesSeen:N0}/{result.VocabSize:N0} vocab entries ({vocabCoverage:F1}%){across}");
+
+                if (options.ValidationSplit > 0f && result.ValidationTokenCount == 0)
+                    AnsiConsole.MarkupLine("[yellow]Warning:[/] corpus too short for the requested validation split; validation was skipped.");
 
                 if (result.BestValidationLoss is not null)
                     AnsiConsole.MarkupLine(
