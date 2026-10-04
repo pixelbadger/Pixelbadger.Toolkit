@@ -262,7 +262,7 @@
 <header>
   <h1>SmolDLC</h1>
   <div class="subtitle">The Pixelbadger Toolkit software delivery lifecycle</div>
-  <div class="meta">One human prompt. Fully autonomous delivery.</div>
+  <div class="meta">One human prompt, one release approval. Everything between is autonomous.</div>
 </header>
 
 <nav>
@@ -311,9 +311,9 @@
   </section>
 
   <section>
-    <h2>The one human prompt</h2>
+    <h2>The human touchpoints</h2>
     <p>
-      Everything else in this lifecycle is automated. This is the only moment a person
+      Everything else in this lifecycle is automated. These are the only two moments a person
       needs to act.
     </p>
 
@@ -327,6 +327,18 @@
           A GitHub Actions workflow detects the label, fires a Claude Code agent to plan
           and implement the work, opens a PR, runs review and CI, and merges automatically
           when everything passes.
+        </p>
+      </div>
+    </div>
+
+    <div class="prompt-count">
+      <div class="prompt-number">2</div>
+      <div class="prompt-detail">
+        <h4>Approve the release</h4>
+        <p>
+          After a merge that changes production code, the NuGet publish job waits in the
+          <code>nuget-publish</code> environment. Click <strong>Review deployments → Approve</strong>
+          on the run in the Actions tab to publish. Nothing reaches nuget.org without that click.
         </p>
       </div>
     </div>
@@ -501,16 +513,23 @@
             pinned to the reviewed commit. A human's outstanding change request blocks the merge.
             <code>auto-merge.yml</code> still handles PRs approved by a human.
           </p>
+          <p style="margin-top:0.5rem;">
+            A merge made with <code>GITHUB_TOKEN</code> doesn't fire the push or
+            <code>pull_request</code> events the post-merge workflows listen for, so the job dispatches
+            them itself with <code>gh workflow run</code>. <code>workflow_dispatch</code> is exempt from
+            that rule.
+          </p>
           <div class="tag-row">
             <span class="tag">pr-checks.yml — auto-merge</span>
             <span class="tag">auto-merge.yml (human approvals)</span>
             <span class="tag">gh pr merge --squash</span>
+            <span class="tag">gh workflow run</span>
           </div>
         </div>
       </div>
 
       <div class="arrow-down split">↓ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ↓</div>
-      <div class="parallel-label">Two post-merge workflows fire</div>
+      <div class="parallel-label">Two post-merge workflows run</div>
 
       <div class="pipeline-row parallel">
 
@@ -531,26 +550,29 @@
           </ul>
           <div class="tag-row" style="margin-top:0.5rem;">
             <span class="tag">project-automation.yml</span>
-            <span class="tag">on: pull_request closed</span>
+            <span class="tag">on: pull_request closed; workflow_dispatch</span>
           </div>
         </div>
 
         <!-- Stage 7b: publish -->
         <div class="stage automation">
-          <div class="stage-label">GitHub Actions — continuous delivery</div>
+          <div class="stage-label">GitHub Actions — continuous delivery · human approval</div>
           <h3>Build, pack, publish &amp; release</h3>
           <p>
-            Triggered by the merge push to master (only when production files changed).
-            Runs a clean Release build and test, then:
+            Triggered by the merge (only when production files changed). Runs a clean Release
+            build and test, then waits for a human to approve the <code>nuget-publish</code>
+            environment. Once approved it:
           </p>
           <ul style="font-size:0.82rem; color:var(--text2); margin: 0.5rem 0 0 1.2rem; line-height:1.7;">
             <li>Packs the NuGet package</li>
+            <li>Logs in to nuget.org via trusted publishing (OIDC, short-lived key)</li>
             <li>Pushes to <code>nuget.org</code> with <code>--skip-duplicate</code></li>
             <li>Tags the commit <code>vX.Y.Z</code> on GitHub</li>
             <li>Creates a GitHub Release with auto-generated notes</li>
           </ul>
           <div class="tag-row" style="margin-top:0.5rem;">
             <span class="tag">publish-to-nuget.yml</span>
+            <span class="tag">environment: nuget-publish</span>
             <span class="tag">dotnet nuget push</span>
             <span class="tag">gh release create</span>
           </div>
@@ -566,8 +588,7 @@
           <div class="stage-label">Anyone, anywhere</div>
           <h3>Install the tool</h3>
           <p>
-            The package is live on NuGet within minutes of the merge. No action required
-            from the repository owner.
+            The package is live on NuGet within minutes of the release approval.
           </p>
           <div class="cmd-block" style="margin-top:0.75rem;">
             <span class="prompt">$ </span><span class="cmd">dotnet tool install</span>
@@ -620,7 +641,7 @@
           <td><code>pr-checks.yml</code> — <code>auto-merge</code> job</td>
           <td>claude-review approved and all checks green (<code>feature/</code> branches)</td>
           <td><span class="wf-actor actions-tag">GitHub Actions (bash)</span></td>
-          <td>Squash-merges the reviewed commit and deletes the branch, unless a human still has changes requested.</td>
+          <td>Squash-merges the reviewed commit and deletes the branch, unless a human still has changes requested. Then dispatches <code>project-automation.yml</code> and, for production changes, <code>publish-to-nuget.yml</code>.</td>
         </tr>
         <tr>
           <td><code>pr-checks.yml</code> — <code>mechanical-checks</code> job</td>
@@ -642,15 +663,15 @@
         </tr>
         <tr>
           <td><code>project-automation.yml</code></td>
-          <td>PR merged to master</td>
+          <td>PR merged to master; or dispatched by <code>auto-merge</code> with the PR number</td>
           <td><span class="wf-actor actions-tag">GitHub Actions (bash)</span></td>
           <td>Parses <code>Closes #N</code> from the PR body. Closes linked issues, applies <code>status: done</code>, removes <code>status: in-progress</code>, and tags with the release version.</td>
         </tr>
         <tr>
           <td><code>publish-to-nuget.yml</code></td>
-          <td>Push to master (production paths only)</td>
+          <td>Push to master (production paths only); or dispatched by <code>auto-merge</code> / by hand</td>
           <td><span class="wf-actor nuget-tag">NuGet CD</span></td>
-          <td>Clean Release build → <code>dotnet nuget push</code> → git tag → GitHub Release with auto-generated release notes.</td>
+          <td>Clean Release build → waits for approval in the <code>nuget-publish</code> environment → <code>dotnet nuget push</code> → git tag → GitHub Release with auto-generated release notes.</td>
         </tr>
       </tbody>
     </table>
@@ -708,7 +729,11 @@
     <div class="info-box">
       <strong>Repository settings.</strong> Automated approval needs
       <em>Allow GitHub Actions to create and approve pull requests</em> enabled under
-      Settings → Actions → General.
+      Settings → Actions → General. Releases need a <code>nuget-publish</code> environment
+      (Settings → Environments) with you as a required reviewer. Publishing uses NuGet
+      <em>trusted publishing</em>, so no long-lived API key is stored: a policy on nuget.org trusts
+      <code>publish-to-nuget.yml</code> in the <code>nuget-publish</code> environment, and the
+      environment holds only the <code>NUGET_USER</code> secret (the nuget.org profile name).
     </div>
   </section>
 
