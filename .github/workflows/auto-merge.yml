@@ -17,6 +17,8 @@ jobs:
       - name: Find PR and check merge readiness
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # No checkout in this job, so gh can't infer the repo from .git
+          GH_REPO: ${{ github.repository }}
         run: |
           # Determine PR number from whichever event fired
           if [ "${{ github.event_name }}" = "pull_request_review" ]; then
@@ -24,7 +26,9 @@ jobs:
             HEAD_BRANCH="${{ github.event.pull_request.head.ref }}"
             BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
           elif [ "${{ github.event_name }}" = "check_suite" ]; then
-            PR_NUMBER=$(gh pr list --state open --json number,headRefName,baseRefName \
+            # Match the PR to the branch this check suite ran on, not just any open PR
+            PR_NUMBER=$(gh pr list --state open --head "${{ github.event.check_suite.head_branch }}" \
+              --json number,baseRefName \
               --jq '.[] | select(.baseRefName == "master") | .number' | head -1)
             if [ -z "$PR_NUMBER" ]; then
               echo "No open PR targeting master found for this check suite. Skipping."
