@@ -40,7 +40,7 @@ jobs:
             1. Read the issue: `gh issue view ${{ github.event.issue.number }}`
             2. Claim it: `gh issue edit ${{ github.event.issue.number }} --remove-label "status: to-do" --add-label "status: in-progress"`
             3. Derive a short branch name from the issue title and create the branch: `git checkout -b feature/<short-description>`
-            4. Enter plan mode (the plan is auto-accepted — do not wait for human approval, proceed immediately to implementation)
+            4. Plan the implementation briefly in your own reasoning. Do NOT use plan mode: this run is headless and nobody can approve a plan, so entering plan mode ends the run with no PR.
             5. Implement the feature: write code, tests, bump the version in Pixelbadger.Toolkit/Pixelbadger.Toolkit.csproj, update README.md
             6. Verify: `dotnet build && dotnet test`
             7. Stage and commit all changes: `git add <files> && git commit -m "<message>"`
@@ -60,20 +60,104 @@ jobs:
             )"
             ```
 
+            A PR is the only way a human hears from you, so every run MUST end with an open PR.
+            If you cannot finish (blocked, unclear requirements, failing build, push rejected), still
+            commit whatever you have, push, and open a draft PR (`gh pr create --draft ...`) whose body
+            explains what was done, what is blocking, and what you need from a human.
+            Finish with a short summary of the outcome; it is shown to a human if no PR could be opened.
+
             Follow all instructions in CLAUDE.md. Do what has been asked; nothing more, nothing less.
           claude_args: '--model claude-sonnet-5-5 --dangerously-skip-permissions'
 
-      # Diagnostic: on failure, print only the error fields from the result
-      # message (not the full transcript, which show_full_output would expose).
-      - name: Show Claude error on failure
-        if: failure()
+      # Print only the result fields from the final message (not the full
+      # transcript, which show_full_output would expose). Runs on success too:
+      # a "successful" run can still stop early without opening a PR.
+      - name: Show Claude result
+        if: always()
         env:
           EXECUTION_FILE: ${{ steps.claude.outputs.execution_file }}
         run: |
           f="${EXECUTION_FILE:-$RUNNER_TEMP/claude-execution-output.json}"
           if [ ! -f "$f" ]; then echo "No execution file at $f"; exit 0; fi
-          jq '[.[] | select(.type == "result") | {subtype, is_error, api_error_status, result, errors}]' "$f" \
+          jq '[.[] | select(.type == "result") | {subtype, is_error, num_turns, api_error_status, result, errors}]' "$f" \
             || jq -c '.[-1] | {type, subtype, is_error, result, errors}' "$f"
+
+      # Guarantee: the PR is the only comms channel with a human, so if the
+      # agent didn't open one, open a draft PR carrying its work (if any) and
+      # its final message.
+      - name: Ensure a PR exists for this issue
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          EXECUTION_FILE: ${{ steps.claude.outputs.execution_file }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          EXISTING=$(gh pr list --state open --json number,body \
+            --jq "[.[] | select(.body | test(\"(?i)(closes|fixes|resolves|refs) #${ISSUE_NUMBER}\\\\b\"))][0].number // empty")
+          if [ -n "$EXISTING" ]; then
+            echo "PR #$EXISTING already references issue #$ISSUE_NUMBER."
+            exit 0
+          fi
+
+          echo "No PR found for issue #$ISSUE_NUMBER. Opening a fallback draft PR."
+
+          # The action revokes its app token when it finishes; push with the job token instead.
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GH_REPO}.git"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Keep any uncommitted agent work
+          if [ -n "$(git status --porcelain)" ]; then
+            git add -A
+            git commit -m "WIP: uncommitted agent changes for #${ISSUE_NUMBER}"
+          fi
+
+          FALLBACK_BRANCH="feature/agent-issue-${ISSUE_NUMBER}-run-${GITHUB_RUN_ID}"
+          BRANCH=$(git rev-parse --abbrev-ref HEAD)
+          [[ "$BRANCH" == feature/* ]] || BRANCH="$FALLBACK_BRANCH"
+          PUSHED=""
+          if [ "$(git rev-list --count origin/master..HEAD)" -gt 0 ]; then
+            git push -u origin "HEAD:refs/heads/${BRANCH}" && PUSHED=1 \
+              || echo "::warning::Pushing the agent's work was rejected (changes under .github/workflows need the 'workflows' permission)."
+          fi
+          if [ -z "$PUSHED" ]; then
+            # Nothing pushable: open the PR from an empty commit so a human still gets the message
+            BRANCH="$FALLBACK_BRANCH"
+            git checkout -B "$BRANCH" origin/master
+            git commit --allow-empty -m "Agent run for #${ISSUE_NUMBER} did not open a PR"
+            git push -u origin "$BRANCH"
+          fi
+
+          f="${EXECUTION_FILE:-$RUNNER_TEMP/claude-execution-output.json}"
+          RESULT=$(jq -r '[.[] | select(.type == "result")][-1] | "subtype: \(.subtype), turns: \(.num_turns)\n\n\(.result // "(no result text)")"' "$f" 2>/dev/null \
+            || echo "(no execution output found)")
+
+          {
+            echo "Refs #${ISSUE_NUMBER}"
+            echo
+            echo "## Agent did not open a PR"
+            echo "The agent run for this issue ended without opening a PR, so this draft was opened automatically."
+            echo "Run: ${RUN_URL}"
+            echo
+            if [ -n "$PUSHED" ]; then
+              echo "The agent's work is included as-is on \`${BRANCH}\`."
+            else
+              echo "There were no pushable changes; this PR contains a single empty commit."
+            fi
+            echo
+            echo "## Agent's final message"
+            echo
+            echo "$RESULT"
+            echo
+            echo "Reply here or update the issue and relabel it \`status: to-do\` to re-run."
+          } > "$RUNNER_TEMP/fallback-pr-body.md"
+
+          gh pr create --draft --base master --head "$BRANCH" \
+            --title "[needs human] ${ISSUE_TITLE}" \
+            --body-file "$RUNNER_TEMP/fallback-pr-body.md"
 
   agent-build-review:
     if: "github.event_name == 'pull_request_review' && github.event.review.state != 'approved' && contains(github.event.review.user.login, 'claude')"
