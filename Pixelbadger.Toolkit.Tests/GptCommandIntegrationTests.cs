@@ -82,13 +82,13 @@ public class GptCommandIntegrationTests : IDisposable
         var corpusPath = Path.Combine(_testDirectory, "corpus.txt");
         await File.WriteAllTextAsync(corpusPath, string.Concat(Enumerable.Repeat("hello gpt world. ", 40)));
 
-        var exit = await GptCommand.Create().Parse(new[]
-        {
-            "train", "--source", corpusPath, "--out", Path.Combine(_testDirectory, "model"), "--steps", "1",
-            "--validation-split", "-0.5"
-        }).InvokeAsync();
+        // The command's error path calls Environment.Exit, so run it out-of-process to keep the test host alive.
+        var (exitCode, standardOutput, _) = await ToolkitProcess.RunAsync(null,
+            "gpt", "train", "--source", corpusPath, "--out", Path.Combine(_testDirectory, "model"), "--steps", "1",
+            "--validation-split", "-0.5");
 
-        exit.Should().NotBe(0);
+        exitCode.Should().NotBe(0);
+        standardOutput.Should().Contain("validation-split must be at least 0 and less than 1.");
     }
 
     [Theory]
