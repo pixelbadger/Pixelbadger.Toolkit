@@ -565,6 +565,7 @@
           </p>
           <ul style="font-size:0.82rem; color:var(--text2); margin: 0.5rem 0 0 1.2rem; line-height:1.7;">
             <li>Packs the NuGet package</li>
+            <li>Logs in to nuget.org via trusted publishing (OIDC, short-lived key)</li>
             <li>Pushes to <code>nuget.org</code> with <code>--skip-duplicate</code></li>
             <li>Tags the commit <code>vX.Y.Z</code> on GitHub</li>
             <li>Creates a GitHub Release with auto-generated notes</li>
@@ -729,8 +730,10 @@
       <strong>Repository settings.</strong> Automated approval needs
       <em>Allow GitHub Actions to create and approve pull requests</em> enabled under
       Settings → Actions → General. Releases need a <code>nuget-publish</code> environment
-      (Settings → Environments) with you as a required reviewer, holding the
-      <code>NUGET_API_KEY</code> secret.
+      (Settings → Environments) with you as a required reviewer. Publishing uses NuGet
+      <em>trusted publishing</em>, so no long-lived API key is stored: a policy on nuget.org trusts
+      <code>publish-to-nuget.yml</code> in the <code>nuget-publish</code> environment, and the
+      environment holds only the <code>NUGET_USER</code> secret (the nuget.org profile name).
     </div>
   </section>
 

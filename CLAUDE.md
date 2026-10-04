@@ -275,7 +275,7 @@ Available topics and actions:
 ## Environment Variables
 
 - **OPENAI_API_KEY**: Required for LLM functionality (llm commands using OpenAI as provider)
-- **NUGET_API_KEY**: Required for publishing packages to NuGet
+- **NUGET_API_KEY**: Only needed to publish to NuGet by hand. CI uses NuGet trusted publishing (OIDC) and stores no API key
 
 ## Autonomous Ticket Workflow
 
