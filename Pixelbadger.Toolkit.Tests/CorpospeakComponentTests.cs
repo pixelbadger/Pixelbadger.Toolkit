@@ -1,6 +1,6 @@
 using FluentAssertions;
 using Moq;
-using OpenAI.Chat;
+using Microsoft.Extensions.AI;
 using Pixelbadger.Toolkit.Components;
 using Pixelbadger.Toolkit.Services;
 
@@ -258,9 +258,9 @@ public class CorpospeakComponentTests : IDisposable
         // Assert
         capturedMessages.Should().NotBeNull();
         capturedMessages.Should().HaveCount(1);
-        capturedMessages![0].ToString().Should().Contain("User");
-        capturedMessages[0].Content[0].Text.Should().Contain(source);
-        capturedMessages[0].Content[0].Text.Should().Contain("C-suite executives");
+        capturedMessages![0].Role.Should().Be(ChatRole.User);
+        capturedMessages[0].Text.Should().Contain(source);
+        capturedMessages[0].Text.Should().Contain("C-suite executives");
     }
 
     [Fact]
@@ -284,20 +284,20 @@ public class CorpospeakComponentTests : IDisposable
         capturedMessages.Should().NotBeNull();
         capturedMessages.Should().HaveCount(5); // 2 user messages + 2 assistant responses + 1 final prompt
 
-        capturedMessages![0].ToString().Should().Contain("User");
-        capturedMessages[0].Content[0].Text.Should().Be("Hey team");
+        capturedMessages![0].Role.Should().Be(ChatRole.User);
+        capturedMessages[0].Text.Should().Be("Hey team");
 
-        capturedMessages[1].ToString().Should().Contain("Assistant");
-        capturedMessages[1].Content[0].Text.Should().Be("I understand your writing style.");
+        capturedMessages[1].Role.Should().Be(ChatRole.Assistant);
+        capturedMessages[1].Text.Should().Be("I understand your writing style.");
 
-        capturedMessages[2].ToString().Should().Contain("User");
-        capturedMessages[2].Content[0].Text.Should().Be("Great work everyone");
+        capturedMessages[2].Role.Should().Be(ChatRole.User);
+        capturedMessages[2].Text.Should().Be("Great work everyone");
 
-        capturedMessages[3].ToString().Should().Contain("Assistant");
-        capturedMessages[3].Content[0].Text.Should().Be("I understand your writing style.");
+        capturedMessages[3].Role.Should().Be(ChatRole.Assistant);
+        capturedMessages[3].Text.Should().Be("I understand your writing style.");
 
-        capturedMessages[4].ToString().Should().Contain("User");
-        capturedMessages[4].Content[0].Text.Should().Contain(source);
+        capturedMessages[4].Role.Should().Be(ChatRole.User);
+        capturedMessages[4].Text.Should().Contain(source);
     }
 
     [Theory]
@@ -328,7 +328,7 @@ public class CorpospeakComponentTests : IDisposable
 
         // Assert
         capturedMessages.Should().NotBeNull();
-        var promptText = capturedMessages![0].Content[0].Text;
+        var promptText = capturedMessages![0].Text;
 
         promptText.Should().Contain(expectedAudienceType);
         promptText.Should().Contain(expectedKeyword1);
@@ -354,7 +354,7 @@ public class CorpospeakComponentTests : IDisposable
 
         // Assert
         capturedMessages.Should().NotBeNull();
-        var finalPrompt = capturedMessages!.Last().Content[0].Text;
+        var finalPrompt = capturedMessages!.Last().Text;
 
         finalPrompt.Should().Contain("adapt the writing style");
         finalPrompt.Should().Contain("idiolect");
@@ -380,7 +380,7 @@ public class CorpospeakComponentTests : IDisposable
 
         // Assert
         capturedMessages.Should().NotBeNull();
-        var promptText = capturedMessages![0].Content[0].Text;
+        var promptText = capturedMessages![0].Text;
 
         promptText.Should().NotContain("idiolect");
         promptText.Should().NotContain("previous messages");
@@ -428,7 +428,7 @@ public class CorpospeakComponentTests : IDisposable
 
         // Assert
         capturedMessages.Should().NotBeNull();
-        var promptText = capturedMessages![0].Content[0].Text;
+        var promptText = capturedMessages![0].Text;
         promptText.Should().Contain("<userinput>");
         promptText.Should().Contain("</userinput>");
         promptText.Should().Contain("prompt injection");
@@ -454,7 +454,7 @@ public class CorpospeakComponentTests : IDisposable
 
         // Assert
         capturedMessages.Should().NotBeNull();
-        var promptText = capturedMessages![0].Content[0].Text;
+        var promptText = capturedMessages![0].Text;
         promptText.Should().Contain(escapedSource);
         promptText.Should().NotContain("<great>");
     }

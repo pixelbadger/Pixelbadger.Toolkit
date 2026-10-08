@@ -1,6 +1,6 @@
 using FluentAssertions;
 using Moq;
-using OpenAI.Chat;
+using Microsoft.Extensions.AI;
 using Pixelbadger.Toolkit.Components;
 using Pixelbadger.Toolkit.Services;
 
@@ -87,14 +87,16 @@ public class OcaaarComponentTests : IDisposable
         capturedMessages.Should().NotBeNull();
         capturedMessages.Should().HaveCount(2);
 
-        capturedMessages![0].ToString().Should().Contain("System");
-        capturedMessages[0].Content[0].Text.Should().Contain("pirate");
-        capturedMessages[0].Content[0].Text.Should().Contain("extract the text");
-        capturedMessages[0].Content[0].Text.Should().Contain("bucaneering dialect");
+        capturedMessages![0].Role.Should().Be(ChatRole.System);
+        capturedMessages[0].Text.Should().Contain("pirate");
+        capturedMessages[0].Text.Should().Contain("extract the text");
+        capturedMessages[0].Text.Should().Contain("bucaneering dialect");
 
-        capturedMessages[1].ToString().Should().Contain("User");
-        capturedMessages[1].Content.Should().HaveCount(1);
-        capturedMessages[1].Content[0].Kind.Should().Be(ChatMessageContentPartKind.Image);
+        capturedMessages[1].Role.Should().Be(ChatRole.User);
+        capturedMessages[1].Contents.Should().HaveCount(1);
+        var data = capturedMessages[1].Contents[0].Should().BeOfType<DataContent>().Subject;
+        data.MediaType.Should().Be("image/png");
+        data.Data.ToArray().Should().Equal(imageBytes);
     }
 
     [Fact]
@@ -119,13 +121,13 @@ public class OcaaarComponentTests : IDisposable
     }
 
     [Theory]
-    [InlineData(".jpg")]
-    [InlineData(".jpeg")]
-    [InlineData(".png")]
-    [InlineData(".gif")]
-    [InlineData(".webp")]
-    [InlineData(".bmp")] // fallback case
-    public async Task OcaaarAsync_ShouldProcessDifferentImageFormats(string extension)
+    [InlineData(".jpg", "image/jpeg")]
+    [InlineData(".jpeg", "image/jpeg")]
+    [InlineData(".png", "image/png")]
+    [InlineData(".gif", "image/gif")]
+    [InlineData(".webp", "image/webp")]
+    [InlineData(".bmp", "image/jpeg")] // fallback case
+    public async Task OcaaarAsync_ShouldProcessDifferentImageFormats(string extension, string expectedMediaType)
     {
         // Arrange
         var imagePath = Path.Combine(_testDirectory, $"test{extension}");
@@ -145,9 +147,10 @@ public class OcaaarComponentTests : IDisposable
         // Assert
         capturedMessages.Should().NotBeNull();
         var imageMessage = capturedMessages![1];
-        var imagePart = imageMessage.Content[0];
+        var imagePart = imageMessage.Contents[0].Should().BeOfType<DataContent>().Subject;
 
-        imagePart.Kind.Should().Be(ChatMessageContentPartKind.Image);
+        imagePart.MediaType.Should().Be(expectedMediaType);
+        imagePart.Data.ToArray().Should().Equal(imageBytes);
     }
 
     [Fact]
@@ -213,7 +216,7 @@ public class OcaaarComponentTests : IDisposable
 
         // Assert
         capturedMessages.Should().NotBeNull();
-        var systemMessage = capturedMessages![0].Content[0].Text;
+        var systemMessage = capturedMessages![0].Text;
 
         systemMessage.Should().Contain("pirate");
         systemMessage.Should().Contain("extract the text");
@@ -285,7 +288,7 @@ public class OcaaarComponentTests : IDisposable
         _mockLlmService.Verify(x => x.CompleteChatAsync(
             It.Is<IEnumerable<ChatMessage>>(messages =>
                 messages.Count() == 2 &&
-                messages.Last().Content[0].Kind == ChatMessageContentPartKind.Image),
+                messages.Last().Contents[0] is DataContent),
             It.IsAny<string?>()), Times.Once);
     }
 }

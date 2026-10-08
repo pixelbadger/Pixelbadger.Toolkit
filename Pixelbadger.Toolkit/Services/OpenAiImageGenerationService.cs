@@ -9,11 +9,11 @@ public class OpenAiImageGenerationService : IImageGenerationService
 
     private readonly ImageClient _imageClient;
 
-    public OpenAiImageGenerationService(string model = DefaultModel)
+    public OpenAiImageGenerationService(LlmModelOptions options)
     {
         var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY")
             ?? throw new InvalidOperationException("OPENAI_API_KEY environment variable is not set.");
-        _imageClient = new OpenAIClient(apiKey).GetImageClient(model);
+        _imageClient = new OpenAIClient(apiKey).GetImageClient(options.Model ?? DefaultModel);
     }
 
     public async Task<byte[]> GenerateImageAsync(string prompt)

@@ -1,4 +1,5 @@
 using System.CommandLine;
+using Microsoft.Extensions.DependencyInjection;
 using Pixelbadger.Toolkit.Components;
 using Pixelbadger.Toolkit.Services;
 using Spectre.Console;
@@ -21,26 +22,85 @@ public static class LlmCommand
         return command;
     }
 
-    internal static bool TryValidateReasoningEffort(
-        string? effort,
-        IReadOnlyList<string> supported,
-        out string? normalised)
+    /// <summary>Provider names accepted by --provider. Add new providers here and in <see cref="BuildLlmServices"/>.</summary>
+    internal static readonly string[] SupportedProviders = [LlmProviders.OpenAi, LlmProviders.Claude];
+
+    private static Option<string> CreateProviderOption()
     {
-        if (effort is null)
+        var option = new Option<string>("--provider")
         {
-            normalised = null;
-            return true;
+            Description = $"The LLM provider to use (supported: {string.Join(", ", SupportedProviders)})",
+            DefaultValueFactory = _ => LlmProviders.OpenAi
+        };
+        option.AcceptOnlyFromAmong(SupportedProviders);
+        return option;
+    }
+
+    private static Option<string?> CreateModelOption(string description = "The model to use (defaults to the provider's default model)")
+        => new("--model") { Description = description };
+
+    /// <summary>
+    /// Composition root: registers exactly one provider module plus the provider-neutral services.
+    /// Nothing here reads an API key; keys are only read when a provider service is resolved.
+    /// </summary>
+    internal static ServiceProvider BuildLlmServices(string provider, string? model)
+    {
+        var services = new ServiceCollection();
+
+        switch (provider)
+        {
+            case LlmProviders.OpenAi:
+                services.AddOpenAiLlmProvider(model);
+                break;
+            case LlmProviders.Claude:
+                services.AddClaudeLlmProvider(model);
+                break;
+            default:
+                throw new ArgumentException($"Unknown provider '{provider}'. Supported providers: {string.Join(", ", SupportedProviders)}", nameof(provider));
         }
 
-        var match = supported.FirstOrDefault(s => s.Equals(effort, StringComparison.OrdinalIgnoreCase));
-        if (match is null)
-        {
-            normalised = null;
-            return false;
-        }
+        services.AddSingleton<ILlmCompatibilityValidator, LlmCompatibilityValidator>();
+        services.AddSingleton<IHistoryService, HistoryService>();
+        services.AddTransient<ChatComponent>();
+        services.AddTransient<TranslateComponent>();
+        services.AddTransient<OcaaarComponent>();
+        services.AddTransient<CorpospeakComponent>();
+        services.AddTransient<GenerateImageComponent>();
 
-        normalised = match;
-        return true;
+        return services.BuildServiceProvider();
+    }
+
+    private static readonly IReadOnlySet<LlmCapability> TextChatOnly = new HashSet<LlmCapability> { LlmCapability.TextChat };
+
+    /// <summary>
+    /// Builds the provider, validates compatibility BEFORE resolving any provider service (and so before any
+    /// API-key lookup, file read, history DB access or network call), then runs the action. Returns the exit code.
+    /// </summary>
+    internal static async Task<int> RunLlmActionAsync(
+        string provider,
+        string? model,
+        LlmActionRequirements requirements,
+        Func<IServiceProvider, LlmCompatibilityResult, Task> action)
+    {
+        try
+        {
+            using var services = BuildLlmServices(provider, model);
+
+            var compatibility = services.GetRequiredService<ILlmCompatibilityValidator>().Validate(requirements);
+            if (!compatibility.IsCompatible)
+            {
+                AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(compatibility.Error!)}");
+                return 1;
+            }
+
+            await action(services, compatibility);
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
+            return 1;
+        }
     }
 
     private static Command CreateChatCommand()
@@ -49,44 +109,34 @@ public static class LlmCommand
 
         var messageOption = new Option<string>("--message") { Description = "The message to send to the LLM", Required = true };
         var sessionIdOption = new Option<long?>("--session-id") { Description = "Session ID to continue a previous conversation (omit to start a new session)" };
-        var modelOption = new Option<string>("--model") { Description = "The model to use", DefaultValueFactory = _ => "gpt-5-nano" };
-        var reasoningEffortOption = new Option<string?>("--reasoning-effort") { Description = "Reasoning effort level (e.g. low, medium, high for OpenAI o-series models)" };
+        var modelOption = CreateModelOption();
+        var providerOption = CreateProviderOption();
+        var reasoningEffortOption = new Option<string?>("--reasoning-effort") { Description = "Reasoning effort level (supported values depend on --provider)" };
 
         command.Add(messageOption);
         command.Add(sessionIdOption);
         command.Add(modelOption);
+        command.Add(providerOption);
         command.Add(reasoningEffortOption);
 
-        command.SetAction(async (parseResult, cancellationToken) =>
+        command.SetAction((parseResult, cancellationToken) =>
         {
-            try
-            {
-                var message = parseResult.GetValue(messageOption)!;
-                var sessionId = parseResult.GetValue(sessionIdOption);
-                var model = parseResult.GetValue(modelOption)!;
-                var reasoningEffort = parseResult.GetValue(reasoningEffortOption);
+            var message = parseResult.GetValue(messageOption)!;
+            var sessionId = parseResult.GetValue(sessionIdOption);
+            var reasoningEffort = parseResult.GetValue(reasoningEffortOption);
 
-                var llmClientService = new OpenAiLlmClientService(model);
-
-                if (!TryValidateReasoningEffort(reasoningEffort, llmClientService.SupportedReasoningEfforts, out var normalisedEffort))
+            return RunLlmActionAsync(
+                parseResult.GetValue(providerOption)!,
+                parseResult.GetValue(modelOption),
+                new LlmActionRequirements("chat", TextChatOnly, reasoningEffort),
+                async (services, compatibility) =>
                 {
-                    Console.WriteLine($"Error: Invalid reasoning effort '{reasoningEffort}'. Supported values: {string.Join(", ", llmClientService.SupportedReasoningEfforts)}");
-                    Environment.Exit(1);
-                    return;
-                }
+                    var result = await services.GetRequiredService<ChatComponent>()
+                        .ChatAsync(message, sessionId, compatibility.NormalisedReasoningEffort);
 
-                using var historyService = new HistoryService();
-                var chatComponent = new ChatComponent(llmClientService, historyService);
-                var result = await chatComponent.ChatAsync(message, sessionId, normalisedEffort);
-
-                AnsiConsole.WriteLine(result.Response);
-                Console.Error.WriteLine($"Session: {result.SessionId}");
-            }
-            catch (Exception ex)
-            {
-                AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
-                Environment.Exit(1);
-            }
+                    AnsiConsole.WriteLine(result.Response);
+                    Console.Error.WriteLine($"Session: {result.SessionId}");
+                });
         });
 
         return command;
@@ -98,32 +148,30 @@ public static class LlmCommand
 
         var textOption = new Option<string>("--text") { Description = "The text to translate", Required = true };
         var targetLanguageOption = new Option<string>("--target-language") { Description = "The target language to translate to", Required = true };
-        var modelOption = new Option<string>("--model") { Description = "The model to use", DefaultValueFactory = _ => "gpt-5-nano" };
+        var modelOption = CreateModelOption();
+        var providerOption = CreateProviderOption();
 
         command.Add(textOption);
         command.Add(targetLanguageOption);
         command.Add(modelOption);
+        command.Add(providerOption);
 
-        command.SetAction(async (parseResult, cancellationToken) =>
+        command.SetAction((parseResult, cancellationToken) =>
         {
-            try
-            {
-                var text = parseResult.GetValue(textOption)!;
-                var targetLanguage = parseResult.GetValue(targetLanguageOption)!;
-                var model = parseResult.GetValue(modelOption)!;
+            var text = parseResult.GetValue(textOption)!;
+            var targetLanguage = parseResult.GetValue(targetLanguageOption)!;
 
-                var llmClientService = new OpenAiLlmClientService(model);
-                using var historyService = new HistoryService();
-                var translateComponent = new TranslateComponent(llmClientService, historyService);
-                var translation = await translateComponent.TranslateAsync(text, targetLanguage);
+            return RunLlmActionAsync(
+                parseResult.GetValue(providerOption)!,
+                parseResult.GetValue(modelOption),
+                new LlmActionRequirements("translate", TextChatOnly),
+                async (services, _) =>
+                {
+                    var translation = await services.GetRequiredService<TranslateComponent>()
+                        .TranslateAsync(text, targetLanguage);
 
-                AnsiConsole.WriteLine(translation);
-            }
-            catch (Exception ex)
-            {
-                AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
-                Environment.Exit(1);
-            }
+                    AnsiConsole.WriteLine(translation);
+                });
         });
 
         return command;
@@ -134,30 +182,27 @@ public static class LlmCommand
         var command = new Command("ocaaar", "Extract text from an image and translate it to pirate speak");
 
         var imagePathOption = new Option<string>("--image-path") { Description = "Path to the image file to process", Required = true };
-        var modelOption = new Option<string>("--model") { Description = "The model to use", DefaultValueFactory = _ => "gpt-5-nano" };
+        var modelOption = CreateModelOption();
+        var providerOption = CreateProviderOption();
 
         command.Add(imagePathOption);
         command.Add(modelOption);
+        command.Add(providerOption);
 
-        command.SetAction(async (parseResult, cancellationToken) =>
+        command.SetAction((parseResult, cancellationToken) =>
         {
-            try
-            {
-                var imagePath = parseResult.GetValue(imagePathOption)!;
-                var model = parseResult.GetValue(modelOption)!;
+            var imagePath = parseResult.GetValue(imagePathOption)!;
 
-                var llmClientService = new OpenAiLlmClientService(model);
-                using var historyService = new HistoryService();
-                var ocaaarComponent = new OcaaarComponent(llmClientService, historyService);
-                var response = await ocaaarComponent.OcaaarAsync(imagePath);
+            return RunLlmActionAsync(
+                parseResult.GetValue(providerOption)!,
+                parseResult.GetValue(modelOption),
+                new LlmActionRequirements("ocaaar", new HashSet<LlmCapability> { LlmCapability.TextChat, LlmCapability.ImageInput }),
+                async (services, _) =>
+                {
+                    var response = await services.GetRequiredService<OcaaarComponent>().OcaaarAsync(imagePath);
 
-                AnsiConsole.WriteLine(response);
-            }
-            catch (Exception ex)
-            {
-                AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
-                Environment.Exit(1);
-            }
+                    AnsiConsole.WriteLine(response);
+                });
         });
 
         return command;
@@ -170,34 +215,32 @@ public static class LlmCommand
         var sourceOption = new Option<string>("--source") { Description = "The source text to rewrite (or path to file containing the text)", Required = true };
         var audienceOption = new Option<string>("--audience") { Description = "Target audience (csuite, engineering, product, sales, marketing, operations, finance, legal, hr, customer-success)", Required = true };
         var userMessagesOption = new Option<string[]>("--user-messages") { Description = "Optional user messages to learn idiolect from (text or file paths, multiple values allowed)", AllowMultipleArgumentsPerToken = true };
-        var modelOption = new Option<string>("--model") { Description = "The model to use", DefaultValueFactory = _ => "gpt-5-nano" };
+        var modelOption = CreateModelOption();
+        var providerOption = CreateProviderOption();
 
         command.Add(sourceOption);
         command.Add(audienceOption);
         command.Add(userMessagesOption);
         command.Add(modelOption);
+        command.Add(providerOption);
 
-        command.SetAction(async (parseResult, cancellationToken) =>
+        command.SetAction((parseResult, cancellationToken) =>
         {
-            try
-            {
-                var source = parseResult.GetValue(sourceOption)!;
-                var audience = parseResult.GetValue(audienceOption)!;
-                var userMessages = parseResult.GetValue(userMessagesOption) ?? [];
-                var model = parseResult.GetValue(modelOption)!;
+            var source = parseResult.GetValue(sourceOption)!;
+            var audience = parseResult.GetValue(audienceOption)!;
+            var userMessages = parseResult.GetValue(userMessagesOption) ?? [];
 
-                var llmClientService = new OpenAiLlmClientService(model);
-                using var historyService = new HistoryService();
-                var corpospeakComponent = new CorpospeakComponent(llmClientService, historyService);
-                var result = await corpospeakComponent.CorpospeakAsync(source, audience, userMessages);
+            return RunLlmActionAsync(
+                parseResult.GetValue(providerOption)!,
+                parseResult.GetValue(modelOption),
+                new LlmActionRequirements("corpospeak", TextChatOnly),
+                async (services, _) =>
+                {
+                    var result = await services.GetRequiredService<CorpospeakComponent>()
+                        .CorpospeakAsync(source, audience, userMessages);
 
-                AnsiConsole.WriteLine(result);
-            }
-            catch (Exception ex)
-            {
-                AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
-                Environment.Exit(1);
-            }
+                    AnsiConsole.WriteLine(result);
+                });
         });
 
         return command;
@@ -205,37 +248,38 @@ public static class LlmCommand
 
     internal static Command CreateGenerateImageCommand()
     {
-        var command = new Command("generate-image", "Generate an image from a text prompt using OpenAI");
+        var command = new Command("generate-image", "Generate an image from a text prompt using an LLM provider");
 
         var promptOption = new Option<string>("--prompt") { Description = "The prompt describing the image to generate", Required = true };
         var outFileOption = new Option<string>("--out-file") { Description = "Path to write the generated image to", Required = true };
-        var modelOption = new Option<string>("--model") { Description = "The image model to use", DefaultValueFactory = _ => OpenAiImageGenerationService.DefaultModel };
+        var modelOption = CreateModelOption();
+        var providerOption = CreateProviderOption();
 
         var overwriteOption = new Option<bool>("--overwrite") { Description = "Replace --out-file if it already exists" };
 
         command.Add(promptOption);
         command.Add(outFileOption);
         command.Add(modelOption);
+        command.Add(providerOption);
         command.Add(overwriteOption);
 
-        command.SetAction(async (parseResult, cancellationToken) =>
+        command.SetAction((parseResult, cancellationToken) =>
         {
-            try
-            {
-                var prompt = parseResult.GetValue(promptOption)!;
-                var outFile = parseResult.GetValue(outFileOption)!;
-                var model = parseResult.GetValue(modelOption)!;
+            var prompt = parseResult.GetValue(promptOption)!;
+            var outFile = parseResult.GetValue(outFileOption)!;
+            var overwrite = parseResult.GetValue(overwriteOption);
 
-                var component = new GenerateImageComponent(new OpenAiImageGenerationService(model));
-                var path = await component.GenerateImageAsync(prompt, outFile, parseResult.GetValue(overwriteOption));
+            return RunLlmActionAsync(
+                parseResult.GetValue(providerOption)!,
+                parseResult.GetValue(modelOption),
+                new LlmActionRequirements("generate-image", new HashSet<LlmCapability> { LlmCapability.ImageGeneration }),
+                async (services, _) =>
+                {
+                    var path = await services.GetRequiredService<GenerateImageComponent>()
+                        .GenerateImageAsync(prompt, outFile, overwrite);
 
-                AnsiConsole.MarkupLine($"[green]Image written to {Markup.Escape(path)}[/]");
-            }
-            catch (Exception ex)
-            {
-                AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
-                Environment.Exit(1);
-            }
+                    AnsiConsole.MarkupLine($"[green]Image written to {Markup.Escape(path)}[/]");
+                });
         });
 
         return command;

@@ -15,7 +15,7 @@ public class OpenAiImageGenerationServiceTests : IDisposable
     {
         Environment.SetEnvironmentVariable("OPENAI_API_KEY", null);
 
-        var act = () => new OpenAiImageGenerationService();
+        var act = () => new OpenAiImageGenerationService(new LlmModelOptions(null));
 
         act.Should().Throw<InvalidOperationException>().WithMessage("*OPENAI_API_KEY*");
     }
@@ -25,7 +25,7 @@ public class OpenAiImageGenerationServiceTests : IDisposable
     {
         Environment.SetEnvironmentVariable("OPENAI_API_KEY", "test-key");
 
-        var act = () => new OpenAiImageGenerationService("custom-model");
+        var act = () => new OpenAiImageGenerationService(new LlmModelOptions("custom-model"));
 
         act.Should().NotThrow();
     }

@@ -117,4 +117,5 @@ pbtk gpt complete --model ./.gpt --prompt "The" --temperature 0
 ## Requirements
 
 - .NET 10.0
-- OpenAI API key (for `llm` commands) — set the `OPENAI_API_KEY` environment variable
+- OpenAI API key (for `llm` commands with the default `--provider openai`) — set the `OPENAI_API_KEY` environment variable
+- Anthropic API key (for `llm` commands with `--provider claude`) — set the `ANTHROPIC_API_KEY` environment variable

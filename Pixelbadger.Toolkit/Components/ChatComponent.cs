@@ -1,4 +1,4 @@
-using OpenAI.Chat;
+using Microsoft.Extensions.AI;
 using Pixelbadger.Toolkit.Services;
 
 namespace Pixelbadger.Toolkit.Components;
@@ -25,16 +25,16 @@ public class ChatComponent
             var existingMessages = await _historyService.GetSessionMessagesAsync(sessionId.Value);
             foreach (var msg in existingMessages)
             {
-                messages.Add(msg.Role switch
+                messages.Add(new ChatMessage(msg.Role switch
                 {
-                    "system" => ChatMessage.CreateSystemMessage(msg.Content),
-                    "assistant" => ChatMessage.CreateAssistantMessage(msg.Content),
-                    _ => ChatMessage.CreateUserMessage(msg.Content)
-                });
+                    "system" => ChatRole.System,
+                    "assistant" => ChatRole.Assistant,
+                    _ => ChatRole.User
+                }, msg.Content));
             }
         }
 
-        messages.Add(ChatMessage.CreateUserMessage(question));
+        messages.Add(new ChatMessage(ChatRole.User, question));
 
         var result = await _llmClientService.CompleteChatAsync(messages, reasoningEffort);
 

@@ -1,4 +1,4 @@
-using OpenAI.Chat;
+using Microsoft.Extensions.AI;
 using Pixelbadger.Toolkit.Services;
 
 namespace Pixelbadger.Toolkit.Components;
@@ -23,16 +23,13 @@ public class OcaaarComponent
         }
 
         var imageBytes = await File.ReadAllBytesAsync(resolvedPath);
-        var imageData = BinaryData.FromBytes(imageBytes);
 
         var systemPrompt = "You are a salty and seasoned pirate, with excellent reading capabilities. The user will submit an image. You are to extract the text from that image and translate that text into your bucaneering dialect. Return ONLY the pirate-translated text, nothing else - no explanations, no original text, no additional commentary. Just the buccaneer version of what ye read, savvy? Aaargh me hearties, splice the main brace!";
 
         var messages = new List<ChatMessage>
         {
-            ChatMessage.CreateSystemMessage(systemPrompt),
-            ChatMessage.CreateUserMessage(
-                ChatMessageContentPart.CreateImagePart(imageData, GetImageMediaType(imagePath))
-            )
+            new ChatMessage(ChatRole.System, systemPrompt),
+            new ChatMessage(ChatRole.User, [new DataContent(imageBytes, GetImageMediaType(imagePath))])
         };
 
         var chatResult = await _llmClientService.CompleteChatAsync(messages);

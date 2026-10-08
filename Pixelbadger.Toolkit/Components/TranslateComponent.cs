@@ -1,4 +1,4 @@
-using OpenAI.Chat;
+using Microsoft.Extensions.AI;
 using Pixelbadger.Toolkit.Services;
 using Pixelbadger.Toolkit.Utilities;
 
@@ -25,8 +25,8 @@ public class TranslateComponent
 
         var messages = new List<ChatMessage>
         {
-            ChatMessage.CreateSystemMessage(systemPrompt),
-            ChatMessage.CreateUserMessage(sanitizedUserMessage)
+            new ChatMessage(ChatRole.System, systemPrompt),
+            new ChatMessage(ChatRole.User, sanitizedUserMessage)
         };
 
         var chatResult = await _llmClientService.CompleteChatAsync(messages);
