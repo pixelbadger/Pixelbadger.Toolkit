@@ -76,6 +76,8 @@ The project is .NET 10, and uses Microsoft's System.CommandLine library for buil
   - `pbtk llm chat --message "Continue our conversation" --session-id 42 --model "gpt-4o-mini"`
   - `pbtk llm chat --message "Solve this hard problem" --reasoning-effort high`
   - `pbtk llm translate --text "Hello, how are you?" --target-language "Spanish"`
+  - `pbtk llm chat --message "Hello, how are you?" --provider claude`
+  - `pbtk llm translate --text "Hello" --target-language "French" --provider claude --model claude-haiku-5-5`
   - `pbtk llm ocaaar --image-path ./image.jpg`
   - `pbtk llm generate-image --prompt "A pirate ship at sunset" --out-file ./ship.png`
   - `pbtk llm corpospeak --source "API performance is great" --audience "csuite"`
@@ -232,7 +234,10 @@ The project follows a topic-based command architecture with a component-per-comm
 ```
 Services/
 ├── ILlmClientService.cs        # Provider-neutral LLM interface (with LlmChatResult record)
-└── OpenAiLlmClientService.cs   # OpenAI implementation of ILlmClientService
+├── OpenAiLlmClientService.cs   # OpenAI implementation of ILlmClientService
+├── ClaudeLlmClientService.cs   # Claude implementation of ILlmClientService
+├── LlmCompatibility.cs         # Capabilities + compatibility validator
+└── LlmServiceCollectionExtensions*.cs  # Per-provider DI registration modules (selected by --provider)
 
 Components/
 ├── ChatComponent.cs            # Chat command logic (injects ILlmClientService)
@@ -270,12 +275,15 @@ Available topics and actions:
 - SixLabors.ImageSharp (for steganography)
 - System.CommandLine (beta)
 - OpenAI (for LLM integration)
+- Anthropic (official Claude SDK)
+- Microsoft.Extensions.DependencyInjection
 - Microsoft.Extensions.AI (for AI abstractions)
 - Microsoft.Extensions.AI.OpenAI (for OpenAI integration)
 
 ## Environment Variables
 
-- **OPENAI_API_KEY**: Required for LLM functionality (llm commands using OpenAI as provider)
+- **OPENAI_API_KEY**: Required for llm commands with --provider openai (the default)
+- **ANTHROPIC_API_KEY**: Required for llm commands with --provider claude
 - **NUGET_API_KEY**: Only needed to publish to NuGet by hand. CI uses NuGet trusted publishing (OIDC) and stores no API key
 
 ## Autonomous Ticket Workflow

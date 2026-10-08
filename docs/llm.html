@@ -34,16 +34,43 @@
   <section id="prerequisites">
     <h2>Prerequisites</h2>
     <p>
-      All commands in this topic call the OpenAI API. The <code>OPENAI_API_KEY</code> environment variable
-      must be set before running any command.
+      Commands in this topic call an LLM provider, selected with <code>--provider</code>. The provider
+      is <code>openai</code> by default; <code>claude</code> is also supported. Each provider reads its own
+      API key from the environment:
     </p>
+    <ul>
+      <li><code>OPENAI_API_KEY</code> for <code>--provider openai</code> (the default)</li>
+      <li><code>ANTHROPIC_API_KEY</code> for <code>--provider claude</code></li>
+    </ul>
     <div class="cmd-block">
       <span class="prompt">$ </span><span class="cmd">export</span>
       <span class="val"> OPENAI_API_KEY=sk-...</span>
     </div>
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">export</span>
+      <span class="val"> ANTHROPIC_API_KEY=sk-ant-...</span>
+    </div>
     <p>
-      By default all commands use the <code>gpt-5-nano</code> model. Pass <code>--model</code> to override.
+      When <code>--model</code> is omitted, each command uses the provider's default model: <code>gpt-5-nano</code>
+      for <code>openai</code> (<code>gpt-image-1</code> for <code>generate-image</code>) and <code>claude-sonnet-5-5</code>
+      for <code>claude</code>. Pass <code>--model</code> to override.
     </p>
+
+    <h3>Provider capabilities</h3>
+    <p>
+      Each command checks that the selected provider supports what it needs before any API key is read,
+      input file is opened, history is accessed or network call is made. An unsupported combination prints
+      an <code>Error:</code> message and exits with status 1.
+    </p>
+    <table>
+      <thead><tr><th>Capability</th><th>Commands</th><th><code>openai</code></th><th><code>claude</code></th></tr></thead>
+      <tbody>
+        <tr><td>Text chat</td><td><code>chat</code>, <code>translate</code>, <code>corpospeak</code></td><td>Yes</td><td>Yes</td></tr>
+        <tr><td>Image input</td><td><code>ocaaar</code></td><td>Yes</td><td>Yes</td></tr>
+        <tr><td>Image generation</td><td><code>generate-image</code></td><td>Yes</td><td>No</td></tr>
+        <tr><td><code>--reasoning-effort</code> values</td><td><code>chat</code></td><td><code>low</code>, <code>medium</code>, <code>high</code></td><td><code>low</code>, <code>medium</code>, <code>high</code>, <code>xhigh</code>, <code>max</code></td></tr>
+      </tbody>
+    </table>
   </section>
 
   <!-- HISTORY OVERVIEW -->
@@ -92,12 +119,19 @@
       <span class="opt"> --reasoning-effort</span> <span class="val">high</span>
     </div>
 
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk llm chat</span>
+      <span class="opt"> --message</span> <span class="val">"Hello, how are you?"</span>
+      <span class="opt"> --provider</span> <span class="val">claude</span>
+    </div>
+
     <div class="diagram-wrap">
       <div class="mermaid">
 flowchart LR
     MSG["--message"] --> COMP["Send to\nLLM chat API"]
     SID["--session-id\n(optional)"] -->|"load prior\nmessages"| COMP
     RE["--reasoning-effort\n(optional)"] --> COMP
+    PROV["--provider\n(default: openai)"] --> COMP
     COMP --> RESP(["stdout: assistant reply"])
     COMP --> HIST["Session stored\nin ~/.pbtk/history.db"]
     COMP --> SID_OUT(["stderr: Session: &lt;id&gt;"])
@@ -113,7 +147,8 @@ flowchart LR
 
     <div class="info-box">
       Sessions created by other commands (e.g. <code>translate</code>) can be continued with
-      <code>chat --session-id</code> since all commands share the same history database.
+      <code>chat --session-id</code> since all commands share the same history database. History is
+      provider-agnostic, so a session started with one <code>--provider</code> can be continued with the other.
     </div>
 
     <table>
@@ -121,8 +156,9 @@ flowchart LR
       <tbody>
         <tr><td><code>--message</code></td><td>Yes</td><td>&mdash;</td><td>The user message to send</td></tr>
         <tr><td><code>--session-id</code></td><td>No</td><td>&mdash;</td><td>Session ID to continue a previous conversation</td></tr>
-        <tr><td><code>--model</code></td><td>No</td><td><code>gpt-5-nano</code></td><td>Model to use</td></tr>
-        <tr><td><code>--reasoning-effort</code></td><td>No</td><td>&mdash;</td><td>Reasoning effort level for o-series models: <code>low</code>, <code>medium</code>, <code>high</code></td></tr>
+        <tr><td><code>--provider</code></td><td>No</td><td><code>openai</code></td><td>LLM provider: <code>openai</code> or <code>claude</code></td></tr>
+        <tr><td><code>--model</code></td><td>No</td><td>Provider default (<code>gpt-5-nano</code> or <code>claude-sonnet-5-5</code>)</td><td>Model to use</td></tr>
+        <tr><td><code>--reasoning-effort</code></td><td>No</td><td>&mdash;</td><td>Reasoning effort level. Values depend on the provider: <code>openai</code> accepts <code>low</code>, <code>medium</code>, <code>high</code>; <code>claude</code> accepts <code>low</code>, <code>medium</code>, <code>high</code>, <code>xhigh</code>, <code>max</code></td></tr>
       </tbody>
     </table>
   </section>
@@ -141,11 +177,20 @@ flowchart LR
       <span class="opt"> --target-language</span> <span class="val">Spanish</span>
     </div>
 
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk llm translate</span>
+      <span class="opt"> --text</span> <span class="val">"Hello"</span>
+      <span class="opt"> --target-language</span> <span class="val">French</span>
+      <span class="opt"> --provider</span> <span class="val">claude</span>
+      <span class="opt"> --model</span> <span class="val">claude-haiku-5-5</span>
+    </div>
+
     <div class="diagram-wrap">
       <div class="mermaid">
 flowchart LR
     T["--text"] --> CALL["LLM\nchat completion"]
     LANG["--target-language"] --> CALL
+    PROV["--provider\n(default: openai)"] --> CALL
     CALL --> OUT(["stdout: translated text"])
     CALL --> HIST["Session stored\nin ~/.pbtk/history.db"]
       </div>
@@ -156,7 +201,8 @@ flowchart LR
       <tbody>
         <tr><td><code>--text</code></td><td>Yes</td><td>&mdash;</td><td>The text to translate</td></tr>
         <tr><td><code>--target-language</code></td><td>Yes</td><td>&mdash;</td><td>Target language (e.g. <code>Spanish</code>, <code>French</code>, <code>Japanese</code>)</td></tr>
-        <tr><td><code>--model</code></td><td>No</td><td><code>gpt-5-nano</code></td><td>Model to use</td></tr>
+        <tr><td><code>--provider</code></td><td>No</td><td><code>openai</code></td><td>LLM provider: <code>openai</code> or <code>claude</code></td></tr>
+        <tr><td><code>--model</code></td><td>No</td><td>Provider default (<code>gpt-5-nano</code> or <code>claude-sonnet-5-5</code>)</td><td>Model to use</td></tr>
       </tbody>
     </table>
   </section>
@@ -179,6 +225,7 @@ flowchart LR
       <div class="mermaid">
 flowchart LR
     IMG["--image-path\n(local image file)"] --> ENC["Base64 encode\nimage"]
+    PROV["--provider\n(default: openai)"] --> CALL
     ENC --> CALL["LLM vision\nchat completion\n(extract text + pirate-speak prompt)"]
     CALL --> OUT(["stdout: pirate-speak text"])
     CALL --> HIST["Session stored\nin ~/.pbtk/history.db"]
@@ -186,15 +233,16 @@ flowchart LR
     </div>
 
     <div class="info-box">
-      The image is base64-encoded and sent inline with the API request. Supported formats are those
-      accepted by the OpenAI vision API: JPEG, PNG, GIF, and WebP.
+      The image is base64-encoded and sent inline with the API request. Supported formats are JPEG, PNG,
+      GIF, and WebP. Both <code>openai</code> and <code>claude</code> support image input.
     </div>
 
     <table>
       <thead><tr><th>Option</th><th>Required</th><th>Default</th><th>Description</th></tr></thead>
       <tbody>
         <tr><td><code>--image-path</code></td><td>Yes</td><td>&mdash;</td><td>Path to the image file to process</td></tr>
-        <tr><td><code>--model</code></td><td>No</td><td><code>gpt-5-nano</code></td><td>Model to use (must support vision)</td></tr>
+        <tr><td><code>--provider</code></td><td>No</td><td><code>openai</code></td><td>LLM provider: <code>openai</code> or <code>claude</code></td></tr>
+        <tr><td><code>--model</code></td><td>No</td><td>Provider default (<code>gpt-5-nano</code> or <code>claude-sonnet-5-5</code>)</td><td>Model to use (must support image input)</td></tr>
       </tbody>
     </table>
   </section>
@@ -241,6 +289,7 @@ flowchart LR
     SRC["--source\n(text or file path)"] --> CALL["LLM\nchat completion\n(audience-tuned prompt)"]
     AUD["--audience"] --> CALL
     UM["--user-messages\n(optional idiolect examples)"] --> CALL
+    PROV["--provider\n(default: openai)"] --> CALL
     CALL --> OUT(["stdout: rewritten text"])
     CALL --> HIST["Session stored\nin ~/.pbtk/history.db"]
       </div>
@@ -258,7 +307,8 @@ flowchart LR
         <tr><td><code>--source</code></td><td>Yes</td><td>&mdash;</td><td>Source text to rewrite (or file path)</td></tr>
         <tr><td><code>--audience</code></td><td>Yes</td><td>&mdash;</td><td>Target audience slug (see list above)</td></tr>
         <tr><td><code>--user-messages</code></td><td>No</td><td>&mdash;</td><td>Example messages to learn idiolect from (text or file paths, repeatable)</td></tr>
-        <tr><td><code>--model</code></td><td>No</td><td><code>gpt-5-nano</code></td><td>Model to use</td></tr>
+        <tr><td><code>--provider</code></td><td>No</td><td><code>openai</code></td><td>LLM provider: <code>openai</code> or <code>claude</code></td></tr>
+        <tr><td><code>--model</code></td><td>No</td><td>Provider default (<code>gpt-5-nano</code> or <code>claude-sonnet-5-5</code>)</td><td>Model to use</td></tr>
       </tbody>
     </table>
   </section>
@@ -272,6 +322,12 @@ flowchart LR
       command does not create a history session.
     </p>
 
+    <div class="warning-box">
+      Image generation is supported only by the <code>openai</code> provider. <code>--provider claude</code>
+      is rejected before any work is done, for example:
+      <code>Error: The 'generate-image' action requires image generation which is not supported by the 'claude' provider.</code>
+    </div>
+
     <div class="cmd-block">
       <span class="prompt">$ </span><span class="cmd">pbtk llm generate-image</span>
       <span class="opt"> --prompt</span> <span class="val">"A pirate ship at sunset"</span>
@@ -283,7 +339,8 @@ flowchart LR
       <tbody>
         <tr><td><code>--prompt</code></td><td>Yes</td><td>&mdash;</td><td>Prompt describing the image to generate</td></tr>
         <tr><td><code>--out-file</code></td><td>Yes</td><td>&mdash;</td><td>Path to write the generated image to</td></tr>
-        <tr><td><code>--model</code></td><td>No</td><td><code>gpt-image-1</code></td><td>Image model to use</td></tr>
+        <tr><td><code>--provider</code></td><td>No</td><td><code>openai</code></td><td>LLM provider. Only <code>openai</code> supports image generation</td></tr>
+        <tr><td><code>--model</code></td><td>No</td><td>Provider default (<code>gpt-image-1</code> for <code>openai</code>)</td><td>Image model to use</td></tr>
         <tr><td><code>--overwrite</code></td><td>No</td><td>off</td><td>Replace <code>--out-file</code> if it already exists (otherwise the command fails)</td></tr>
       </tbody>
     </table>
@@ -352,31 +409,31 @@ flowchart LR
         <tr>
           <td><code>llm chat</code></td>
           <td><code>--message</code></td>
-          <td><code>--session-id</code> <code>--model</code> <code>--reasoning-effort</code></td>
+          <td><code>--session-id</code> <code>--provider</code> <code>--model</code> <code>--reasoning-effort</code></td>
           <td>Assistant reply to stdout; session ID to stderr</td>
         </tr>
         <tr>
           <td><code>llm translate</code></td>
           <td><code>--text</code> <code>--target-language</code></td>
-          <td><code>--model</code></td>
+          <td><code>--provider</code> <code>--model</code></td>
           <td>Translated text to stdout</td>
         </tr>
         <tr>
           <td><code>llm ocaaar</code></td>
           <td><code>--image-path</code></td>
-          <td><code>--model</code></td>
+          <td><code>--provider</code> <code>--model</code></td>
           <td>Pirate-speak OCR result to stdout</td>
         </tr>
         <tr>
           <td><code>llm corpospeak</code></td>
           <td><code>--source</code> <code>--audience</code></td>
-          <td><code>--user-messages</code> <code>--model</code></td>
+          <td><code>--user-messages</code> <code>--provider</code> <code>--model</code></td>
           <td>Rewritten text to stdout</td>
         </tr>
         <tr>
           <td><code>llm generate-image</code></td>
           <td><code>--prompt</code> <code>--out-file</code></td>
-          <td><code>--model</code> <code>--overwrite</code></td>
+          <td><code>--provider</code> <code>--model</code> <code>--overwrite</code></td>
           <td>Image file written to <code>--out-file</code></td>
         </tr>
         <tr>
