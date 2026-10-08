@@ -1,5 +1,7 @@
 using System.CommandLine;
+using Pixelbadger.Toolkit.CommandLine;
 using Pixelbadger.Toolkit.Commands;
+using Pixelbadger.Toolkit.Services;
 
 var rootCommand = new RootCommand("CLI toolkit exposing varied functionality organized by topic");
 
@@ -14,4 +16,6 @@ rootCommand.Add(MarkovCommand.Create());
 rootCommand.Add(DemosceneCommand.Create());
 rootCommand.Add(GptCommand.Create());
 
-return await rootCommand.Parse(args).InvokeAsync();
+var store = new SqliteConfigStore();
+ConfigBootstrap.AddConfigTopic(rootCommand, store);
+return await ConfigBootstrap.InvokeAsync(rootCommand, args, store);
