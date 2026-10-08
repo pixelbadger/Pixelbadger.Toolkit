@@ -306,11 +306,16 @@ The worker must:
 4. not merge other streams;
 5. not claim the overall feature is complete.
 
-### Base safety
+### Worktrees (mandatory)
 
-Each worker must verify its worktree/branch begins from the specified base.
+Every stream that writes to the repository works in its own git worktree, created by the orchestrator before dispatch. Workers never write in the operator's checkout.
 
-If stale, correct it before implementation and report that correction.
+- The orchestrator creates each worktree explicitly from the locked base commit, outside the repository directory (e.g. a scratch directory):
+  `git worktree add -b swarm/<stream> <absolute path> <base SHA>`
+  Do not rely on agent-runtime automatic worktree isolation: it may branch from a different commit than the locked base and may remove the worktree when a worker pauses without changes.
+- The brief names the absolute worktree path and branch. The worker works only there, using absolute paths.
+- Before writing, the worker verifies `HEAD` equals the specified base SHA (or a descendant the brief allows). If it is stale, or the worktree is missing, the worker stops and reports. It never falls back to another directory, including the operator's checkout.
+- Worktrees persist until the orchestrator has accepted composition of their streams. Then the orchestrator removes them (`git worktree remove`) and deletes their `swarm/*` branches.
 
 ---
 
@@ -465,7 +470,7 @@ The change is complete only when the orchestrator can demonstrate all of the fol
 7. Migration/upgrade behaviour meets the locked specification.
 8. No known resource grows without an intentional retention policy.
 9. Documentation describes observed/current behaviour rather than inferred behaviour.
-10. No agent worktree, scratch file, accidental generated output, or orchestration residue is included.
+10. No agent worktree, scratch file, accidental generated output, or orchestration residue is included, and every swarm worktree and `swarm/*` branch has been removed.
 11. The final diff contains no unexplained scope expansion.
 12. The orchestrator is satisfied that the **specification**, not merely the implementation plan, has been met.
 
@@ -553,7 +558,7 @@ When invoked with a change request:
 4. Continue until the Zero-Ambiguity Gate is satisfied.
 5. Present the LOCKED SPECIFICATION and request explicit approval.
 6. After approval, show the implementation DAG and model routing.
-7. Dispatch implementation streams.
+7. Create a worktree per writing stream from the locked base, then dispatch implementation streams into them.
 8. Integrate and fan out validation.
 9. Replan defects into further implementation rounds.
 10. Stop only at the Completion Gate.
