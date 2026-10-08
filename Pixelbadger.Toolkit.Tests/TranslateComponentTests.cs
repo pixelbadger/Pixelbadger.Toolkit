@@ -1,6 +1,6 @@
 using FluentAssertions;
 using Moq;
-using OpenAI.Chat;
+using Microsoft.Extensions.AI;
 using Pixelbadger.Toolkit.Components;
 using Pixelbadger.Toolkit.Services;
 
@@ -58,8 +58,8 @@ public class TranslateComponentTests
         // Assert
         result.Should().Be(expectedTranslation);
         capturedMessages.Should().NotBeNull();
-        capturedMessages![1].Content[0].Text.Should().Contain("&lt;script&gt;");
-        capturedMessages[1].Content[0].Text.Should().NotContain("<script>");
+        capturedMessages![1].Text.Should().Contain("&lt;script&gt;");
+        capturedMessages[1].Text.Should().NotContain("<script>");
     }
 
     [Fact]
@@ -81,8 +81,8 @@ public class TranslateComponentTests
         // Assert
         result.Should().Be(expectedTranslation);
         capturedMessages.Should().NotBeNull();
-        capturedMessages![0].Content[0].Text.Should().Contain("&lt;script&gt;");
-        capturedMessages[0].Content[0].Text.Should().NotContain("<script>");
+        capturedMessages![0].Text.Should().Contain("&lt;script&gt;");
+        capturedMessages[0].Text.Should().NotContain("<script>");
     }
 
     [Fact]
@@ -105,14 +105,14 @@ public class TranslateComponentTests
         capturedMessages.Should().NotBeNull();
         capturedMessages.Should().HaveCount(2);
 
-        capturedMessages![0].ToString().Should().Contain("System");
-        capturedMessages[0].Content[0].Text.Should().Contain("translation tool");
-        capturedMessages[0].Content[0].Text.Should().Contain(targetLanguage);
+        capturedMessages![0].Role.Should().Be(ChatRole.System);
+        capturedMessages[0].Text.Should().Contain("translation tool");
+        capturedMessages[0].Text.Should().Contain(targetLanguage);
 
-        capturedMessages[1].ToString().Should().Contain("User");
-        capturedMessages[1].Content[0].Text.Should().Contain("<userinput>");
-        capturedMessages[1].Content[0].Text.Should().Contain(text);
-        capturedMessages[1].Content[0].Text.Should().Contain("</userinput>");
+        capturedMessages[1].Role.Should().Be(ChatRole.User);
+        capturedMessages[1].Text.Should().Contain("<userinput>");
+        capturedMessages[1].Text.Should().Contain(text);
+        capturedMessages[1].Text.Should().Contain("</userinput>");
     }
 
     [Fact]
@@ -208,7 +208,7 @@ public class TranslateComponentTests
 
         // Assert
         capturedMessages.Should().NotBeNull();
-        var systemMessage = capturedMessages![0].Content[0].Text;
+        var systemMessage = capturedMessages![0].Text;
 
         systemMessage.Should().Contain("prompt injection");
         systemMessage.Should().Contain("userinput");

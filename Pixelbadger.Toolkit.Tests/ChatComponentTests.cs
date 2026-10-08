@@ -1,6 +1,6 @@
 using FluentAssertions;
 using Moq;
-using OpenAI.Chat;
+using Microsoft.Extensions.AI;
 using Pixelbadger.Toolkit.Components;
 using Pixelbadger.Toolkit.Models;
 using Pixelbadger.Toolkit.Services;
@@ -100,7 +100,10 @@ public class ChatComponentTests
 
         // Assert
         capturedMessages.Should().HaveCount(3); // 2 existing + 1 new
-        capturedMessages![2].Content[0].Text.Should().Be(question);
+        capturedMessages!.Select(m => m.Role).Should().Equal(ChatRole.User, ChatRole.Assistant, ChatRole.User);
+        capturedMessages![0].Text.Should().Be("Previous question");
+        capturedMessages![1].Text.Should().Be("Previous response");
+        capturedMessages![2].Text.Should().Be(question);
     }
 
     [Fact]
@@ -154,7 +157,7 @@ public class ChatComponentTests
 
         // Assert
         capturedMessages.Should().HaveCount(1);
-        capturedMessages![0].Content[0].Text.Should().Be(question);
+        capturedMessages![0].Text.Should().Be(question);
     }
 
     [Fact]
@@ -180,7 +183,7 @@ public class ChatComponentTests
 
         // Assert
         capturedMessages.Should().HaveCount(4);
-        capturedMessages![0].ToString().Should().Contain("System");
+        capturedMessages![0].Role.Should().Be(ChatRole.System);
     }
 
     [Fact]

@@ -1,4 +1,4 @@
-using OpenAI.Chat;
+using Microsoft.Extensions.AI;
 using Pixelbadger.Toolkit.Services;
 using Pixelbadger.Toolkit.Utilities;
 
@@ -69,14 +69,14 @@ public class CorpospeakComponent
         {
             foreach (var userMessage in userMessages)
             {
-                messages.Add(ChatMessage.CreateUserMessage(userMessage));
+                messages.Add(new ChatMessage(ChatRole.User, userMessage));
                 history.Add(("user", userMessage));
-                messages.Add(ChatMessage.CreateAssistantMessage("I understand your writing style."));
+                messages.Add(new ChatMessage(ChatRole.Assistant, "I understand your writing style."));
                 history.Add(("assistant", "I understand your writing style."));
             }
         }
 
-        messages.Add(ChatMessage.CreateUserMessage(prompt));
+        messages.Add(new ChatMessage(ChatRole.User, prompt));
         history.Add(("user", prompt));
 
         return (messages, history);

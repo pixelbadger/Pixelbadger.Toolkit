@@ -16,7 +16,8 @@ public class LlmGenerateImageCommandTests
         result.Errors.Should().BeEmpty();
         result.GetValue<string>("--prompt").Should().Be("a cat");
         result.GetValue<string>("--out-file").Should().Be("cat.png");
-        result.GetValue<string>("--model").Should().Be("gpt-image-1");
+        result.GetValue<string?>("--model").Should().BeNull();
+        result.GetValue<string>("--provider").Should().Be("openai");
         result.GetValue<bool>("--overwrite").Should().BeFalse();
     }
 
