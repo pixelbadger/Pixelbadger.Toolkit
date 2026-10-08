@@ -23,7 +23,7 @@ public static class LlmCommand
     }
 
     /// <summary>Provider names accepted by --provider. Add new providers here and in <see cref="BuildLlmServices"/>.</summary>
-    internal static readonly string[] SupportedProviders = [LlmProviders.OpenAi];
+    internal static readonly string[] SupportedProviders = [LlmProviders.OpenAi, LlmProviders.Claude];
 
     private static Option<string> CreateProviderOption()
     {
@@ -51,6 +51,9 @@ public static class LlmCommand
         {
             case LlmProviders.OpenAi:
                 services.AddOpenAiLlmProvider(model);
+                break;
+            case LlmProviders.Claude:
+                services.AddClaudeLlmProvider(model);
                 break;
             default:
                 throw new ArgumentException($"Unknown provider '{provider}'. Supported providers: {string.Join(", ", SupportedProviders)}", nameof(provider));
