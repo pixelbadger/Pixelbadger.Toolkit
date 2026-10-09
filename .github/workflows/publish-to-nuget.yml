@@ -47,6 +47,14 @@ jobs:
     - name: Restore dependencies
       run: dotnet restore
 
+    - name: Install Six Labors license
+      env:
+        SIXLABORS_LICENSE: ${{ secrets.SIXLABORS_LICENSE }}
+      run: |
+        printf '%s\n' "$SIXLABORS_LICENSE" > "$RUNNER_TEMP/sixlabors.lic"
+        # Later steps read this as an MSBuild property (build/SixLabors.ImageSharp.targets)
+        echo "SixLaborsLicenseFile=$RUNNER_TEMP/sixlabors.lic" >> "$GITHUB_ENV"
+
     - name: Build
       run: dotnet build --no-restore --configuration Release
 
@@ -74,6 +82,14 @@ jobs:
 
     - name: Restore dependencies
       run: dotnet restore Pixelbadger.Toolkit/Pixelbadger.Toolkit.csproj
+
+    - name: Install Six Labors license
+      env:
+        SIXLABORS_LICENSE: ${{ secrets.SIXLABORS_LICENSE }}
+      run: |
+        printf '%s\n' "$SIXLABORS_LICENSE" > "$RUNNER_TEMP/sixlabors.lic"
+        # Later steps read this as an MSBuild property (build/SixLabors.ImageSharp.targets)
+        echo "SixLaborsLicenseFile=$RUNNER_TEMP/sixlabors.lic" >> "$GITHUB_ENV"
 
     - name: Build
       run: dotnet build Pixelbadger.Toolkit/Pixelbadger.Toolkit.csproj --no-restore --configuration Release

@@ -9,7 +9,16 @@
 
   <ItemGroup>
     <PackageReference Include="BenchmarkDotNet" Version="0.15.8" />
-    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="4.1.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Transitive packages pinned to their latest non-breaking (same-major) release -->
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.Abstractions" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.FileProviders.Abstractions" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.12" />
   </ItemGroup>
 
   <ItemGroup>

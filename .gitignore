@@ -489,3 +489,6 @@ test-assets/
 # GPT/Markov model checkpoint directories
 .gpt/
 .Markov/
+
+# Six Labors (ImageSharp) license file. Never commit it; CI supplies it from a secret.
+sixlabors.lic
