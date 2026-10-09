@@ -1,4 +1,5 @@
 using System.CommandLine;
+using Pixelbadger.Toolkit.CommandLine;
 using Microsoft.Extensions.DependencyInjection;
 using Pixelbadger.Toolkit.Components;
 using Pixelbadger.Toolkit.Services;
@@ -108,7 +109,7 @@ public static class LlmCommand
         var command = new Command("chat", "Chat with an LLM maintaining conversation history");
 
         var messageOption = new Option<string>("--message") { Description = "The message to send to the LLM", Required = true };
-        var sessionIdOption = new Option<long?>("--session-id") { Description = "Session ID to continue a previous conversation (omit to start a new session)" };
+        var sessionIdOption = new Option<long?>("--session-id") { Description = "Session ID to continue a previous conversation (omit to start a new session)" }.WithImmutableDefault();
         var modelOption = CreateModelOption();
         var providerOption = CreateProviderOption();
         var reasoningEffortOption = new Option<string?>("--reasoning-effort") { Description = "Reasoning effort level (supported values depend on --provider)" };
@@ -255,7 +256,7 @@ public static class LlmCommand
         var modelOption = CreateModelOption();
         var providerOption = CreateProviderOption();
 
-        var overwriteOption = new Option<bool>("--overwrite") { Description = "Replace --out-file if it already exists" };
+        var overwriteOption = new Option<bool>("--overwrite") { Description = "Replace --out-file if it already exists" }.WithImmutableDefault();
 
         command.Add(promptOption);
         command.Add(outFileOption);

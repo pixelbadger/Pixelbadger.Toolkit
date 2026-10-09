@@ -1,4 +1,5 @@
 using System.CommandLine;
+using Pixelbadger.Toolkit.CommandLine;
 using Pixelbadger.Toolkit.Components;
 using Pixelbadger.Toolkit.Services;
 using Spectre.Console;
@@ -42,7 +43,7 @@ public static class GptCommand
         var nLayerOption = new Option<int>("--n-layer") { Description = "Number of transformer blocks", DefaultValueFactory = _ => 3 };
         var lrOption = new Option<float>("--lr") { Description = "Learning rate", DefaultValueFactory = _ => 3e-4f };
         var seedOption = new Option<int>("--seed") { Description = "Random seed for reproducible runs", DefaultValueFactory = _ => 1337 };
-        var resumeOption = new Option<bool>("--resume") { Description = "Resume training from the checkpoint in --out (architecture and tokenizer options are taken from the checkpoint)" };
+        var resumeOption = new Option<bool>("--resume") { Description = "Resume training from the checkpoint in --out (architecture and tokenizer options are taken from the checkpoint)" }.WithImmutableDefault();
         var tokenizerOption = new Option<TokenizerKind>("--tokenizer") { Description = "Tokenizer: bpe (byte-pair subwords) or char (one token per character)", DefaultValueFactory = _ => TokenizerKind.Bpe };
         var vocabSizeOption = new Option<int>("--vocab-size") { Description = "Target vocabulary size for the bpe tokenizer (>= 256; ignored for char)", DefaultValueFactory = _ => 512 };
         var lossGraphOption = new Option<string?>("--loss-graph") { Description = "Path to write an HTML graph of the per-step training loss" };

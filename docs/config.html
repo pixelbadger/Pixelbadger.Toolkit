@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pixelbadger Toolkit — Config</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header>
+  <h1>Config <span class="badge">config</span></h1>
+  <div class="subtitle">Per-user default values for command options, stored in a local SQLite database</div>
+  <div class="meta">Pixelbadger Toolkit &mdash; <code>pbtk config</code> &mdash; <a href="index.html" style="color:#60a5fa">&#8592; all topics</a></div>
+</header>
+
+<nav>
+  <a href="#overview">Overview</a>
+  <a href="#usage">Usage</a>
+  <a href="#precedence">Precedence</a>
+  <a href="#not-configurable">What can't be configured</a>
+  <a href="#storage">Storage</a>
+  <a href="#command-ref">Command Reference</a>
+</nav>
+
+<div class="content">
+
+  <!-- OVERVIEW -->
+  <section id="overview">
+    <h2>Overview</h2>
+    <p>
+      The <code>config</code> topic sets, shows and removes per-user default values for command options.
+      Set a default once at a topic, group or action level and every command at or below that level uses it
+      unless you pass the option on the command line.
+    </p>
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk config</span>
+      <span class="val"> &lt;topic&gt;</span>
+      <span class="val"> [&lt;group&gt;…]</span>
+      <span class="val"> [&lt;action&gt;]</span>
+      <span class="opt"> [--option value …]</span>
+    </div>
+    <p>
+      The command tree of <code>config</code> mirrors every other topic, group and action. An option that a command
+      accepts is configurable under the same path and with the same name, except the options listed in
+      <a href="#not-configurable">What can't be configured</a>. The topic, group and action words select the level you
+      are configuring.
+    </p>
+    <div class="info-box">
+      Defaults are per user. They apply to every <code>pbtk</code> invocation that runs as the same user.
+    </div>
+  </section>
+
+  <!-- USAGE -->
+  <section id="usage">
+    <h2>Usage</h2>
+
+    <h3>Set a topic-wide default</h3>
+    <p>
+      This sets <code>--model</code> for every <code>llm</code> action that has a <code>--model</code> option:
+    </p>
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk config llm</span>
+      <span class="opt"> --model</span> <span class="val">claude-sonnet-5-5</span>
+    </div>
+    <pre style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:1rem;overflow-x:auto;font-size:0.85rem;line-height:1.6;color:#e2e8f0;">Set llm --model = claude-sonnet-5-5</pre>
+
+    <h3>Override it for one action</h3>
+    <p>
+      A default set on an action wins over the default set on its topic, so <code>chat</code> uses
+      <code>gpt-5-nano</code> while the other <code>llm</code> actions keep <code>claude-sonnet-5-5</code>:
+    </p>
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk config llm chat</span>
+      <span class="opt"> --model</span> <span class="val">gpt-5-nano</span>
+    </div>
+    <pre style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:1rem;overflow-x:auto;font-size:0.85rem;line-height:1.6;color:#e2e8f0;">Set llm chat --model = gpt-5-nano</pre>
+
+    <h3>Show the effective values</h3>
+    <p>
+      Run a level with no options to list the values it resolves to. Each line names the level the value comes from.
+    </p>
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk config llm chat</span>
+    </div>
+    <pre style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:1rem;overflow-x:auto;font-size:0.85rem;line-height:1.6;color:#e2e8f0;">--model = gpt-5-nano (from: llm chat)</pre>
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk config llm</span>
+    </div>
+    <pre style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:1rem;overflow-x:auto;font-size:0.85rem;line-height:1.6;color:#e2e8f0;">--model = claude-sonnet-5-5 (from: llm)</pre>
+    <p>
+      A level with nothing configured prints <code>No configured defaults for &lt;level&gt;</code>.
+    </p>
+
+    <h3>Remove a default</h3>
+    <p>
+      <code>--unset</code> removes the value stored at that level only. The levels above it are not affected.
+      It is repeatable, and the leading dashes on the name are optional:
+    </p>
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk config llm chat</span>
+      <span class="opt"> --unset</span> <span class="val">model</span>
+    </div>
+    <pre style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:1rem;overflow-x:auto;font-size:0.85rem;line-height:1.6;color:#e2e8f0;">Unset llm chat --model</pre>
+    <p>After that, <code>pbtk config llm chat</code> falls back to the topic-level value:</p>
+    <pre style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:1rem;overflow-x:auto;font-size:0.85rem;line-height:1.6;color:#e2e8f0;">--model = claude-sonnet-5-5 (from: llm)</pre>
+    <p>
+      Removing a name that is not set at that level prints <code>llm chat --model was not set</code> and exits 0.
+      A name that is not configurable at that level is an error (see <a href="#not-configurable">What can't be configured</a>).
+    </p>
+
+    <h3>Help shows the configured defaults</h3>
+    <p>
+      Once a default is set, the action's <code>--help</code> shows it as <code>[default: …]</code>, so you can
+      see the value the command will use before running it:
+    </p>
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk llm chat --help</span>
+    </div>
+    <pre style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:1rem;overflow-x:auto;font-size:0.85rem;line-height:1.6;color:#e2e8f0;">Description:
+  Chat with an LLM maintaining conversation history
+
+Usage:
+  Pixelbadger.Toolkit llm chat [options]
+
+Options:
+  --message &lt;message&gt; (REQUIRED)         The message to send to the LLM
+  --session-id &lt;session-id&gt;              Session ID to continue a previous conversation (omit to start a new session)
+  --model &lt;model&gt;                        The model to use (defaults to the provider's default model) [default: gpt-5-nano]
+  --provider &lt;claude|openai&gt;             The LLM provider to use (supported: openai, claude) [default: openai]
+  --reasoning-effort &lt;reasoning-effort&gt;  Reasoning effort level (supported values depend on --provider)
+  -?, -h, --help                         Show help and usage information</pre>
+
+    <h3>Validation</h3>
+    <p>
+      Values are parsed and checked by the same option definitions the real command uses. For example,
+      <code>--provider</code> accepts only <code>openai</code> and <code>claude</code>:
+    </p>
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk config llm chat</span>
+      <span class="opt"> --provider</span> <span class="val">nope</span>
+    </div>
+    <pre style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:1rem;overflow-x:auto;font-size:0.85rem;line-height:1.6;color:#e2e8f0;">Error: Argument 'nope' not recognized. Must be one of:
+	'openai'
+	'claude'</pre>
+    <p>
+      On an error, the command exits with status 1 and nothing is written. When one command sets several values and
+      one of them is invalid, none of them are stored.
+    </p>
+    <div class="warning-box">
+      <strong>Provider-dependent values are checked late.</strong> <code>--reasoning-effort</code> accepts any token
+      when you run <code>config</code>, because its allowed values depend on <code>--provider</code>, which
+      <code>config</code> does not see. The value is stored, and the error appears when a command that uses it runs.
+      For example, after <code>pbtk config llm --reasoning-effort ultra</code>:
+    </div>
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk llm chat --message hi</span>
+    </div>
+    <pre style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:1rem;overflow-x:auto;font-size:0.85rem;line-height:1.6;color:#e2e8f0;">Error: Invalid reasoning effort 'ultra' for provider 'openai'. Supported values:
+low, medium, high</pre>
+  </section>
+
+  <!-- PRECEDENCE -->
+  <section id="precedence">
+    <h2>Precedence</h2>
+    <p>
+      For each option, the value that is used is the first one found in this order:
+    </p>
+    <ol>
+      <li>The value given on the command line.</li>
+      <li>The default configured at the action level (for example <code>llm chat</code>).</li>
+      <li>The default configured at the group level (for example <code>oauth profile</code>).</li>
+      <li>The default configured at the topic level (for example <code>llm</code>).</li>
+      <li>The built-in default of the option.</li>
+    </ol>
+    <p>
+      Each level is checked only at that level's own path. For example, a default set on <code>oauth</code> applies to
+      <code>oauth profile add</code> unless the group or the action sets its own value.
+    </p>
+    <p>Here is a worked example with a real server. The built-in <code>--port</code> default of
+      <code>web serve-html</code> is <code>8080</code>:</p>
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk config web</span>
+      <span class="opt"> --port</span> <span class="val">9000</span>
+    </div>
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk config web serve-html</span>
+      <span class="opt"> --port</span> <span class="val">9100</span>
+    </div>
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk web serve-html --help</span>
+    </div>
+    <pre style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:1rem;overflow-x:auto;font-size:0.85rem;line-height:1.6;color:#e2e8f0;">  --port &lt;port&gt;             Port to bind the server to [default: 9100]</pre>
+    <p>
+      With <code>--port 9100</code> stored on the action, starting the server without <code>--port</code> binds
+      <code>9100</code>. Passing <code>--port 9200</code> on the command line binds <code>9200</code> instead. Unsetting the action
+      value makes the topic value, <code>9000</code>, apply again.
+    </p>
+  </section>
+
+  <!-- NOT CONFIGURABLE -->
+  <section id="not-configurable">
+    <h2>What can't be configured</h2>
+    <p>These cannot be set through <code>config</code>. Passing one to <code>config</code> fails as an unknown argument:</p>
+    <ul>
+      <li><strong>Required options.</strong> For example <code>llm chat --message</code>, <code>web serve-html --file</code>
+        and <code>gpt train --source</code>. A required value is always specific to the run.</li>
+      <li><strong>Immutable options.</strong> These are marked as never persisted, because they are secrets, destructive
+        or identify a session. They are <code>llm chat --session-id</code>, <code>llm generate-image --overwrite</code>,
+        <code>gpt train --resume</code> and <code>oauth profile add --client-secret</code>
+        (also <code>oauth profile update --client-secret</code>).</li>
+      <li><strong>The config topic itself.</strong> <code>pbtk config config</code> is not a valid command.</li>
+    </ul>
+    <div class="info-box">
+      A stored entry for a required option is not used. Commands report it as an unknown entry and ignore it.
+      See <a href="#storage">Storage</a>.
+    </div>
+  </section>
+
+  <!-- STORAGE -->
+  <section id="storage">
+    <h2>Storage</h2>
+    <p>
+      Defaults live in a SQLite database. Its location is:
+    </p>
+    <ul>
+      <li><code>$XDG_CONFIG_HOME/pbtk/config.db</code> when <code>XDG_CONFIG_HOME</code> is set, otherwise
+        <code>~/.config/pbtk/config.db</code>, on Linux and macOS.</li>
+      <li><code>%APPDATA%\pbtk\config.db</code> on Windows.</li>
+    </ul>
+    <p>
+      The database has one table per topic, named after the topic. Each row holds the action path (empty for the topic
+      level, otherwise words such as <code>chat</code> or <code>profile add</code>), the option name, and the value.
+      A topic only reads and writes its own table.
+    </p>
+    <p>
+      The database is created on the first <code>set</code>. A missing database is treated as having no defaults.
+    </p>
+
+    <h3>Bad config</h3>
+    <p>
+      If the database cannot be read, every command that reads defaults fails with:
+    </p>
+    <pre style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:1rem;overflow-x:auto;font-size:0.85rem;line-height:1.6;color:#e2e8f0;">Error: config database &lt;path&gt; is unreadable: &lt;reason&gt;</pre>
+    <p>
+      A stored value that no longer validates fails only the actions that use it, and only when the option falls back
+      to that default. Passing the option on the command line avoids the stored value. For example:
+    </p>
+    <pre style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:1rem;overflow-x:auto;font-size:0.85rem;line-height:1.6;color:#e2e8f0;">Configured default for web serve-html --port is invalid: Cannot parse argument 'abc' for option '--port' as expected type 'System.Int32'.</pre>
+    <p>
+      An entry that does not match a configurable option at its level is ignored. Each command of that topic prints a
+      warning to stderr for it. The row stays in the database until you unset it:
+    </p>
+    <pre style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:1rem;overflow-x:auto;font-size:0.85rem;line-height:1.6;color:#e2e8f0;">Warning: ignoring unknown config entry web nope --port</pre>
+  </section>
+
+  <!-- COMMAND REFERENCE -->
+  <section id="command-ref">
+    <h2>Command Reference</h2>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Command</th>
+          <th>Required options</th>
+          <th>Optional options</th>
+          <th>Output</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>config &lt;level&gt; --&lt;option&gt; &lt;value&gt;</code></td>
+          <td>None</td>
+          <td>Any configurable option of the level, repeatable</td>
+          <td><code>Set &lt;level&gt; --&lt;option&gt; = &lt;value&gt;</code></td>
+        </tr>
+        <tr>
+          <td><code>config &lt;level&gt;</code></td>
+          <td>None</td>
+          <td>None</td>
+          <td>Effective values with <code>(from: &lt;level&gt;)</code>, or <code>No configured defaults for &lt;level&gt;</code></td>
+        </tr>
+        <tr>
+          <td><code>config &lt;level&gt; --unset &lt;option&gt;</code></td>
+          <td>None</td>
+          <td><code>--unset</code> (repeatable, dashes optional)</td>
+          <td><code>Unset &lt;level&gt; --&lt;option&gt;</code> or <code>&lt;level&gt; --&lt;option&gt; was not set</code></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+</div>
+
+<footer>
+  Pixelbadger Toolkit &mdash; Config Documentation
+</footer>
+
+</body>
+</html>

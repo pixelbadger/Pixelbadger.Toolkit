@@ -1,4 +1,5 @@
 using System.CommandLine;
+using Pixelbadger.Toolkit.CommandLine;
 using Pixelbadger.Toolkit.Components;
 using Pixelbadger.Toolkit.Services;
 using Spectre.Console;
@@ -68,7 +69,7 @@ public static class OAuthCommand
         var nameOption = new Option<string>("--name") { Description = "Profile name", Required = true };
         var authorityOption = new Option<string>("--authority") { Description = "OAuth authority URI (e.g. https://login.microsoftonline.com/tenant)", Required = true };
         var clientIdOption = new Option<string>("--client-id") { Description = "OAuth client ID", Required = true };
-        var clientSecretOption = new Option<string?>("--client-secret") { Description = "OAuth client secret (will be prompted securely if omitted)" };
+        var clientSecretOption = new Option<string?>("--client-secret") { Description = "OAuth client secret (will be prompted securely if omitted)" }.WithImmutableDefault();
         var scopeOption = new Option<string?>("--scope") { Description = "OAuth scope (optional)" };
 
         command.Add(nameOption);
@@ -113,7 +114,7 @@ public static class OAuthCommand
         var nameOption = new Option<string>("--name") { Description = "Profile name to update", Required = true };
         var authorityOption = new Option<string?>("--authority") { Description = "New OAuth authority URI" };
         var clientIdOption = new Option<string?>("--client-id") { Description = "New OAuth client ID" };
-        var clientSecretOption = new Option<string?>("--client-secret") { Description = "New OAuth client secret (will be prompted securely if omitted)" };
+        var clientSecretOption = new Option<string?>("--client-secret") { Description = "New OAuth client secret (will be prompted securely if omitted)" }.WithImmutableDefault();
         var scopeOption = new Option<string?>("--scope") { Description = "New OAuth scope" };
 
         command.Add(nameOption);

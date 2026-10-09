@@ -89,6 +89,10 @@ The project is .NET 10, and uses Microsoft's System.CommandLine library for buil
   - `pbtk gpt train --source corpus.txt --out ./.gpt --loss-graph ./loss.html`
   - `pbtk gpt train --source corpus.txt --out ./.gpt --validation-split 0.1 --eval-interval 50`
   - `pbtk gpt complete --model ./.gpt --prompt "ROMEO:" --max-tokens 200`
+  - `pbtk config llm --model claude-sonnet-5-5`
+  - `pbtk config llm chat --model gpt-5-nano`
+  - `pbtk config llm chat`
+  - `pbtk config llm chat --unset model`
 
 ### Testing Requirements
 
@@ -218,6 +222,13 @@ The project follows a topic-based command architecture with a component-per-comm
 - **Commands/**: Contains topic command definitions, each topic has a static `Create()` method that registers sub-actions
 - **Components/**: Contains the core business logic implementations that commands delegate to
 
+### Per-user config
+
+- `ConfigBootstrap.AddConfigTopic` in `Program.cs` must stay after all topic registrations, because the `config` tree is built from the finished command tree.
+- Every non-required option is configurable automatically. No per-option wiring is needed.
+- To exclude an option, mark it with `.WithImmutableDefault()` (namespace `Pixelbadger.Toolkit.CommandLine`). Use this for secrets and destructive or session-identifying flags.
+- The option key `unset` is reserved for the `config` command's `--unset` option.
+
 ## Component-Per-Command Pattern
 
 **IMPORTANT**: Each command action should have its own dedicated component class. This enforces single responsibility principle and improves maintainability.
@@ -267,6 +278,7 @@ Available topics and actions:
 - **web**: serve-html
 - **llm**: chat, translate, ocaaar, corpospeak, generate-image
 - **gpt**: train, complete
+- **config**: mirrors every topic/group/action; sets, shows (bare) and unsets (--unset) per-user option defaults
 
 ## Dependencies
 
@@ -279,6 +291,7 @@ Available topics and actions:
 - Microsoft.Extensions.DependencyInjection
 - Microsoft.Extensions.AI (for AI abstractions)
 - Microsoft.Extensions.AI.OpenAI (for OpenAI integration)
+- Dapper (config store data access)
 
 ## Environment Variables
 
