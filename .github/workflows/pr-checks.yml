@@ -157,9 +157,6 @@ jobs:
 
   build-and-test:
     runs-on: ubuntu-latest
-    env:
-      # Read by SixLabors.ImageSharp's build-time license check (build/SixLabors.ImageSharp.targets)
-      SixLaborsLicenseFile: ${{ runner.temp }}/sixlabors.lic
     needs: [check-changes, check-version]
     if: always() && (needs.check-version.result == 'success' || needs.check-version.result == 'skipped')
     steps:
@@ -173,7 +170,10 @@ jobs:
       - name: Install Six Labors license
         env:
           SIXLABORS_LICENSE: ${{ secrets.SIXLABORS_LICENSE }}
-        run: printf '%s\n' "$SIXLABORS_LICENSE" > "$RUNNER_TEMP/sixlabors.lic"
+        run: |
+          printf '%s\n' "$SIXLABORS_LICENSE" > "$RUNNER_TEMP/sixlabors.lic"
+          # Later steps read this as an MSBuild property (build/SixLabors.ImageSharp.targets)
+          echo "SixLaborsLicenseFile=$RUNNER_TEMP/sixlabors.lic" >> "$GITHUB_ENV"
       - name: Build
         run: dotnet build --no-restore --configuration Release
       - name: Test

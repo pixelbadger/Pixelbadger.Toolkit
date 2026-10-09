@@ -35,9 +35,6 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
     needs: [check-changes]
-    env:
-      # Read by SixLabors.ImageSharp's build-time license check (build/SixLabors.ImageSharp.targets)
-      SixLaborsLicenseFile: ${{ runner.temp }}/sixlabors.lic
 
     steps:
     - uses: actions/checkout@v4
@@ -53,7 +50,10 @@ jobs:
     - name: Install Six Labors license
       env:
         SIXLABORS_LICENSE: ${{ secrets.SIXLABORS_LICENSE }}
-      run: printf '%s\n' "$SIXLABORS_LICENSE" > "$RUNNER_TEMP/sixlabors.lic"
+      run: |
+        printf '%s\n' "$SIXLABORS_LICENSE" > "$RUNNER_TEMP/sixlabors.lic"
+        # Later steps read this as an MSBuild property (build/SixLabors.ImageSharp.targets)
+        echo "SixLaborsLicenseFile=$RUNNER_TEMP/sixlabors.lic" >> "$GITHUB_ENV"
 
     - name: Build
       run: dotnet build --no-restore --configuration Release
@@ -64,9 +64,6 @@ jobs:
 
   publish-main:
     runs-on: ubuntu-latest
-    env:
-      # Read by SixLabors.ImageSharp's build-time license check (build/SixLabors.ImageSharp.targets)
-      SixLaborsLicenseFile: ${{ runner.temp }}/sixlabors.lic
     needs: [check-changes, build-and-test]
     if: github.event_name == 'workflow_dispatch' || needs.check-changes.outputs.main-code-changed == 'true'
     # Required reviewers on this environment gate every release on a human approval.
@@ -89,7 +86,10 @@ jobs:
     - name: Install Six Labors license
       env:
         SIXLABORS_LICENSE: ${{ secrets.SIXLABORS_LICENSE }}
-      run: printf '%s\n' "$SIXLABORS_LICENSE" > "$RUNNER_TEMP/sixlabors.lic"
+      run: |
+        printf '%s\n' "$SIXLABORS_LICENSE" > "$RUNNER_TEMP/sixlabors.lic"
+        # Later steps read this as an MSBuild property (build/SixLabors.ImageSharp.targets)
+        echo "SixLaborsLicenseFile=$RUNNER_TEMP/sixlabors.lic" >> "$GITHUB_ENV"
 
     - name: Build
       run: dotnet build Pixelbadger.Toolkit/Pixelbadger.Toolkit.csproj --no-restore --configuration Release
