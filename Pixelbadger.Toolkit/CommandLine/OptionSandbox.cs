@@ -85,10 +85,12 @@ internal static class OptionSandbox
 
     private static object? SetErrorCore<T>(Option option, string message)
     {
-        ((Option<T>)option).DefaultValueFactory = result =>
+        var typed = (Option<T>)option;
+        var original = typed.DefaultValueFactory;
+        typed.DefaultValueFactory = result =>
         {
             result.AddError(message);
-            return default!;
+            return original is null ? default! : original(result);
         };
         return null;
     }

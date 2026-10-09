@@ -210,6 +210,28 @@ public class ConfigDefaultsBinderTests
     }
 
     [Fact]
+    public void ParseWithConfig_ShouldShowBuiltInDefaultInHelp_WhenConfiguredValueInvalid()
+    {
+        _store.Seed("demo", "run", "count", "abc");
+
+        var help = HelpText("demo", "run");
+
+        help.Should().Contain("[default: 3]");
+        help.Should().NotContain("[default: 0]");
+    }
+
+    [Fact]
+    public void ParseWithConfig_ShouldReportInvalidConfiguredDefault_WhenInvalidValueParsedWithoutHelp()
+    {
+        _store.Seed("demo", "run", "count", "abc");
+
+        var parse = Parse("demo", "run", "--name", "n");
+
+        parse.Errors.Select(e => e.Message).Should().ContainSingle()
+            .Which.Should().StartWith("Configured default for demo run --count is invalid:");
+    }
+
+    [Fact]
     public void ParseWithConfig_ShouldBeIdempotent_WhenCalledRepeatedlyOnOneTree()
     {
         _store.Seed("demo", "run", "count", "20");
