@@ -10,7 +10,7 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>pbtk</ToolCommandName>
     <PackageId>Pixelbadger.Toolkit</PackageId>
-    <Version>7.2.0</Version>
+    <Version>7.2.1</Version>
     <Authors>Pixelbadger</Authors>
     <Description>A CLI toolkit exposing varied functionality organized by topic, including string manipulation, distance calculations, esoteric programming language interpreters, image steganography, web serving, LLM integration, homomorphic encryption, Markov chain text generation, and Amiga demoscene effects.</Description>
     <PackageTags>cli;toolkit;strings;interpreters;steganography;llm;openai;crypto;homomorphic-encryption;markov;text-generation;demoscene;amiga</PackageTags>
@@ -33,18 +33,24 @@
 
   <ItemGroup>
     <PackageReference Include="Anthropic" Version="12.54.1" />
-    <PackageReference Include="Dapper" Version="2.1.66" />
-    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.8" />
-    <PackageReference Include="Microsoft.Extensions.AI" Version="10.6.0" />
-    <PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="10.6.0" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.8" />
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.8" />
-    <PackageReference Include="OpenAI" Version="2.10.0" />
-    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
+    <PackageReference Include="Dapper" Version="2.1.89" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.AI" Version="10.10.0" />
+    <PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="10.10.1" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.12" />
+    <PackageReference Include="OpenAI" Version="2.14.0" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="4.1.2" />
     <PackageReference Include="Spectre.Console" Version="0.57.2" />
     <PackageReference Include="Spectre.Console.ImageSharp" Version="0.57.2" />
-    <PackageReference Include="System.CommandLine" Version="2.0.8" />
-    <PackageReference Include="System.Numerics.Tensors" Version="10.0.8" />
+    <PackageReference Include="System.CommandLine" Version="2.0.12" />
+    <PackageReference Include="System.Numerics.Tensors" Version="10.0.12" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Transitive packages pinned to their latest non-breaking (same-major) release -->
+    <PackageReference Include="System.ClientModel" Version="1.16.0" />
+    <PackageReference Include="System.Memory.Data" Version="10.0.12" />
   </ItemGroup>
 
 </Project>
