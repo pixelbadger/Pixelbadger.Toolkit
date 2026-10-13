@@ -58,6 +58,8 @@ The project is .NET 10, and uses Microsoft's System.CommandLine library for buil
 
 ### Development Commands
 
+**Terminal requirement**: Set `TERM=xterm` before running the toolkit or `dotnet test` on Linux (e.g. `TERM=xterm dotnet test`). With other values such as `TERM=linux`, Spectre.Console writes nothing when stdout is redirected, so piped output is lost and the CLI integration tests fail.
+
 - **Build**: `dotnet build`
 - **Test**: `dotnet test`
 - **Package**: `dotnet pack`
