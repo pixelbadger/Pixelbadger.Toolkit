@@ -13,7 +13,7 @@ The swarm has exactly three roles:
 
 - **Operator** — the human. Owns intent, priorities, risk appetite, budget, and final product judgement.
 - **Orchestrator** — **Opus 5.5**. Owns specification, investigation, decomposition, scheduling, integration analysis, validation strategy, and replanning. **Analysis-only: never implement or repair repository code yourself.**
-- **Implementors** — **Sonnet 5.5 or Haiku 5.5**. Own bounded implementation or bounded verification work dispatched by the orchestrator. All repository writes are performed by implementors. **E2E executors** are Haiku 5.5 implementors that run a strict E2E test plan and return evidence; they never write to the repository.
+- **Implementors** — **Sonnet 5.5 or Haiku 5.5**. Own bounded implementation or bounded verification work dispatched by the orchestrator. All repository writes are performed by implementors. **E2E executors** run E2E tests and return evidence: Haiku 5.5 for fixed test plans, Sonnet 5.5 for exploratory sessions. They never write to the repository.
 
 The delivery loop is:
 
@@ -420,7 +420,7 @@ Run the strongest available evidence appropriate to the specification:
 - build;
 - unit tests;
 - integration tests;
-- end-to-end verification, always per the **E2E Verification Protocol** (executed by Haiku E2E executors, never by the orchestrator);
+- end-to-end verification, always per the **E2E Verification Protocol** (executed by E2E executors, never by the orchestrator);
 - migrations against realistic prior state;
 - fault/retry/restart tests;
 - linters/static analysis;
@@ -472,7 +472,7 @@ Then replan.
 
 E2E verification proves that the assembled candidate does what the locked specification says when a real user or client drives it through a real surface. It is distinct from the unit and integration suites, and it does not replace them.
 
-The orchestrator **designs** E2E verification and **judges** its evidence. It never **executes** it. Browser sessions, screenshots, and long command transcripts consume a lot of context. They belong in disposable Haiku 5.5 E2E executors, which return only the confirmation evidence the orchestrator needs to decide.
+The orchestrator **designs** E2E verification and **judges** its evidence. It never **executes** it. Browser sessions, screenshots, and long command transcripts consume a lot of context. They belong in disposable E2E executors (Haiku 5.5 for fixed plans, Sonnet 5.5 for exploratory sessions), which return only the confirmation evidence the orchestrator needs to decide.
 
 ## 1. Choose the surface for each criterion
 
@@ -542,7 +542,8 @@ Plan rules:
 
 1. **Build once.** The orchestrator builds the candidate before fan-out, so parallel executors do not race on build output. Executors run the prebuilt artefact.
 2. **Isolate.** Each parallel executor gets its own port, data directory, and evidence directory. If the app cannot run as multiple instances, run its plans sequentially.
-3. **Dispatch** each plan to a **Haiku 5.5** subagent with the executor brief below and the plan verbatim. Do not route E2E execution to Sonnet. If a scenario seems to need judgement, the plan is not strict enough, so rewrite it.
+3. **Dispatch** each fixed plan to a **Haiku 5.5** subagent with the executor brief below and the plan verbatim. If a scenario that proves an acceptance criterion seems to need judgement, the plan is not strict enough, so rewrite it. Do not escalate it to Sonnet.
+4. **Exploratory sessions** go to **Sonnet 5.5** (see §3a). Use them when you need to probe beyond the scripted paths: edge cases, unexpected input, UI states, or interactions between features.
 
 Executor brief (include verbatim):
 
@@ -557,6 +558,39 @@ You are an E2E executor. Run the plan below exactly as written. You are producin
 - Always run TEARDOWN.
 - Return the handover in the exact format specified. Report observations, not conclusions about the feature.
 ```
+
+## 3a. Exploratory sessions
+
+Exploratory sessions find defects. Fixed plans prove criteria. An exploratory session's verdict never counts as acceptance evidence. A finding worth keeping becomes a fixed scenario, run by Haiku, before it counts.
+
+Run exploratory sessions after the fixed plans pass, or alongside them on a separate instance.
+
+Give the Sonnet executor a **charter** instead of a step list:
+
+```text
+E2E CHARTER <charter-id>
+Candidate, surface/tool, evidence dir, isolation, SETUP, TEARDOWN: as for a fixed plan
+Mission:   <what to probe, e.g. "invalid and boundary input on the config form">
+Spec refs: <the acceptance criteria and failure semantics that define correct behaviour>
+In scope / out of scope: <areas, actions not allowed (e.g. no destructive admin actions)>
+Budget:    <max scenarios or tool calls, max screenshots retained>
+```
+
+The executor brief is the same as for fixed plans, with the step-order rules replaced by: "Explore within the mission and budget. When behaviour contradicts the spec refs or looks wrong, record it as a finding, with exact reproduction steps and evidence, then move on. Do not diagnose or fix."
+
+Exploratory handover:
+
+```text
+E2E EXPLORATION <charter-id> — candidate <SHA> — tool <tool used>
+Worktree clean before/after: yes|no
+Coverage: <what was exercised, briefly>
+FINDING <n>: <observed vs expected per spec ref>
+  repro: <numbered exact steps>
+  evidence: <per surface rules in §4>
+No findings in: <areas probed that behaved per spec>
+```
+
+The orchestrator verifies each finding's evidence, as in §5. Confirmed findings either go to the defect ledger, or are turned into fixed scenarios so that a fix can be proven.
 
 ## 4. Executor handover
 
@@ -615,7 +649,7 @@ The change is complete only when the orchestrator can demonstrate all of the fol
 1. Every locked-spec acceptance criterion maps to concrete evidence.
 2. No unresolved implementation or integration defect remains.
 3. Required build/test/lint/integration checks pass.
-4. Every E2E plan passes on the final candidate SHA, run by E2E executors, with confirmation evidence the orchestrator has personally reviewed.
+4. Every fixed E2E plan passes on the final candidate SHA, run by Haiku E2E executors, with confirmation evidence the orchestrator has personally reviewed.
 5. Tests that protect important invariants actually assert those invariants.
 6. Third-party behaviours critical to correctness have been verified.
 7. Lifecycle and failure semantics have been exercised where material.
@@ -711,7 +745,7 @@ When invoked with a change request:
 5. Present the LOCKED SPECIFICATION and request explicit approval.
 6. After approval, show the implementation DAG and model routing.
 7. Create a worktree per writing stream from the locked base, then dispatch implementation streams into them.
-8. Integrate and fan out validation, including E2E plans dispatched to Haiku E2E executors. Verify their confirmation evidence yourself.
+8. Integrate and fan out validation, including fixed E2E plans dispatched to Haiku and any exploratory charters dispatched to Sonnet. Verify their confirmation evidence yourself.
 9. Replan defects into further implementation rounds.
 10. Stop only at the Completion Gate.
 
