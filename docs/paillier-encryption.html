@@ -246,7 +246,7 @@ flowchart LR
     <h3>Decrypt a number</h3>
     <p>
       Reads an encrypted number file and private key, writes the plaintext to stdout. If decryption fails
-      (wrong key, tampered or malformed ciphertext, or an invalid value), it prints
+      (wrong key, malformed or out-of-range ciphertext, a ciphertext from a different key, or an invalid value), it prints
       <code>Error: Decryption failed: input is invalid or was not encrypted with this key.</code> and exits
       with code 1. A missing or unreadable file reports its own specific error.
     </p>
@@ -390,7 +390,7 @@ flowchart LR
     <h3>decrypt-string</h3>
     <p>
       Decrypts all 100 entries and removes every NUL, so padding does not appear in the output. If
-      decryption fails (wrong key, tampered or malformed ciphertext, or an invalid character), it prints
+      decryption fails (wrong key, malformed or out-of-range ciphertext, a ciphertext from a different key, or an invalid character), it prints
       <code>Error: Decryption failed: input is invalid or was not encrypted with this key.</code> and exits
       with code 1. A missing or unreadable file reports its own specific error.
     </p>
@@ -600,7 +600,10 @@ flowchart LR
         <tr>
           <td>Decryption errors</td>
           <td><code>Error: Decryption failed: input is invalid or was not encrypted with this key.</code> (exit 1)</td>
-          <td>Applies to wrong key, tampered or malformed ciphertext, and invalid characters. Missing or unreadable files keep their specific error</td>
+          <td>Applies to wrong key, malformed or out-of-range ciphertext, a ciphertext from a different key, and invalid characters. Missing or unreadable files keep their specific error</td>
+        </tr>
+        <tr>
+          <td>Integrity</td><td>Not provided</td><td>Paillier ciphertexts are malleable: a well-formed ciphertext that has been modified decrypts to a different value without an error. Use a separate signature or MAC if you need tamper detection</td>
         </tr>
         <tr>
           <td>Compatibility</td>
