@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Numerics;
+using System.Text;
 using System.Text.Json;
 using FluentAssertions;
 using Pixelbadger.Toolkit.Components;
@@ -174,7 +175,7 @@ public class CryptoCommandIntegrationTests : IDisposable
             "crypto", "decrypt", "--in-file", encFile, "--private-key-file", privateKeyFile);
 
         exitCode.Should().Be(1);
-        stdout.Should().Contain("Error:");
+        stdout.Trim().Should().Be(GenericError);
     }
 
     [Fact]
@@ -186,7 +187,7 @@ public class CryptoCommandIntegrationTests : IDisposable
 
         await WriteKeyFilesAsync(publicKeyFile, privateKeyFile);
         await RunToolkitCommandAsync("crypto", "encrypt-string",
-            "--string", "hello world", "--public-key-file", publicKeyFile, "--out-file", encFile);
+            "--string-file", await WriteTextFileAsync("in.txt", "hello world"), "--public-key-file", publicKeyFile, "--out-file", encFile);
 
         var (exitCode, stdout, _) = await RunToolkitCommandAsync(
             "crypto", "decrypt-string", "--in-file", encFile, "--private-key-file", privateKeyFile);
@@ -205,9 +206,9 @@ public class CryptoCommandIntegrationTests : IDisposable
 
         await WriteKeyFilesAsync(publicKeyFile, privateKeyFile);
         await RunToolkitCommandAsync("crypto", "encrypt-string",
-            "--string", "hello world", "--public-key-file", publicKeyFile, "--out-file", encFile);
+            "--string-file", await WriteTextFileAsync("in.txt", "hello world"), "--public-key-file", publicKeyFile, "--out-file", encFile);
         await RunToolkitCommandAsync("crypto", "replace",
-            "--in-file", encFile, "--start", "6", "--replacement", "there", "--out-file", updatedFile);
+            "--in-file", encFile, "--start", "6", "--replacement-file", await WriteTextFileAsync("rep.txt", "there"), "--out-file", updatedFile);
 
         var (exitCode, stdout, _) = await RunToolkitCommandAsync(
             "crypto", "decrypt-string", "--in-file", updatedFile, "--private-key-file", privateKeyFile);
@@ -226,10 +227,10 @@ public class CryptoCommandIntegrationTests : IDisposable
 
         await WriteKeyFilesAsync(publicKeyFile, privateKeyFile);
         await RunToolkitCommandAsync("crypto", "encrypt-string",
-            "--string", "hi", "--public-key-file", publicKeyFile, "--out-file", encFile);
+            "--string-file", await WriteTextFileAsync("in.txt", "hi"), "--public-key-file", publicKeyFile, "--out-file", encFile);
 
         var (exitCode, stdout, _) = await RunToolkitCommandAsync(
-            "crypto", "replace", "--in-file", encFile, "--start", "1", "--replacement", "xyz", "--out-file", updatedFile);
+            "crypto", "replace", "--in-file", encFile, "--start", "99", "--replacement-file", await WriteTextFileAsync("rep.txt", "xy"), "--out-file", updatedFile);
 
         exitCode.Should().Be(1);
         stdout.Should().Contain("Error:");
@@ -246,7 +247,7 @@ public class CryptoCommandIntegrationTests : IDisposable
         var tooLong = new string('a', 101);
 
         var (exitCode, stdout, _) = await RunToolkitCommandAsync(
-            "crypto", "encrypt-string", "--string", tooLong, "--public-key-file", publicKeyFile, "--out-file", encFile);
+            "crypto", "encrypt-string", "--string-file", await WriteTextFileAsync("in.txt", tooLong), "--public-key-file", publicKeyFile, "--out-file", encFile);
 
         exitCode.Should().Be(1);
         stdout.Should().Contain("Error:");
@@ -394,13 +395,13 @@ public class CryptoCommandIntegrationTests : IDisposable
 
         await WriteKeyFilesAsync(publicKeyFile, privateKeyFile);
         await RunToolkitCommandAsync("crypto", "encrypt-string",
-            "--string", "hello world", "--public-key-file", publicKeyFile, "--out-file", encFile);
+            "--string-file", await WriteTextFileAsync("in.txt", "hello world"), "--public-key-file", publicKeyFile, "--out-file", encFile);
 
         var (exitCode, stdout, _) = await RunToolkitCommandAsync(
             "crypto", "substring", "--in-file", encFile, "--start", "6", "--length", "5", "--out-file", subFile);
 
         exitCode.Should().Be(0);
-        stdout.Should().Contain("Encrypted substring (5 characters) written to");
+        stdout.Should().Contain("Encrypted substring written to");
 
         var (decryptExitCode, decryptStdout, _) = await RunToolkitCommandAsync(
             "crypto", "decrypt-string", "--in-file", subFile, "--private-key-file", privateKeyFile);
@@ -418,7 +419,7 @@ public class CryptoCommandIntegrationTests : IDisposable
 
         await WriteKeyFilesAsync(publicKeyFile, privateKeyFile);
         await RunToolkitCommandAsync("crypto", "encrypt-string",
-            "--string", "hello world", "--public-key-file", publicKeyFile, "--out-file", encFile);
+            "--string-file", await WriteTextFileAsync("in.txt", "hello world"), "--public-key-file", publicKeyFile, "--out-file", encFile);
         await RunToolkitCommandAsync("crypto", "substring",
             "--in-file", encFile, "--start", "6", "--out-file", subFile);
 
@@ -439,10 +440,10 @@ public class CryptoCommandIntegrationTests : IDisposable
 
         await WriteKeyFilesAsync(publicKeyFile, privateKeyFile);
         await RunToolkitCommandAsync("crypto", "encrypt-string",
-            "--string", "hi", "--public-key-file", publicKeyFile, "--out-file", encFile);
+            "--string-file", await WriteTextFileAsync("in.txt", "hi"), "--public-key-file", publicKeyFile, "--out-file", encFile);
 
         var (exitCode, stdout, _) = await RunToolkitCommandAsync(
-            "crypto", "substring", "--in-file", encFile, "--start", "1", "--length", "5", "--out-file", subFile);
+            "crypto", "substring", "--in-file", encFile, "--start", "98", "--length", "5", "--out-file", subFile);
 
         exitCode.Should().Be(1);
         stdout.Should().Contain("Error:");
@@ -480,6 +481,208 @@ public class CryptoCommandIntegrationTests : IDisposable
 
         exitCode.Should().Be(1);
         stdout.Should().Contain("Error:");
+    }
+
+    private const string GenericError = "Error: Decryption failed: input is invalid or was not encrypted with this key.";
+
+    private async Task<(string Pub, string Priv, string Enc)> EncryptFileAsync(string content)
+    {
+        var pub = Path.Combine(_testDirectory, "test.pub");
+        var priv = Path.Combine(_testDirectory, "test.key");
+        var enc = Path.Combine(_testDirectory, "msg.estr");
+        await WriteKeyFilesAsync(pub, priv);
+        var (exit, _, _) = await RunToolkitCommandAsync("crypto", "encrypt-string",
+            "--string-file", await WriteTextFileAsync("in.txt", content), "--public-key-file", pub, "--out-file", enc);
+        exit.Should().Be(0);
+        return (pub, priv, enc);
+    }
+
+    private async Task<string> DecryptStringAsync(string enc, string priv)
+    {
+        var (exit, stdout, _) = await RunToolkitCommandAsync("crypto", "decrypt-string", "--in-file", enc, "--private-key-file", priv);
+        exit.Should().Be(0);
+        // The command ends its output with exactly one newline; remove only that one.
+        return stdout.EndsWith(Environment.NewLine) ? stdout[..^Environment.NewLine.Length] : stdout;
+    }
+
+    [Theory]
+    [InlineData("hello\n", "hello")]
+    [InlineData("hello\r\n", "hello")]
+    [InlineData("hello\n\n", "hello\n")]
+    [InlineData("hello", "hello")]
+    [InlineData(" hello ", " hello ")]
+    public async Task EncryptString_ShouldStripExactlyOneTrailingLineEnding_WhenReadingFromFile(string content, string expected)
+    {
+        var (_, priv, enc) = await EncryptFileAsync(content);
+
+        (await DecryptStringAsync(enc, priv)).Should().Be(expected);
+    }
+
+    [Fact]
+    public async Task EncryptString_ShouldWriteExactly100Characters_WhenEncrypting()
+    {
+        var (_, _, enc) = await EncryptFileAsync("hello");
+
+        var parsed = JsonSerializer.Deserialize<EncryptedString>(await File.ReadAllTextAsync(enc));
+        parsed!.Characters.Should().HaveCount(100);
+    }
+
+    [Fact]
+    public async Task EncryptString_ShouldRoundTrip_WhenReadingFromStdin()
+    {
+        var pub = Path.Combine(_testDirectory, "test.pub");
+        var priv = Path.Combine(_testDirectory, "test.key");
+        var enc = Path.Combine(_testDirectory, "msg.estr");
+        await WriteKeyFilesAsync(pub, priv);
+
+        var (exitCode, stdout, _) = await ToolkitProcess.RunWithStdinAsync(null, "h\u00e9llo w\u00f6rld\n",
+            "crypto", "encrypt-string", "--string-file", "-", "--public-key-file", pub, "--out-file", enc);
+
+        exitCode.Should().Be(0);
+        stdout.Should().Contain("Encrypted string written to");
+        stdout.Should().NotContain("characters");
+        (await DecryptStringAsync(enc, priv)).Should().Be("h\u00e9llo w\u00f6rld");
+    }
+
+    [Fact]
+    public async Task Replace_ShouldReadReplacementFromStdin_WhenReplacementFileIsDash()
+    {
+        var (_, priv, enc) = await EncryptFileAsync("hello world");
+        var updated = Path.Combine(_testDirectory, "updated.estr");
+
+        var (exitCode, _, _) = await ToolkitProcess.RunWithStdinAsync(null, "there\r\n",
+            "crypto", "replace", "--in-file", enc, "--start", "6", "--replacement-file", "-", "--out-file", updated);
+
+        exitCode.Should().Be(0);
+        (await DecryptStringAsync(updated, priv)).Should().Be("hello there");
+    }
+
+    [Fact]
+    public async Task Replace_ShouldExtendString_WhenReplacingIntoPadding()
+    {
+        var (_, priv, enc) = await EncryptFileAsync("hello");
+        var updated = Path.Combine(_testDirectory, "updated.estr");
+
+        var (exitCode, _, _) = await RunToolkitCommandAsync("crypto", "replace",
+            "--in-file", enc, "--start", "7", "--replacement-file", await WriteTextFileAsync("rep.txt", "X"), "--out-file", updated);
+
+        exitCode.Should().Be(0);
+        (await DecryptStringAsync(updated, priv)).Should().Be("helloX");
+    }
+
+    [Fact]
+    public async Task EncryptString_ShouldRejectRemovedStringOption_WhenStringFlagUsed()
+    {
+        var pub = Path.Combine(_testDirectory, "test.pub");
+        var priv = Path.Combine(_testDirectory, "test.key");
+        var enc = Path.Combine(_testDirectory, "msg.estr");
+        await WriteKeyFilesAsync(pub, priv);
+
+        var (exitCode, _, _) = await RunToolkitCommandAsync("crypto", "encrypt-string",
+            "--string", "hello", "--public-key-file", pub, "--out-file", enc);
+
+        exitCode.Should().NotBe(0);
+        File.Exists(enc).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Replace_ShouldRejectRemovedReplacementOption_WhenReplacementFlagUsed()
+    {
+        var (_, _, enc) = await EncryptFileAsync("hello");
+        var updated = Path.Combine(_testDirectory, "updated.estr");
+
+        var (exitCode, _, _) = await RunToolkitCommandAsync("crypto", "replace",
+            "--in-file", enc, "--start", "0", "--replacement", "X", "--out-file", updated);
+
+        exitCode.Should().NotBe(0);
+        File.Exists(updated).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task EncryptString_ShouldReturnFailure_WhenStringFileContainsNul()
+    {
+        var pub = Path.Combine(_testDirectory, "test.pub");
+        var priv = Path.Combine(_testDirectory, "test.key");
+        var enc = Path.Combine(_testDirectory, "msg.estr");
+        await WriteKeyFilesAsync(pub, priv);
+
+        var (exitCode, stdout, _) = await RunToolkitCommandAsync("crypto", "encrypt-string",
+            "--string-file", await WriteTextFileAsync("nul.txt", "ab\0cd"), "--public-key-file", pub, "--out-file", enc);
+
+        exitCode.Should().Be(1);
+        stdout.Should().Contain("Error:");
+        File.Exists(enc).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task DecryptString_ShouldPrintGenericError_WhenWrongPrivateKeyUsed()
+    {
+        var (_, _, enc) = await EncryptFileAsync("hello");
+        var otherPriv = Path.Combine(_testDirectory, "other.key");
+        var otherKey = new HomomorphicEncryptionComponent().GenerateKey();
+        await File.WriteAllTextAsync(otherPriv, JsonSerializer.Serialize(otherKey, JsonOptions));
+
+        var (exitCode, stdout, _) = await RunToolkitCommandAsync(
+            "crypto", "decrypt-string", "--in-file", enc, "--private-key-file", otherPriv);
+
+        exitCode.Should().Be(1);
+        stdout.Trim().Should().Be(GenericError);
+    }
+
+    [Fact]
+    public async Task Decrypt_ShouldPrintGenericError_WhenWrongPrivateKeyUsed()
+    {
+        var pub = Path.Combine(_testDirectory, "test.pub");
+        var priv = Path.Combine(_testDirectory, "test.key");
+        var encFile = Path.Combine(_testDirectory, "number.enc");
+        await WriteKeyFilesAsync(pub, priv);
+        await RunToolkitCommandAsync("crypto", "encrypt", "--number", "42", "--public-key-file", pub, "--out-file", encFile);
+        var otherPriv = Path.Combine(_testDirectory, "other.key");
+        await File.WriteAllTextAsync(otherPriv, JsonSerializer.Serialize(new HomomorphicEncryptionComponent().GenerateKey(), JsonOptions));
+
+        var (exitCode, stdout, _) = await RunToolkitCommandAsync(
+            "crypto", "decrypt", "--in-file", encFile, "--private-key-file", otherPriv);
+
+        exitCode.Should().Be(1);
+        stdout.Trim().Should().Be(GenericError);
+    }
+
+    [Fact]
+    public async Task DecryptString_ShouldPrintGenericError_WhenInputFileIsMalformedJson()
+    {
+        var pub = Path.Combine(_testDirectory, "test.pub");
+        var priv = Path.Combine(_testDirectory, "test.key");
+        await WriteKeyFilesAsync(pub, priv);
+        var bad = await WriteTextFileAsync("bad.estr", "{ not valid json }");
+
+        var (exitCode, stdout, _) = await RunToolkitCommandAsync(
+            "crypto", "decrypt-string", "--in-file", bad, "--private-key-file", priv);
+
+        exitCode.Should().Be(1);
+        stdout.Trim().Should().Be(GenericError);
+    }
+
+    [Fact]
+    public async Task DecryptString_ShouldPrintSpecificError_WhenInputFileIsMissing()
+    {
+        var pub = Path.Combine(_testDirectory, "test.pub");
+        var priv = Path.Combine(_testDirectory, "test.key");
+        await WriteKeyFilesAsync(pub, priv);
+
+        var (exitCode, stdout, _) = await RunToolkitCommandAsync(
+            "crypto", "decrypt-string", "--in-file", Path.Combine(_testDirectory, "missing.estr"), "--private-key-file", priv);
+
+        exitCode.Should().Be(1);
+        stdout.Should().Contain("Error:");
+        stdout.Should().Contain("missing.estr");
+        stdout.Should().NotContain("Decryption failed");
+    }
+
+    private async Task<string> WriteTextFileAsync(string name, string content)
+    {
+        var path = Path.Combine(_testDirectory, name);
+        await File.WriteAllBytesAsync(path, new UTF8Encoding(false).GetBytes(content));
+        return path;
     }
 
     private static Task<(int ExitCode, string StandardOutput, string StandardError)> RunToolkitCommandAsync(params string[] args) =>

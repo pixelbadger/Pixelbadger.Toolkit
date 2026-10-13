@@ -455,17 +455,4 @@ public class HomomorphicEncryptionComponent
 
         return true;
     }
-
-    private static BigInteger GenerateRandomBigInteger(BigInteger max, RandomNumberGenerator rng)
-    {
-        var byteCount = max.GetByteCount(isUnsigned: true);
-        var bytes = new byte[byteCount];
-        BigInteger result;
-        do
-        {
-            rng.GetBytes(bytes);
-            result = new BigInteger(bytes, isUnsigned: true);
-        } while (result <= 0 || result >= max);
-        return result;
-    }
 }
