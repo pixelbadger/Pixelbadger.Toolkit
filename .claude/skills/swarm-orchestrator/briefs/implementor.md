@@ -24,7 +24,7 @@ One clear result the worker owns.
 
 ## Required verification
 
-Name the focused tests/checks that establish correctness. Implementors run **filtered** test runs scoped to their change. The full suite is owned by the orchestrator (see **Verification budget**, Phase 4).
+Name the focused tests/checks that establish correctness. Implementors run **filtered** test runs scoped to their change. The full suite is run separately by the orchestrator's test executors.
 
 Require new tests where behaviour changes.
 

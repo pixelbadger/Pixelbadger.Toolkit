@@ -23,7 +23,7 @@ This is the only place a model is named. Everything else in this skill, and ever
 |---|---|---|---|
 | Orchestrator | Orchestrator | — (the invoking session) | Opus 5.5 |
 | Judgement | Semantic implementors, subtle reviewers, E2E explorers | `sonnet` | Sonnet 5.5 |
-| Mechanical | Bounded implementors, narrow audits, E2E executors | `haiku` | Haiku 5.5 |
+| Mechanical | Bounded implementors, narrow audits, test executors, E2E executors | `haiku` | Haiku 5.5 |
 
 When the models change, change this table only.
 
@@ -111,13 +111,14 @@ If an action fits neither list, treat it as mutation.
 - silently change the locked specification during implementation;
 - ask the operator a question that can be answered by inspecting the repository, dependency source, documentation, tests, runtime behaviour, or other available evidence;
 - accept an implementor's success claim as proof without reviewing evidence;
+- run test suites itself; every suite run goes to a test executor (see **Test executors**, Phase 4);
 - execute E2E scenarios itself (driving a browser, taking screenshots, running scenario CLI/API transcripts); E2E is always run by E2E executors (see **E2E Verification Protocol**);
 - declare completion because "tests pass" if the tests do not prove the specification.
 
 ### The orchestrator MAY
 
 - inspect any repository file, history, diff, dependency source, generated output, logs, schema, or test result;
-- run builds, unit/integration test suites, linters, benchmarks, static analysis, and read-only diagnostics;
+- run builds, linters, benchmarks, static analysis, and read-only diagnostics;
 - perform the non-mutating actions listed above;
 - create and sequence implementation plans;
 - spawn parallel (up to the concurrency cap) or sequential implementors;
@@ -161,7 +162,7 @@ Before interviewing the operator:
 3. Inspect tests that define current behaviour.
 4. Inspect recent related commits/PRs when they clarify architectural intent.
 5. If correctness depends on a third-party library's behaviour, inspect its source or authoritative implementation evidence rather than assuming.
-6. **Establish a green baseline.** Build the base commit and run its test suite in this environment. Record pre-existing failures, and the environment requirements needed to get green: SDKs, environment variables such as `TERM`, licences, and build configurations that can't run here. Measure one build's and one test run's peak memory and disk use: this is the per-unit footprint for the concurrency policy. Diagnose any failure that isn't explained before going further. These findings, together with the Stage A and Stage B results, become the **Environment block** that every brief carries.
+6. **Establish a green baseline.** Build the base commit, then dispatch a test executor (see **Test executors**, Phase 4) to run its test suite in this environment, measuring footprint. Record pre-existing failures from its result, and the environment requirements needed to get green: SDKs, environment variables such as `TERM`, licences, and build configurations that can't run here. Measure the build's peak memory and disk use yourself, and take the test run's from the executor: together they are the per-unit footprint for the concurrency policy. Diagnose any failure that isn't explained before going further. These findings, together with the Stage A and Stage B results, become the **Environment block** that every brief carries.
 7. Run environment **Stage B (stack)** from `reference/environment-checks.md`.
 8. Identify which questions are factual and answer them yourself.
 9. Ask the operator only questions that require product intent, trade-offs, or risk decisions.
@@ -436,10 +437,10 @@ The orchestrator synthesises all findings.
 Run the strongest available evidence appropriate to the specification:
 
 - build (once per candidate, before fan-out);
-- unit and integration suites, per the **Verification budget** below, run by the orchestrator in its own worktree, alongside the E2E plans (but never alongside timing plans);
+- unit and integration suites, per the **Verification budget** below, run by test executors against the built candidate, alongside the E2E plans (but never alongside timing plans);
 - end-to-end verification, always per the **E2E Verification Protocol** (executed by E2E executors, never by the orchestrator);
 - migrations against realistic prior state;
-- fault/retry/restart tests;
+- fault/retry/restart tests (run by test executors);
 - linters/static analysis;
 - performance/benchmark checks;
 - deployment/container build;
@@ -448,10 +449,20 @@ Run the strongest available evidence appropriate to the specification:
 
 A passing test suite is evidence, not proof.
 
+### Test executors
+
+Every test-suite run (the baseline, each fix round's targeted suites, the final full pass, and fault/retry/restart suites) is dispatched to a **mechanical-tier test executor** with `briefs/test-executor.md`. The orchestrator builds the candidate first, then hands the executor the built worktree and exact commands that do not rebuild (e.g. `dotnet test --no-build`). Test output is long; it stays in the executor's context and the evidence dir.
+
+The executor interprets but does not diagnose. It reports totals, each failure with its message and `file:line`, whether each failure is new or pre-existing against the baseline list, and environmental signatures (OOM kill, port in use, timeout, missing SDK) separately from assertion failures.
+
+Do not accept a test result as a verdict. Before accepting one, check that it is consistent: the totals agree with the log tail, every failure in the tail is listed, the candidate SHA and worktree cleanliness are confirmed, and nothing marked pre-existing is missing from the baseline list. Open the full log only when the handover is insufficient to judge. An environmental signature is an environment issue to diagnose read-only (re-run Stage C if it is OOM or disk), not a defect.
+
+Implementors still run their own filtered tests while they work, since that output stays in their context.
+
 ### Verification budget
 
-- **Fix rounds:** run only the targeted suites covering the changed code and its direct dependants, plus the E2E plans that touch changed behaviour.
-- **Final candidate:** run the full unit and integration suite **once**, at the end, on the candidate you intend to present at the Completion Gate. If that pass forces another fix round, the next final candidate gets its own full pass.
+- **Fix rounds:** a test executor runs only the targeted suites covering the changed code and its direct dependants, plus the E2E plans that touch changed behaviour.
+- **Final candidate:** a test executor runs the full unit and integration suite **once**, at the end, on the candidate you intend to present at the Completion Gate. If that pass forces another fix round, the next final candidate gets its own full pass.
 - **Disk and memory:** re-run environment Stage C before each build, suite run or fan-out, and stay within the concurrency cap (see **Concurrency policy**). Never start a run that can't finish.
 
 ## 4. Defect ledger
@@ -511,7 +522,7 @@ The change is complete only when the orchestrator can demonstrate all of the fol
 
 1. Every locked-spec acceptance criterion maps to concrete evidence.
 2. No unresolved implementation or integration defect remains.
-3. Required build/test/lint/integration checks pass, including one full-suite pass on the final candidate SHA.
+3. Required build/test/lint/integration checks pass, including one full-suite pass on the final candidate SHA, run by a test executor, with its result reviewed by the orchestrator.
 4. Every fixed E2E plan passes on the final candidate SHA, run by mechanical-tier E2E executors, with confirmation evidence the orchestrator has personally reviewed.
 5. Tests that protect important invariants actually assert those invariants.
 6. Third-party behaviours critical to correctness have been verified.
@@ -590,7 +601,7 @@ When invoked with a change request:
 10. Create a worktree per writing stream from the locked base under a short root, with detached sibling worktrees for relative references, then dispatch implementation streams into them, up to the cap.
 11. Show the operator an early screenshot of each accepted UI stream before integration.
 12. Integrate and fan out validation, including fixed E2E plans dispatched to the mechanical tier and any exploratory charters dispatched to the judgement tier. Verify their confirmation evidence yourself.
-13. Replan defects into further implementation rounds, verifying each with targeted suites; run the full suite once on the final candidate.
+13. Replan defects into further implementation rounds, verifying each with targeted suites run by test executors; dispatch one full-suite run on the final candidate.
 14. Stop only at the Completion Gate.
 
 Never collapse Specification → Implementation → Integration into one agent pass.
