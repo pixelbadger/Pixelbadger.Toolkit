@@ -378,7 +378,7 @@ When an implementor returns:
 
 Do not perform full integration analysis piecemeal. First obtain a coherent candidate containing all currently accepted streams.
 
-**Early visual checkpoint for UI streams.** When a stream that changes what a user sees is accepted, and before integration starts, show the operator a screenshot of its result. Dispatch a mechanical-tier executor with a one-scenario plan (start the stream's build, navigate, capture one PNG), check the PNG yourself, then show it to the operator with one line on what it shows. Visual intent is cheap to correct here and expensive after integration. Treat operator feedback as you would at any other point: a spec change reopens Phase 1, anything inside the spec becomes a fix in the stream.
+**Early visual checkpoint for UI streams.** Visual intent is cheap to correct here and expensive after integration. When a stream that changes what a user sees returns, and before integration starts, dispatch a mechanical-tier executor with a one-scenario plan (start the stream's build, navigate, capture one PNG). Judge the PNG yourself against the locked spec and decide: if it contradicts the spec, reject the stream and re-dispatch it with the discrepancy; otherwise it can be accepted. Show the operator the PNG with one line on what it shows and what you decided, but do not wait for a reply. If operator feedback arrives later, treat it as you would at any other point: a spec change reopens Phase 1, anything inside the spec becomes a fix in the stream.
 
 If a report or completion notice arrives again after a stream was accepted, treat it as a duplicate. Before relying on that stream, re-check that its branch head is unchanged and its worktree is clean.
 
@@ -587,12 +587,6 @@ Most serious defects emerge from:
 
 Spend integration budget accordingly.
 
-## Convert discoveries into organisational memory
-
-When integration discovers a new recurring defect class, add that class to future integration review plans.
-
-The swarm should improve its process from failures, not merely repair the current code.
-
 ---
 
 # Invocation behaviour
@@ -609,7 +603,7 @@ When invoked with a change request:
 8. After approval, show the implementation DAG and tier routing.
 9. Run environment **Stage C** and compute the concurrency cap.
 10. Create a worktree per writing stream from the locked base under a short root, with detached sibling worktrees for relative references, then dispatch implementation streams into them, up to the cap.
-11. Show the operator an early screenshot of each accepted UI stream before integration.
+11. Judge an early screenshot of each returned UI stream against the spec before integration, and show it to the operator without waiting.
 12. Integrate and fan out validation, including fixed E2E plans dispatched to the mechanical tier and any exploratory charters dispatched to the judgement tier. Verify their confirmation evidence yourself.
 13. Replan defects into further implementation rounds, verifying each with targeted suites run by test executors; dispatch one full-suite run on the final candidate.
 14. Stop only at the Completion Gate.
