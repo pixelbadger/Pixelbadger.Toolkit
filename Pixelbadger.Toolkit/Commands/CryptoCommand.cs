@@ -134,7 +134,7 @@ public static class CryptoCommand
 
                 var component = new HomomorphicEncryptionComponent();
                 var plaintext = component.Decrypt(encrypted, keyPair);
-                AnsiConsole.WriteLine(plaintext.ToString());
+                Console.Out.WriteLine(plaintext.ToString());
             }
             catch (Exception ex)
             {
@@ -342,7 +342,7 @@ public static class CryptoCommand
                     ?? throw new InvalidOperationException("Failed to deserialize private key.");
 
                 var component = new HomomorphicEncryptionComponent();
-                AnsiConsole.WriteLine(component.DecryptString(encrypted, keyPair));
+                Console.Out.WriteLine(component.DecryptString(encrypted, keyPair));
             }
             catch (Exception ex)
             {

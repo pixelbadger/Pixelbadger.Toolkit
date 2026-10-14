@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Numerics;
 using FluentAssertions;
 using Pixelbadger.Toolkit.Components;
@@ -177,7 +178,7 @@ public class HomomorphicEncryptionComponentTests
     }
 
     [Fact]
-    public void EncryptString_ShouldEncryptOneCodePointPerCharacter()
+    public void EncryptString_ShouldReturnHundredEntries_WhenEncryptingShortString()
     {
         var key = TestKey.Value;
         var publicKey = new PaillierPublicKey { N = key.N };
@@ -430,7 +431,7 @@ public class HomomorphicEncryptionComponentTests
     }
 
     [Fact]
-    public void SubstringEncrypted_ShouldNotShareCharacterReferences_WithOriginal()
+    public void SubstringEncrypted_ShouldNotShareCiphertexts_WithOriginal()
     {
         var key = TestKey.Value;
         var publicKey = new PaillierPublicKey { N = key.N };
@@ -916,5 +917,155 @@ public class HomomorphicEncryptionComponentTests
         var rep = _component.ReplaceInString(legacy, 3, "p!");
         rep.Characters.Should().HaveCount(100);
         _component.DecryptString(rep, key).Should().Be("help!");
+    }
+
+    private const string ModulusMessage = "Paillier modulus must be a positive odd integer of at least 2048 bits.";
+    private const string DecryptFailureMessage = "Decryption failed: input is invalid or was not encrypted with this key.";
+
+    public static TheoryData<string> BadModuli => new()
+    {
+        (-(BigInteger.One << 2048) - 1).ToString(),   // negative, 2049 bits
+        (BigInteger.One << 2048).ToString(),          // even, 2049 bits
+    };
+
+    private static EncryptedString BadModulusString(string n) => new()
+    {
+        Characters = [new EncryptedNumber { Ciphertext = "5", N = n }]
+    };
+
+    [Theory]
+    [MemberData(nameof(BadModuli))]
+    public void Encrypt_ShouldRejectModulus_WhenNotPositiveOdd(string n)
+    {
+        var act = () => _component.Encrypt(1, new PaillierPublicKey { N = n });
+        act.Should().Throw<ArgumentException>().WithMessage($"*{ModulusMessage}*");
+    }
+
+    [Theory]
+    [MemberData(nameof(BadModuli))]
+    public void EncryptString_ShouldRejectModulus_WhenNotPositiveOdd(string n)
+    {
+        var act = () => _component.EncryptString("hi", new PaillierPublicKey { N = n });
+        act.Should().Throw<ArgumentException>().WithMessage($"*{ModulusMessage}*");
+    }
+
+    [Theory]
+    [MemberData(nameof(BadModuli))]
+    public void SubstringEncrypted_ShouldRejectModulus_WhenNotPositiveOdd(string n)
+    {
+        var act = () => _component.SubstringEncrypted(BadModulusString(n), 0, 1);
+        act.Should().Throw<ArgumentException>().WithMessage($"*{ModulusMessage}*");
+    }
+
+    [Theory]
+    [MemberData(nameof(BadModuli))]
+    public void ReplaceInString_ShouldRejectModulus_WhenNotPositiveOdd(string n)
+    {
+        var act = () => _component.ReplaceInString(BadModulusString(n), 0, "x");
+        act.Should().Throw<ArgumentException>().WithMessage($"*{ModulusMessage}*");
+    }
+
+    [Theory]
+    [MemberData(nameof(BadModuli))]
+    public void AddEncrypted_ShouldRejectModulus_WhenNotPositiveOdd(string n)
+    {
+        var e = new EncryptedNumber { Ciphertext = "5", N = n };
+        var act = () => _component.AddEncrypted(e, e);
+        act.Should().Throw<ArgumentException>().WithMessage($"*{ModulusMessage}*");
+    }
+
+    [Theory]
+    [MemberData(nameof(BadModuli))]
+    public void SubtractEncrypted_ShouldRejectModulus_WhenNotPositiveOdd(string n)
+    {
+        var e = new EncryptedNumber { Ciphertext = "5", N = n };
+        var act = () => _component.SubtractEncrypted(e, e);
+        act.Should().Throw<ArgumentException>().WithMessage($"*{ModulusMessage}*");
+    }
+
+    [Theory]
+    [MemberData(nameof(BadModuli))]
+    public void MultiplyEncrypted_ShouldRejectModulus_WhenNotPositiveOdd(string n)
+    {
+        var e = new EncryptedNumber { Ciphertext = "5", N = n };
+        var act = () => _component.MultiplyEncrypted(e, 3);
+        act.Should().Throw<ArgumentException>().WithMessage($"*{ModulusMessage}*");
+    }
+
+    [Theory]
+    [MemberData(nameof(BadModuli))]
+    public void Decrypt_ShouldThrowUniformException_WhenKeyModulusNotPositiveOdd(string n)
+    {
+        var key = new PaillierKeyPair { N = n, Lambda = "3", Mu = "5" };
+        var act = () => _component.Decrypt(new EncryptedNumber { Ciphertext = "5", N = n }, key);
+        act.Should().Throw<CryptographicException>().WithMessage(DecryptFailureMessage);
+    }
+
+    [Theory]
+    [MemberData(nameof(BadModuli))]
+    public void DecryptString_ShouldThrowUniformException_WhenKeyModulusNotPositiveOdd(string n)
+    {
+        var key = new PaillierKeyPair { N = n, Lambda = "3", Mu = "5" };
+        var act = () => _component.DecryptString(BadModulusString(n), key);
+        act.Should().Throw<CryptographicException>().WithMessage(DecryptFailureMessage);
+    }
+
+    [Fact]
+    public void SubstringEncrypted_ShouldReportRangeError_WhenStartExceedsLengthAndLengthOmitted()
+    {
+        var key = TestKey.Value;
+        var encrypted = _component.EncryptString("hello", new PaillierPublicKey { N = key.N });
+
+        var act = () => _component.SubstringEncrypted(encrypted, 101);
+
+        act.Should().Throw<ArgumentException>()
+            .WithMessage("Range [101, 101) exceeds string length 100.*");
+    }
+
+    [Fact]
+    public void MultiplyEncrypted_ShouldRerandomise_WhenScalarIsZero()
+    {
+        var key = TestKey.Value;
+        var a = _component.Encrypt(7, new PaillierPublicKey { N = key.N });
+
+        var r1 = _component.MultiplyEncrypted(a, 0);
+        var r2 = _component.MultiplyEncrypted(a, 0);
+
+        r1.Ciphertext.Should().NotBe("1");
+        r2.Ciphertext.Should().NotBe("1");
+        r1.Ciphertext.Should().NotBe(r2.Ciphertext);
+        _component.Decrypt(r1, key).Should().Be(BigInteger.Zero);
+        _component.Decrypt(r2, key).Should().Be(BigInteger.Zero);
+    }
+
+    [Fact]
+    public void SubtractEncrypted_ShouldRerandomise_WhenSubtractingValueFromItself()
+    {
+        var key = TestKey.Value;
+        var a = _component.Encrypt(7, new PaillierPublicKey { N = key.N });
+
+        var r1 = _component.SubtractEncrypted(a, a);
+        var r2 = _component.SubtractEncrypted(a, a);
+
+        r1.Ciphertext.Should().NotBe("1");
+        r1.Ciphertext.Should().NotBe(r2.Ciphertext);
+        _component.Decrypt(r1, key).Should().Be(BigInteger.Zero);
+        _component.Decrypt(r2, key).Should().Be(BigInteger.Zero);
+    }
+
+    [Fact]
+    public void AddEncrypted_ShouldProduceDifferentCiphertexts_WhenCalledTwiceOnSameInputs()
+    {
+        var key = TestKey.Value;
+        var pub = new PaillierPublicKey { N = key.N };
+        var a = _component.Encrypt(2, pub);
+        var b = _component.Encrypt(3, pub);
+
+        var r1 = _component.AddEncrypted(a, b);
+        var r2 = _component.AddEncrypted(a, b);
+
+        r1.Ciphertext.Should().NotBe(r2.Ciphertext);
+        _component.Decrypt(r1, key).Should().Be(5);
+        _component.Decrypt(r2, key).Should().Be(5);
     }
 }

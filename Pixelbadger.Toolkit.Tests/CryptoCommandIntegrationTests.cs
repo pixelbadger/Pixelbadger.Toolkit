@@ -578,10 +578,12 @@ public class CryptoCommandIntegrationTests : IDisposable
         var enc = Path.Combine(_testDirectory, "msg.estr");
         await WriteKeyFilesAsync(pub, priv);
 
-        var (exitCode, _, _) = await RunToolkitCommandAsync("crypto", "encrypt-string",
-            "--string", "hello", "--public-key-file", pub, "--out-file", enc);
+        var (exitCode, stdout, stderr) = await RunToolkitCommandAsync("crypto", "encrypt-string",
+            "--string-file", await WriteTextFileAsync("in.txt", "hello"), "--string", "hello",
+            "--public-key-file", pub, "--out-file", enc);
 
         exitCode.Should().NotBe(0);
+        (stdout + stderr).Should().Contain("Unrecognized command or argument '--string'");
         File.Exists(enc).Should().BeFalse();
     }
 
@@ -591,11 +593,60 @@ public class CryptoCommandIntegrationTests : IDisposable
         var (_, _, enc) = await EncryptFileAsync("hello");
         var updated = Path.Combine(_testDirectory, "updated.estr");
 
-        var (exitCode, _, _) = await RunToolkitCommandAsync("crypto", "replace",
-            "--in-file", enc, "--start", "0", "--replacement", "X", "--out-file", updated);
+        var (exitCode, stdout, stderr) = await RunToolkitCommandAsync("crypto", "replace",
+            "--in-file", enc, "--start", "0",
+            "--replacement-file", await WriteTextFileAsync("rep.txt", "X"), "--replacement", "X",
+            "--out-file", updated);
 
         exitCode.Should().NotBe(0);
+        (stdout + stderr).Should().Contain("Unrecognized command or argument '--replacement'");
         File.Exists(updated).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Multiply_ShouldFailPromptly_WhenModulusIsNegative()
+    {
+        var negN = (-(BigInteger.One << 2048) - 1).ToString();
+        var bad = Path.Combine(_testDirectory, "bad.enc");
+        await File.WriteAllTextAsync(bad, JsonSerializer.Serialize(new EncryptedNumber { Ciphertext = "5", N = negN }));
+        var outFile = Path.Combine(_testDirectory, "out.enc");
+
+        var (exitCode, stdout, _) = await RunToolkitCommandAsync(
+            "crypto", "multiply", "--in-file", bad, "--scalar", "3", "--out-file", outFile);
+
+        exitCode.Should().Be(1);
+        stdout.Should().Contain("Error:");
+        File.Exists(outFile).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task DecryptString_ShouldPrintExactHundredCharacters_WithoutWrapping()
+    {
+        var text = string.Concat(Enumerable.Repeat("abcdefghij", 10));
+        var (_, priv, enc) = await EncryptFileAsync(text);
+
+        var (exitCode, stdout, _) = await RunToolkitCommandAsync(
+            "crypto", "decrypt-string", "--in-file", enc, "--private-key-file", priv);
+
+        exitCode.Should().Be(0);
+        stdout.Should().Be(text + Environment.NewLine);
+    }
+
+    [Fact]
+    public async Task Decrypt_ShouldPrintExactNumber_WhenPlaintextIsLongMaxValue()
+    {
+        var pub = Path.Combine(_testDirectory, "test.pub");
+        var priv = Path.Combine(_testDirectory, "test.key");
+        var encFile = Path.Combine(_testDirectory, "number.enc");
+        await WriteKeyFilesAsync(pub, priv);
+        await RunToolkitCommandAsync("crypto", "encrypt", "--number", long.MaxValue.ToString(),
+            "--public-key-file", pub, "--out-file", encFile);
+
+        var (exitCode, stdout, _) = await RunToolkitCommandAsync(
+            "crypto", "decrypt", "--in-file", encFile, "--private-key-file", priv);
+
+        exitCode.Should().Be(0);
+        stdout.Should().Be(long.MaxValue + Environment.NewLine);
     }
 
     [Fact]

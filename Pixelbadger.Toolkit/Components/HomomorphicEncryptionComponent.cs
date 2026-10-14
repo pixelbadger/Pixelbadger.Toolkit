@@ -127,10 +127,13 @@ public class HomomorphicEncryptionComponent
     {
         var (n, nSquared, cs) = ValidateString(encryptedString, requireNonEmpty: true);
         var count = cs.Length;
-        var len = length ?? count - start;
 
         if (start < 0)
             throw new ArgumentException("Start index must be non-negative.", nameof(start));
+        if (start > count)
+            throw new ArgumentException(
+                $"Range [{start}, {start}) exceeds string length {count}.");
+        var len = length ?? count - start;
         if (len < 0)
             throw new ArgumentException("Length must be non-negative.", nameof(length));
         if ((long)start + len > count)
@@ -370,8 +373,9 @@ public class HomomorphicEncryptionComponent
 
     private static void ValidateModulus(BigInteger n)
     {
-        if (n.GetBitLength() < MinimumKeyBitLength)
-            throw new ArgumentException($"Paillier modulus must be at least {MinimumKeyBitLength} bits.");
+        if (n.Sign <= 0 || n.IsEven || n.GetBitLength() < MinimumKeyBitLength)
+            throw new ArgumentException(
+                $"Paillier modulus must be a positive odd integer of at least {MinimumKeyBitLength} bits.");
     }
 
     private static BigInteger Lcm(BigInteger a, BigInteger b) =>
