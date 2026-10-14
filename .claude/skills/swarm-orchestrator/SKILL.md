@@ -120,7 +120,7 @@ If an action fits neither list, treat it as mutation.
 - run builds, unit/integration test suites, linters, benchmarks, static analysis, and read-only diagnostics;
 - perform the non-mutating actions listed above;
 - create and sequence implementation plans;
-- spawn parallel or sequential implementors;
+- spawn parallel (up to the concurrency cap) or sequential implementors;
 - ask implementors to perform read-only verification during integration;
 - inspect implementor branches/worktrees and commits;
 - ask an implementor to perform branch composition that needs content decisions, or conflict resolution, under a bounded brief;
@@ -131,9 +131,20 @@ If an action fits neither list, treat it as mutation.
 
 ---
 
+# Concurrency policy
+
+This is the only concurrency cap in the skill. Every other mention of running things in parallel defers to it.
+
+- **Computed** at environment Stage C (`reference/environment-checks.md`) from free memory and free disk, each divided by the measured per-unit footprint (one build's peak memory and disk use, measured at the baseline). Leave headroom for the orchestrator and the OS ⚙ (about a fifth of free memory). The cap is the smaller of the two quotients.
+- **Applies to** every concurrent unit: implementor streams, test executors, reviewers, E2E executors, and builds. Each running unit counts as one. A unit's own internal parallelism (e.g. test-runner workers) is part of its measured footprint, not extra units.
+- **Recomputed** before each fan-out by re-running Stage C. If dispatching a unit would exceed the cap, queue it and dispatch it when a running unit finishes. Serialise rather than risk OOM kills, which look like flaky failures.
+- **Timing and performance plans still run alone**, with no other unit running.
+
+---
+
 # Phase 0 — Environment Preflight
 
-Read `reference/environment-checks.md` and run every check in it before SPEC LOCK.
+Run **Stage A (host)** of `reference/environment-checks.md` at invocation, before research. Stage B runs at the end of research (Phase 1 §1), and Stage C after the implementation DAG (Phase 2 §4). Each check is detect → one heal → re-check → record.
 
 ---
 
@@ -150,9 +161,10 @@ Before interviewing the operator:
 3. Inspect tests that define current behaviour.
 4. Inspect recent related commits/PRs when they clarify architectural intent.
 5. If correctness depends on a third-party library's behaviour, inspect its source or authoritative implementation evidence rather than assuming.
-6. **Establish a green baseline.** Build the base commit and run its test suite in this environment. Record pre-existing failures, and the environment requirements needed to get green: SDKs, environment variables such as `TERM`, licences, and build configurations that can't run here. Diagnose any failure that isn't explained before going further. These findings, together with the Phase 0 preflight results, become the **Environment block** that every brief carries.
-7. Identify which questions are factual and answer them yourself.
-8. Ask the operator only questions that require product intent, trade-offs, or risk decisions.
+6. **Establish a green baseline.** Build the base commit and run its test suite in this environment. Record pre-existing failures, and the environment requirements needed to get green: SDKs, environment variables such as `TERM`, licences, and build configurations that can't run here. Measure one build's and one test run's peak memory and disk use: this is the per-unit footprint for the concurrency policy. Diagnose any failure that isn't explained before going further. These findings, together with the Stage A and Stage B results, become the **Environment block** that every brief carries.
+7. Run environment **Stage B (stack)** from `reference/environment-checks.md`.
+8. Identify which questions are factual and answer them yourself.
+9. Ask the operator only questions that require product intent, trade-offs, or risk decisions.
 
 Do not use the operator as a substitute for codebase research.
 
@@ -222,6 +234,7 @@ Do not enter implementation until you can answer **yes** to all of these:
 - Do you know what evidence will convince you the change is complete?
 - Does every user-facing acceptance criterion have an E2E surface, and is the tooling for that surface available in this environment?
 - Is every item on the residual-risk list something that genuinely cannot be settled now? (See below.)
+- Is every Stage A and Stage B environment check `pass` or `healed`, or has the operator answered each `raised` one?
 - Are you, the orchestrator, fully satisfied that the specification is coherent?
 
 **No checkable claim on the residual-risk list.** If reading source (the repository's or a dependency's) or a quick probe (a one-off command, a scratch program, a single request) can settle a claim, settle it before lock. Residual risks are only what can't be established in this environment, or would cost more to establish than the risk is worth, and the latter needs the operator's agreement.
@@ -253,7 +266,7 @@ For each stream record:
 - acceptance checks;
 - risks;
 - selected tier;
-- whether it can run in parallel;
+- whether it can run in parallel (how many actually run at once is set by the **Concurrency policy**);
 - expected commit/handover.
 
 Prefer boundaries that minimise overlapping file ownership.
@@ -301,7 +314,9 @@ The scenarios are finalised against the assembled candidate in Phase 4.
 
 ## 4. Sequence only where necessary
 
-Launch all streams whose dependencies are satisfied.
+Before the first dispatch, run environment **Stage C (sizing)** and compute the concurrency cap (see **Concurrency policy**).
+
+Launch the streams whose dependencies are satisfied, up to the concurrency cap. Queue the rest.
 
 When a stream exposes a missing prerequisite:
 
@@ -397,7 +412,7 @@ Default candidates:
 
 The orchestrator should not perform all integration investigation serially.
 
-Create bounded **read-only verification briefs** for judgement- or mechanical-tier workers when parallel evidence gathering is useful.
+Create bounded **read-only verification briefs** for judgement- or mechanical-tier workers when parallel evidence gathering is useful. They run within the concurrency cap (see **Concurrency policy**).
 
 Examples:
 
@@ -437,8 +452,7 @@ A passing test suite is evidence, not proof.
 
 - **Fix rounds:** run only the targeted suites covering the changed code and its direct dependants, plus the E2E plans that touch changed behaviour.
 - **Final candidate:** run the full unit and integration suite **once**, at the end, on the candidate you intend to present at the Completion Gate. If that pass forces another fix round, the next final candidate gets its own full pass.
-- **Disk guard:** before each build or suite run, check free disk against the footprint measured in Phase 0. If it's short, remove build outputs of accepted or superseded worktrees and stale evidence dirs first. Never start a run that can't finish.
-- **Memory guard:** check free memory before running suites or executors in parallel. Cap concurrency (test parallelism, parallel executors, parallel builds) so the run fits, and serialise rather than risk OOM kills, which look like flaky failures.
+- **Disk and memory:** re-run environment Stage C before each build, suite run or fan-out, and stay within the concurrency cap (see **Concurrency policy**). Never start a run that can't finish.
 
 ## 4. Defect ledger
 
@@ -527,7 +541,7 @@ If workers need continuous negotiation, the decomposition is wrong.
 
 Eight agents completing quickly is not useful if their boundaries create an hour of reconciliation.
 
-Choose the implementation DAG that minimises total expected time to a coherent, validated system.
+Choose the implementation DAG that minimises total expected time to a coherent, validated system. Parallelism is bounded by the concurrency cap in any case (see **Concurrency policy**).
 
 ## Treat model capability as a schedulable resource
 
@@ -564,17 +578,19 @@ The swarm should improve its process from failures, not merely repair the curren
 
 When invoked with a change request:
 
-1. Run the **Phase 0 environment preflight** and record the Environment block.
+1. Run environment **Stage A** and start the Environment block.
 2. Announce **Specification Phase**.
 3. Research the repository and establish a green baseline before asking questions. Settle every checkable claim yourself.
-4. Ask the first unresolved operator decision, one question only, with recommendation and trade-off.
-5. Continue until the Zero-Ambiguity Gate is satisfied.
-6. Present the LOCKED SPECIFICATION and request explicit approval.
-7. After approval, show the implementation DAG and tier routing.
-8. Create a worktree per writing stream from the locked base under a short root, with detached sibling worktrees for relative references, then dispatch implementation streams into them.
-9. Show the operator an early screenshot of each accepted UI stream before integration.
-10. Integrate and fan out validation, including fixed E2E plans dispatched to the mechanical tier and any exploratory charters dispatched to the judgement tier. Verify their confirmation evidence yourself.
-11. Replan defects into further implementation rounds, verifying each with targeted suites; run the full suite once on the final candidate.
-12. Stop only at the Completion Gate.
+4. Run environment **Stage B** and complete the Environment block.
+5. Ask the first unresolved operator decision, one question only, with recommendation and trade-off.
+6. Continue until the Zero-Ambiguity Gate is satisfied.
+7. Present the LOCKED SPECIFICATION and request explicit approval.
+8. After approval, show the implementation DAG and tier routing.
+9. Run environment **Stage C** and compute the concurrency cap.
+10. Create a worktree per writing stream from the locked base under a short root, with detached sibling worktrees for relative references, then dispatch implementation streams into them, up to the cap.
+11. Show the operator an early screenshot of each accepted UI stream before integration.
+12. Integrate and fan out validation, including fixed E2E plans dispatched to the mechanical tier and any exploratory charters dispatched to the judgement tier. Verify their confirmation evidence yourself.
+13. Replan defects into further implementation rounds, verifying each with targeted suites; run the full suite once on the final candidate.
+14. Stop only at the Completion Gate.
 
 Never collapse Specification → Implementation → Integration into one agent pass.

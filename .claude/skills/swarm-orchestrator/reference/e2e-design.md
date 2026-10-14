@@ -43,12 +43,12 @@ Plan rules:
 - Every step has one action and one exact expected outcome. "Check it works" is not a step.
 - Include negative/error-path scenarios wherever the spec defines failure behaviour.
 - Specify waits explicitly (what to wait for, maximum time). Never leave timing to the executor's judgement.
-- Group scenarios that share setup into one plan. Split independent plans so they can run in parallel.
+- Group scenarios that share setup into one plan. Split independent plans so they can run in parallel, within the concurrency cap.
 
 ## 3. Prepare and dispatch executors
 
 1. **Build once.** The orchestrator builds the candidate before fan-out, so parallel executors do not race on build output. Executors run the prebuilt artefact.
-2. **Isolate.** Each parallel executor gets its own port, data directory, and evidence directory. If the app cannot run as multiple instances, run its plans sequentially. **Timing and performance scenarios run alone**, with no other executors, test suites or builds running at the same time. Put them in their own plan and record the machine's core count and load average with the results.
+2. **Isolate.** Each parallel executor gets its own port, data directory, and evidence directory. If the app cannot run as multiple instances, run its plans sequentially. How many executors run at once is set by the concurrency cap in SKILL.md (**Concurrency policy**). **Timing and performance scenarios run alone**, with no other unit running. Put them in their own plan and record the machine's core count and load average with the results.
 3. **Dispatch** each fixed plan to a **mechanical-tier** subagent with the executor brief below and the plan verbatim. If a scenario that proves an acceptance criterion seems to need judgement, the plan is not strict enough, so rewrite it. Do not escalate it to the judgement tier.
 4. **Exploratory sessions** go to the **judgement tier** (see §3a). Use them when you need to probe beyond the scripted paths: edge cases, unexpected input, UI states, or interactions between features.
 
