@@ -219,6 +219,7 @@ Continuously track:
 - **Acceptance criteria**
 - **Required evidence**
 - **E2E scope** — for each user-facing acceptance criterion, the surface it will be exercised through (web UI, HTTP API, CLI, …) and why that surface is sufficient
+- **Budget** — overall, per phase, or both, in units the orchestrator can observe: implementation rounds, streams dispatched, subagents dispatched, wall-clock time
 
 If two decisions conflict, resolve the conflict before proceeding.
 
@@ -236,11 +237,14 @@ Do not enter implementation until you can answer **yes** to all of these:
 - Does every user-facing acceptance criterion have an E2E surface, and is the tooling for that surface available in this environment?
 - Is every item on the residual-risk list something that genuinely cannot be settled now? (See below.)
 - Is every Stage A and Stage B environment check `pass` or `healed`, or has the operator answered each `raised` one?
+- Is there an operator-set budget in units you can observe?
 - Are you, the orchestrator, fully satisfied that the specification is coherent?
 
 **No checkable claim on the residual-risk list.** If reading source (the repository's or a dependency's) or a quick probe (a one-off command, a scratch program, a single request) can settle a claim, settle it before lock. Residual risks are only what can't be established in this environment, or would cost more to establish than the risk is worth, and the latter needs the operator's agreement.
 
-Then present a concise **LOCKED SPECIFICATION** containing the decisions and acceptance criteria. Mark orchestrator-decided items with ⚙.
+**Budget.** If the operator hasn't given a budget by the time the other decisions are settled, ask for one now, as its own single question with a recommended value. If they give it in a unit you can't observe (e.g. tokens or money), the question proposes an observable proxy (e.g. subagents dispatched, rounds, wall-clock time) and asks them to confirm it.
+
+Then present a concise **LOCKED SPECIFICATION** containing the decisions, the budget and the acceptance criteria. Mark orchestrator-decided items with ⚙.
 
 Ask the operator for explicit approval.
 
@@ -362,6 +366,8 @@ States:
 - rejected
 - superseded
 
+Below the ledger, keep a running **spend line** against each budget item, e.g. `Spend: round 2 of 4 · 9 of 20 subagents · 1h40 of 4h`. Update it at every dispatch. When the next dispatch would exceed any budget item, stop before dispatching and ask the operator, with the spend so far, what remains, and a recommendation.
+
 When an implementor returns:
 
 1. inspect the diff;
@@ -469,8 +475,8 @@ Implementors still run their own filtered tests while they work, since that outp
 
 Record every integration finding:
 
-| ID | Spec criterion | Severity | Evidence | Root cause | Required change |
-|---|---|---|---|---|---|
+| ID | Spec criterion | Severity | Evidence | Root cause | Required change | Fix rounds |
+|---|---|---|---|---|---|---|
 
 Classify each finding as one of:
 
@@ -491,6 +497,10 @@ Do not fix them.
 Create a new implementation DAG containing only the work required to close the findings.
 
 Route to the judgement or mechanical tier, execute, then run integration again.
+
+### Recurrence cap
+
+A defect ID that is still open after **two** fix rounds stops its own loop. Do not dispatch a third fix. Reclassify it as a likely specification or contract defect, and escalate to the operator with the evidence from both rounds: what each fix changed, and why the defect survived it. Other defects keep looping.
 
 ### For specification defects
 
@@ -594,7 +604,7 @@ When invoked with a change request:
 3. Research the repository and establish a green baseline before asking questions. Settle every checkable claim yourself.
 4. Run environment **Stage B** and complete the Environment block.
 5. Ask the first unresolved operator decision, one question only, with recommendation and trade-off.
-6. Continue until the Zero-Ambiguity Gate is satisfied.
+6. Continue until the Zero-Ambiguity Gate is satisfied. If no budget has been given, ask for one as its own question.
 7. Present the LOCKED SPECIFICATION and request explicit approval.
 8. After approval, show the implementation DAG and tier routing.
 9. Run environment **Stage C** and compute the concurrency cap.
