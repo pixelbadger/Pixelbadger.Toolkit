@@ -58,7 +58,7 @@ Exploratory sessions find defects. Fixed plans prove criteria. An exploratory se
 
 Run exploratory sessions after the fixed plans pass, or alongside them on a separate instance.
 
-**Blind fixtures.** When the mission is to infer hidden properties (e.g. "can an attacker tell the length or the relationships?"), the orchestrator, or a separate setup executor, prepares the target fixtures. The ground truth (plaintexts, keys, derivations) is kept outside the executor's reach and forbidden to it. Score the executor's guesses against the ground truth afterwards. "Could not do better than chance" is valid and useful evidence.
+**Blind fixtures.** When the mission is to infer hidden properties (e.g. "can an attacker tell the length or the relationships?"), the orchestrator, or a separate setup executor, prepares the target fixtures in scratch space. Fixtures are scratch files, not mutation. The ground truth (plaintexts, keys, derivations) is kept outside the executor's reach and forbidden to it. Score the executor's guesses against the ground truth afterwards. "Could not do better than chance" is valid and useful evidence.
 
 The orchestrator verifies each finding's evidence, as in §5. Confirmed findings either go to the defect ledger, or are turned into fixed scenarios so that a fix can be proven.
 
