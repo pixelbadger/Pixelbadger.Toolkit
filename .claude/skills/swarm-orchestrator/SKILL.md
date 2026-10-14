@@ -551,9 +551,11 @@ Before writing a web-UI plan, check which Chrome tooling this session actually h
 1. **Chrome browser MCP tools** (e.g. Claude in Chrome `mcp__claude-in-chrome__*`, or the built-in browser), when available. The executor loads them per their skill guidance.
 2. **Playwright driving Chromium**, when no browser MCP is available (e.g. headless cloud containers; use the pre-installed Chromium, never download browsers). The executor writes its Playwright script in its scratch directory, never in the repository.
 
-**Browser economy.** Screenshots are expensive in context and weak as evidence of text. Plans prefer, in order: page text, element finds (selector or accessible name, with the element's text, value or state), and network reads (request/response status and body). A plan asks for a screenshot only when **layout is what's being judged**: placement, visibility, styling, overlap, rendering. Mark each such scenario `judges layout: yes` in the plan.
+**Browser economy.** Screenshots are expensive in context and weak as evidence of text. Plans prefer, in order: page text, element finds (selector or accessible name, with the element's text, value or state), and network reads (request/response status and body). A step takes a screenshot only when **layout is what's being judged**: placement, visibility, styling, overlap, rendering. Mark each such scenario `judges layout: yes` in the plan. Those captures stay in the evidence dir.
 
-When a scenario does take a screenshot, it is saved as a PNG at the path the plan names. If the chosen browser tool cannot write screenshots to disk, the plan uses Playwright/Chromium for the capture step against the same running app.
+The web-UI handover carries images on a fixed budget (§4): **one** PNG of the final state the plan names, plus one PNG per identified UI defect. Nothing else is handed over as an image.
+
+Every screenshot is saved as a PNG at the path the plan names. If the chosen browser tool cannot write screenshots to disk, the plan uses Playwright/Chromium for the capture step against the same running app.
 
 ## 2. Write the E2E test plan
 
@@ -568,6 +570,7 @@ E2E PLAN <plan-id>
 Candidate:     <branch> @ <SHA>, at <absolute worktree path>
 Surface/tool:  <web UI via Claude in Chrome | web UI via Playwright+Chromium | API via curl | CLI>
 Evidence dir:  <absolute path in scratch, e.g. <scratch>/e2e/<plan-id>/>
+Handover image: <web UI only: the one state to capture for the handover, e.g. "end of scenario S3", and its PNG path>
 Isolation:     port <N>, data dir <path>, any env vars. Unique per executor running in parallel.
 Environment:   the Environment block (e.g. TERM=xterm), applied to every command.
 Glossary:      every command, helper and check a step may name, defined once, exactly
@@ -609,7 +612,7 @@ You are an E2E executor. Run the plan below exactly as written. You are producin
 
 - Do not modify tracked files in any repository or worktree. Write only inside the evidence dir and your scratch dir. Record `git -C <worktree> status --porcelain` before SETUP and again after TEARDOWN; they must match.
 - Perform steps in order. Do not skip, reorder, add, or "improve" steps.
-- For each step, compare the actual outcome with the expected outcome literally. If they differ, mark the step FAIL, capture failure evidence (screenshot / full response / full output), skip the remaining steps of that scenario, and continue with the next scenario.
+- For each step, compare the actual outcome with the expected outcome literally. If they differ, mark the step FAIL, capture failure evidence (a PNG if it is a UI defect, otherwise page text / full response / full output), skip the remaining steps of that scenario, and continue with the next scenario.
 - If SETUP fails, or the environment prevents a step from being attempted (tool unavailable, port in use, crash before the step), mark it BLOCKED with the error. You may retry a BLOCKED step once. Never retry a FAIL.
 - Do not diagnose root causes, edit code, change configuration, or work around a failure.
 - Always run TEARDOWN.
@@ -646,7 +649,7 @@ Worktree clean before/after: yes|no
 Coverage: <what was exercised, briefly>
 FINDING <n>: <observed vs expected per spec ref>
   repro: <numbered exact steps>
-  evidence: <per surface rules in §4>
+  evidence: <per surface rules in §4; a UI defect includes its PNG>
 No findings in: <areas probed that behaved per spec>
 ```
 
@@ -673,7 +676,7 @@ Deviations from plan: none | <list>
 
 Final confirmation evidence per surface:
 
-- **Web UI:** the page URL, the visible text or state of the key element(s) the expectation refers to, and any network response the expectation names. For a `judges layout: yes` scenario, also the absolute path to **one** PNG of the final verified state. A failing step gets a PNG only when it is a layout step; otherwise its page text and element state.
+- **Web UI:** the page URL, the visible text or state of the key element(s) the expectation refers to, and any network response the expectation names. Per handover (not per scenario), the absolute path to **one** PNG of the plan's handover state, plus one PNG for each identified UI defect (a failing step or exploratory finding about what the user sees), taken at the point of failure. No other images.
 - **API:** the exact request line, status code, relevant headers, and the response body verbatim (pretty-printed, at most ~60 lines, full body saved to the evidence dir with its path).
 - **CLI:** the exact command, exit code, and stdout/stderr verbatim (at most the last ~40 lines each, full output saved to the evidence dir with its path), plus the contents or hash of any file the step expected to be written.
 
@@ -681,7 +684,7 @@ Final confirmation evidence per surface:
 
 Do not accept PASS as a verdict. Verify it:
 
-1. For every scenario, compare the confirmation evidence with the plan's expected outcome yourself. Open each final-state screenshot from a `judges layout: yes` scenario (only those, never per-step captures), and read element text, network reads, API bodies and CLI output.
+1. For every scenario, compare the confirmation evidence with the plan's expected outcome yourself. Open the handover PNG and each UI defect PNG (only those, never per-step captures), and read element text, network reads, API bodies and CLI output.
 2. Confirm that the evidence is from the right candidate SHA, that the worktree stayed clean, and that no deviations undermine the result.
 3. Map each verified scenario to its acceptance criteria in the traceability record.
 4. Open full logs/bodies in the evidence dir only when the handover excerpt is insufficient to judge.
@@ -731,7 +734,7 @@ A short restatement of the locked goal.
 The major behaviours implemented.
 
 ### Evidence
-Acceptance criterion → validating evidence. For E2E: plan/scenario id, surface and tool, candidate SHA, and the key confirmation (element text or screenshot path, API status and response excerpt, CLI exit code and output excerpt).
+Acceptance criterion → validating evidence. For E2E: plan/scenario id, surface and tool, candidate SHA, and the key confirmation (element text and handover screenshot path, API status and response excerpt, CLI exit code and output excerpt).
 
 ### Swarm execution
 Streams, models, and notable routing decisions.
