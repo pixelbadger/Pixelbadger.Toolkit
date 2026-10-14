@@ -121,6 +121,15 @@
       Because <code>r</code> is random and discarded, encrypting the same <code>m</code> twice produces
       different ciphertexts — this is the probabilistic nature of the scheme.
     </p>
+    <p>
+      Because <code>g = n + 1</code>, the term <code>g<sup>m</sup></code> simplifies to
+      <code>1 + m·n (mod n²)</code>.
+    </p>
+    <p>
+      Results of homomorphic operations are re-randomised as well: each output is multiplied by a fresh
+      <code>rⁿ (mod n²)</code>. No output ciphertext equals an input ciphertext, so a result cannot be
+      linked to its inputs by comparing ciphertexts.
+    </p>
 
     <h3>Decryption</h3>
     <p>
@@ -235,7 +244,12 @@ flowchart LR
     </div>
 
     <h3>Decrypt a number</h3>
-    <p>Reads an encrypted number file and private key, writes the plaintext to stdout.</p>
+    <p>
+      Reads an encrypted number file and private key, writes the plaintext to stdout. If decryption fails
+      (wrong key, malformed or out-of-range ciphertext, a ciphertext from a different key, or an invalid value), it prints
+      <code>Error: Decryption failed: input is invalid or was not encrypted with this key.</code> and exits
+      with code 1. A missing or unreadable file reports its own specific error.
+    </p>
     <div class="cmd-block">
       <span class="prompt">$ </span><span class="cmd">pbtk crypto decrypt</span>
       <span class="opt"> --in-file</span> <span class="val">enc42.json</span>
@@ -255,6 +269,12 @@ flowchart LR
     <p>
       These commands operate entirely on ciphertext. No private key is needed and the plaintext
       values are never revealed to the process performing the computation.
+    </p>
+    <p>
+      Outputs are re-randomised: each one is multiplied by a fresh <code>rⁿ (mod n²)</code>, so no output
+      ciphertext equals an input ciphertext. <code>multiply --scalar 0</code> yields a fresh Enc(0), and
+      <code>--scalar 1</code> yields a fresh re-encryption of the input. Both are indistinguishable from any
+      other ciphertext.
     </p>
 
     <div class="op-grid">
@@ -321,17 +341,37 @@ flowchart TD
       numbers, one per character. This representation enables position-aware operations on the
       ciphertext without decryption.
     </p>
+    <p>
+      Every encrypted string is padded to exactly 100 entries: the real characters followed by encrypted
+      NUL (U+0000) padding. The padding is removed on decryption, so it is invisible in the plaintext.
+    </p>
 
     <div class="info-box">
-      Strings are limited to 100 characters. Each character is encrypted independently,
-      so the ciphertext reveals the <em>length</em> of the plaintext string but nothing else.
+      An encrypted string file reveals nothing about the plaintext beyond the 100-character maximum: not its
+      length, not which positions were edited, and not whether two files hold the same text. Whoever runs
+      <code>replace</code> or <code>substring</code> knows the <code>--start</code>, <code>--length</code> and
+      replacement they supplied, since those are plaintext inputs. Plaintext is read from files or stdin
+      rather than command-line arguments so it does not appear in the process list or shell history.
     </div>
 
     <h3>encrypt-string</h3>
-    <p>Encrypts a UTF-8 string as an array of encrypted Unicode code points.</p>
+    <p>
+      Encrypts a UTF-8 string as an array of encrypted Unicode code points. The plaintext is read from the
+      file given by <code>--string-file</code>, or from stdin when the value is <code>-</code>. Exactly one
+      trailing line ending (<code>\n</code> or <code>\r\n</code>) is stripped. The string may contain at most
+      100 Unicode characters, and the NUL character (U+0000) is rejected because it is reserved for padding.
+      The output always contains exactly 100 encrypted entries. On success it prints
+      <code>Encrypted string written to '&lt;path&gt;'</code>.
+    </p>
     <div class="cmd-block">
       <span class="prompt">$ </span><span class="cmd">pbtk crypto encrypt-string</span>
-      <span class="opt"> --string</span> <span class="val">"Hello"</span>
+      <span class="opt"> --string-file</span> <span class="val">hello.txt</span>
+      <span class="opt"> --public-key-file</span> <span class="val">public.json</span>
+      <span class="opt"> --out-file</span> <span class="val">enc_str.json</span>
+    </div>
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span>printf 'Hello' | </span><span class="cmd">pbtk crypto encrypt-string</span>
+      <span class="opt"> --string-file</span> <span class="val">-</span>
       <span class="opt"> --public-key-file</span> <span class="val">public.json</span>
       <span class="opt"> --out-file</span> <span class="val">enc_str.json</span>
     </div>
@@ -340,14 +380,20 @@ flowchart TD
       <div class="mermaid">
 flowchart LR
     S["Plaintext string\n\"Hello\""] --> RUNES["Enumerate\nUnicode runes\nH=72, e=101, l=108, l=108, o=111"]
-    RUNES --> ENC["Encrypt each\ncode point\nwith public key"]
+    RUNES --> PAD["Pad with NUL\nto 100 entries\n95 × U+0000"]
+    PAD --> ENC["Encrypt each\ncode point\nwith public key"]
     PK["public.json"] --> ENC
-    ENC --> OUT["enc_str.json\n[EncryptedNumber × 5]"]
+    ENC --> OUT["enc_str.json\n[EncryptedNumber × 100]\n5 real + 95 Enc(NUL)"]
       </div>
     </div>
 
     <h3>decrypt-string</h3>
-    <p>Decrypts each code point and reconstructs the original string.</p>
+    <p>
+      Decrypts all 100 entries and removes every NUL, so padding does not appear in the output. If
+      decryption fails (wrong key, malformed or out-of-range ciphertext, a ciphertext from a different key, or an invalid character), it prints
+      <code>Error: Decryption failed: input is invalid or was not encrypted with this key.</code> and exits
+      with code 1. A missing or unreadable file reports its own specific error.
+    </p>
     <div class="cmd-block">
       <span class="prompt">$ </span><span class="cmd">pbtk crypto decrypt-string</span>
       <span class="opt"> --in-file</span> <span class="val">enc_str.json</span>
@@ -357,43 +403,57 @@ flowchart LR
     <div class="diagram-wrap">
       <div class="mermaid">
 flowchart LR
-    EF["enc_str.json\n[EncryptedNumber × 5]"] --> DEC["Decrypt each\ncode point\nwith private key"]
+    EF["enc_str.json\n[EncryptedNumber × 100]"] --> DEC["Decrypt each\ncode point\nwith private key"]
     SK["private.json"] --> DEC
-    DEC --> CHARS["Code points\n72, 101, 108, 108, 111"]
-    CHARS --> STR(["stdout: \"Hello\""])
+    DEC --> CHARS["Code points\n72, 101, 108, 108, 111, 0 × 95"]
+    CHARS --> STRIP["Remove NUL padding\n(U+0000)"]
+    STRIP --> STR(["stdout: \"Hello\""])
       </div>
     </div>
 
     <h3>replace</h3>
     <p>
       Overwrites characters at a known position in an encrypted string <em>without decrypting it</em>.
-      The replacement plaintext is re-encrypted with the same public key (recovered from the ciphertext
+      The replacement is read from the file given by <code>--replacement-file</code>, or from stdin when the
+      value is <code>-</code>. Exactly one trailing line ending is stripped, and the NUL character is not
+      allowed. The replacement is encrypted with the same public key (recovered from the ciphertext
       metadata) and substituted into the array at the specified index.
+    </p>
+    <p>
+      The range is checked against the encrypted array length (100 for padded strings), so writing past the
+      real end writes into the padding and succeeds. For example, replacing at <code>--start 7</code> with
+      <code>X</code> in an encrypted <code>hello</code> decrypts to <code>helloX</code>. Every position in the
+      output gets a fresh ciphertext: replaced positions are newly encrypted and all others are
+      re-randomised, so the output cannot be linked to the input by comparing ciphertexts. Replace rejects an
+      empty encrypted string.
     </p>
     <div class="cmd-block">
       <span class="prompt">$ </span><span class="cmd">pbtk crypto replace</span>
       <span class="opt"> --in-file</span> <span class="val">enc_str.json</span>
       <span class="opt"> --start</span> <span class="val">0</span>
-      <span class="opt"> --replacement</span> <span class="val">"J"</span>
+      <span class="opt"> --replacement-file</span> <span class="val">j.txt</span>
       <span class="opt"> --out-file</span> <span class="val">enc_str2.json</span>
     </div>
 
     <div class="diagram-wrap">
       <div class="mermaid">
 flowchart LR
-    EF["enc_str.json\n[Enc H, Enc e, Enc l, Enc l, Enc o]"] --> CLONE[Clone array]
-    REP["Replacement\n\"J\" at index 0"] --> RUNES2["Enumerate runes\nJ=74"]
-    RUNES2 --> REENC["Re-encrypt each\nrune with public key\n(from ciphertext N)"]
-    CLONE --> SPLICE["Splice at start index"]
+    EF["enc_str.json\n[EncryptedNumber × 100]"] --> RERAND["Re-randomise each\nuntouched entry\n(× fresh rⁿ mod n²)"]
+    REP["j.txt\n\"J\" at index 0"] --> RUNES2["Enumerate runes\nJ=74"]
+    RUNES2 --> REENC["Encrypt replacement\nwith public key\n(from ciphertext N)"]
+    RERAND --> SPLICE["Splice at start index\n(past the real end writes into padding)"]
     REENC --> SPLICE
-    SPLICE --> OUT["enc_str2.json\n[Enc J, Enc e, Enc l, Enc l, Enc o]"]
+    SPLICE --> OUT["enc_str2.json\n[EncryptedNumber × 100]\nevery entry fresh"]
       </div>
     </div>
 
     <h3>substring</h3>
     <p>
       Slices an encrypted string by position, returning a new encrypted array of the selected range.
-      No private key is needed.
+      Each entry in the slice is re-randomised, and the result is padded with fresh encrypted NUL back to
+      100 entries. Omitting <code>--length</code> takes the slice to the end of the array, including padding.
+      No private key is needed. On success it prints <code>Encrypted substring written to '&lt;path&gt;'</code>.
+      Substring rejects an empty encrypted string.
     </p>
     <div class="cmd-block">
       <span class="prompt">$ </span><span class="cmd">pbtk crypto substring</span>
@@ -406,8 +466,10 @@ flowchart LR
     <div class="diagram-wrap">
       <div class="mermaid">
 flowchart LR
-    EF["enc_str.json\n[Enc H, Enc e, Enc l, Enc l, Enc o]"] --> SLICE["Slice [start .. start+length)\ne.g. [1..4)"]
-    SLICE --> OUT["enc_sub.json\n[Enc e, Enc l, Enc l]"]
+    EF["enc_str.json\n[EncryptedNumber × 100]"] --> SLICE["Slice [start .. start+length)\ne.g. [1..4)"]
+    SLICE --> RR["Re-randomise\neach entry"]
+    RR --> PAD2["Pad with fresh Enc(NUL)\nto 100 entries"]
+    PAD2 --> OUT["enc_sub.json\n[EncryptedNumber × 100]\n3 real + 97 Enc(NUL)"]
       </div>
     </div>
   </section>
@@ -464,9 +526,9 @@ flowchart LR
         </tr>
         <tr>
           <td><code>crypto encrypt-string</code></td>
-          <td><code>--string</code> <code>--public-key-file</code> <code>--out-file</code></td>
+          <td><code>--string-file</code> <code>--public-key-file</code> <code>--out-file</code></td>
           <td>&mdash;</td>
-          <td>Encrypted string JSON file (array of encrypted code points)</td>
+          <td>Encrypted string JSON file (100 encrypted entries: code points plus NUL padding)</td>
         </tr>
         <tr>
           <td><code>crypto decrypt-string</code></td>
@@ -476,15 +538,15 @@ flowchart LR
         </tr>
         <tr>
           <td><code>crypto replace</code></td>
-          <td><code>--in-file</code> <code>--start</code> <code>--replacement</code> <code>--out-file</code></td>
+          <td><code>--in-file</code> <code>--start</code> <code>--replacement-file</code> <code>--out-file</code></td>
           <td>&mdash;</td>
-          <td>Updated encrypted string JSON file</td>
+          <td>Updated encrypted string JSON file (100 entries, all re-randomised)</td>
         </tr>
         <tr>
           <td><code>crypto substring</code></td>
           <td><code>--in-file</code> <code>--start</code> <code>--out-file</code></td>
           <td><code>--length</code> (defaults to end of string)</td>
-          <td>Encrypted substring JSON file</td>
+          <td>Encrypted substring JSON file (padded to 100 entries)</td>
         </tr>
       </tbody>
     </table>
@@ -512,18 +574,41 @@ flowchart LR
         </tr>
         <tr>
           <td>Max string length</td>
-          <td>100 characters</td>
-          <td>Each character requires one full 2048-bit ciphertext; enforced to limit file size</td>
+          <td>100 Unicode characters; always padded to 100 entries (each file &asymp; 190 KB)</td>
+          <td>Each character requires one full ciphertext; the fixed 100-entry size limits file size and hides the true length</td>
+        </tr>
+        <tr>
+          <td>NUL character</td>
+          <td>Not allowed (U+0000) in plaintext or replacement</td>
+          <td>Reserved for padding; decryption removes every NUL</td>
         </tr>
         <tr>
           <td>String character set</td>
-          <td>Full Unicode (UTF-32 code points)</td>
+          <td>Full Unicode code points, except U+0000</td>
           <td>Characters are stored as Unicode scalar values, supporting any language</td>
         </tr>
         <tr>
           <td>Scalar multiplier</td>
           <td>Non-negative integer</td>
-          <td>Negative scalars not supported; multiply by 0 produces Enc(0)</td>
+          <td>Negative scalars not supported; multiply by 0 produces a fresh Enc(0), and multiply by 1 a fresh re-encryption</td>
+        </tr>
+        <tr>
+          <td>Input validation</td>
+          <td>All characters share one public key N (&ge; 2048 bits); each ciphertext satisfies 0 &lt; c &lt; n² and is coprime to n; at most 100 entries</td>
+          <td>Malformed or mismatched inputs are rejected before any computation. replace and substring reject an empty encrypted string</td>
+        </tr>
+        <tr>
+          <td>Decryption errors</td>
+          <td><code>Error: Decryption failed: input is invalid or was not encrypted with this key.</code> (exit 1)</td>
+          <td>Applies to wrong key, malformed or out-of-range ciphertext, a ciphertext from a different key, and invalid characters. Missing or unreadable files keep their specific error</td>
+        </tr>
+        <tr>
+          <td>Integrity</td><td>Not provided</td><td>Paillier ciphertexts are malleable: a well-formed ciphertext that has been modified decrypts to a different value without an error. Use a separate signature or MAC if you need tamper detection</td>
+        </tr>
+        <tr>
+          <td>Compatibility</td>
+          <td>Unpadded files written by previous versions still decrypt</td>
+          <td>replace and substring on those files produce padded 100-entry output</td>
         </tr>
       </tbody>
     </table>

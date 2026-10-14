@@ -32,14 +32,20 @@ internal static class ToolkitProcess
     }
 
     /// <summary>Starts the toolkit using the caller-supplied config home, which is left in place for reuse across calls.</summary>
-    public static Process StartWithConfigHome(string? workingDirectory, string configHome, params string[] args)
+    public static Process StartWithConfigHome(string? workingDirectory, string configHome, params string[] args) =>
+        StartWithConfigHome(workingDirectory, configHome, false, args);
+
+    private static Process StartWithConfigHome(string? workingDirectory, string configHome, bool redirectStandardInput, string[] args)
     {
         var startInfo = new ProcessStartInfo("dotnet")
         {
+            RedirectStandardInput = redirectStandardInput,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false
         };
+        startInfo.Environment["TERM"] = "xterm";
+        startInfo.Environment["NO_COLOR"] = "1"; // plain text so assertions never see ANSI escapes
         startInfo.Environment["XDG_CONFIG_HOME"] = configHome;
         startInfo.Environment["APPDATA"] = configHome;
 
@@ -60,15 +66,21 @@ internal static class ToolkitProcess
         return Process.Start(startInfo)!;
     }
 
-    public static async Task<(int ExitCode, string StandardOutput, string StandardError)> RunAsync(
+    public static Task<(int ExitCode, string StandardOutput, string StandardError)> RunAsync(
         string? workingDirectory,
+        params string[] args) => RunWithStdinAsync(workingDirectory, null, args);
+
+    /// <summary>Runs the toolkit to completion, writing <paramref name="standardInput"/> (UTF-8, no BOM) to its stdin when non-null.</summary>
+    public static async Task<(int ExitCode, string StandardOutput, string StandardError)> RunWithStdinAsync(
+        string? workingDirectory,
+        string? standardInput,
         params string[] args)
     {
         var configHome = Path.Combine(Path.GetTempPath(), "pbtk-config-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(configHome);
         try
         {
-            return await RunWithConfigHomeAsync(workingDirectory, configHome, args);
+            return await RunCoreAsync(workingDirectory, configHome, standardInput, args);
         }
         finally
         {
@@ -77,12 +89,23 @@ internal static class ToolkitProcess
     }
 
     /// <summary>Runs the toolkit to completion using the caller-supplied config home, which is left in place for reuse across calls.</summary>
-    public static async Task<(int ExitCode, string StandardOutput, string StandardError)> RunWithConfigHomeAsync(
+    public static Task<(int ExitCode, string StandardOutput, string StandardError)> RunWithConfigHomeAsync(
         string? workingDirectory,
         string configHome,
+        params string[] args) => RunCoreAsync(workingDirectory, configHome, null, args);
+
+    private static async Task<(int ExitCode, string StandardOutput, string StandardError)> RunCoreAsync(
+        string? workingDirectory,
+        string configHome,
+        string? standardInput,
         params string[] args)
     {
-        using var process = StartWithConfigHome(workingDirectory, configHome, args);
+        using var process = StartWithConfigHome(workingDirectory, configHome, standardInput is not null, args);
+        if (standardInput is not null)
+        {
+            await process.StandardInput.BaseStream.WriteAsync(new System.Text.UTF8Encoding(false).GetBytes(standardInput));
+            process.StandardInput.Close();
+        }
         var standardOutput = await process.StandardOutput.ReadToEndAsync();
         var standardError = await process.StandardError.ReadToEndAsync();
         await process.WaitForExitAsync();

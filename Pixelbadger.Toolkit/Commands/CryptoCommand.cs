@@ -1,4 +1,5 @@
 using System.CommandLine;
+using System.Text;
 using System.Text.Json;
 using Pixelbadger.Toolkit.Components;
 using Pixelbadger.Toolkit.Models;
@@ -124,21 +125,20 @@ public static class CryptoCommand
                 var privateKeyFile = parseResult.GetValue(privateKeyFileOption)!;
 
                 var encryptedJson = await File.ReadAllTextAsync(inFile);
+                var keyJson = await File.ReadAllTextAsync(privateKeyFile);
+
                 var encrypted = JsonSerializer.Deserialize<EncryptedNumber>(encryptedJson)
                     ?? throw new InvalidOperationException("Failed to deserialize encrypted number.");
-
-                var keyJson = await File.ReadAllTextAsync(privateKeyFile);
                 var keyPair = JsonSerializer.Deserialize<PaillierKeyPair>(keyJson)
                     ?? throw new InvalidOperationException("Failed to deserialize private key.");
 
                 var component = new HomomorphicEncryptionComponent();
                 var plaintext = component.Decrypt(encrypted, keyPair);
-                AnsiConsole.WriteLine(plaintext.ToString());
+                Console.Out.WriteLine(plaintext.ToString());
             }
             catch (Exception ex)
             {
-                AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
-                Environment.Exit(1);
+                ReportDecryptionError(ex);
             }
         });
 
@@ -278,9 +278,9 @@ public static class CryptoCommand
 
     private static Command CreateEncryptStringCommand()
     {
-        var command = new Command("encrypt-string", "Encrypt a UTF-8 string (max 100 characters) as an array of homomorphically encrypted code points");
+        var command = new Command("encrypt-string", "Encrypt a UTF-8 string (max 100 characters; NUL not allowed) read from a file or stdin. The result is always padded to 100 encrypted characters");
 
-        var stringOption = new Option<string>("--string") { Description = "The plaintext string to encrypt (max 100 characters)", Required = true };
+        var stringOption = new Option<string>("--string-file") { Description = "Path to a UTF-8 text file containing the plaintext to encrypt (max 100 characters, no NUL), or '-' to read stdin. One trailing line ending is stripped", Required = true };
         var publicKeyFileOption = new Option<string>("--public-key-file") { Description = "Path to the public key JSON file", Required = true };
         var outFileOption = new Option<string>("--out-file") { Description = "Path to write the encrypted string JSON file", Required = true };
 
@@ -292,7 +292,7 @@ public static class CryptoCommand
         {
             try
             {
-                var str = parseResult.GetValue(stringOption)!;
+                var str = await ReadTextInputAsync(parseResult.GetValue(stringOption)!, cancellationToken);
                 var publicKeyFile = parseResult.GetValue(publicKeyFileOption)!;
                 var outFile = parseResult.GetValue(outFileOption)!;
 
@@ -304,7 +304,7 @@ public static class CryptoCommand
                 var encrypted = component.EncryptString(str, publicKey);
 
                 await File.WriteAllTextAsync(outFile, JsonSerializer.Serialize(encrypted, JsonOptions));
-                AnsiConsole.MarkupLine($"[green]Encrypted string ({encrypted.Characters.Length} characters) written to '{Markup.Escape(outFile)}'[/]");
+                AnsiConsole.MarkupLine($"[green]Encrypted string written to '{Markup.Escape(outFile)}'[/]");
             }
             catch (Exception ex)
             {
@@ -334,20 +334,19 @@ public static class CryptoCommand
                 var privateKeyFile = parseResult.GetValue(privateKeyFileOption)!;
 
                 var encJson = await File.ReadAllTextAsync(inFile);
+                var keyJson = await File.ReadAllTextAsync(privateKeyFile);
+
                 var encrypted = JsonSerializer.Deserialize<EncryptedString>(encJson)
                     ?? throw new InvalidOperationException("Failed to deserialize encrypted string.");
-
-                var keyJson = await File.ReadAllTextAsync(privateKeyFile);
                 var keyPair = JsonSerializer.Deserialize<PaillierKeyPair>(keyJson)
                     ?? throw new InvalidOperationException("Failed to deserialize private key.");
 
                 var component = new HomomorphicEncryptionComponent();
-                AnsiConsole.WriteLine(component.DecryptString(encrypted, keyPair));
+                Console.Out.WriteLine(component.DecryptString(encrypted, keyPair));
             }
             catch (Exception ex)
             {
-                AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
-                Environment.Exit(1);
+                ReportDecryptionError(ex);
             }
         });
 
@@ -356,11 +355,11 @@ public static class CryptoCommand
 
     private static Command CreateReplaceCommand()
     {
-        var command = new Command("replace", "Replace characters at a known position in an encrypted string without decrypting it");
+        var command = new Command("replace", "Replace characters at a known position in an encrypted string (padded to 100 characters) without decrypting it; replacement is read from a file or stdin (NUL not allowed)");
 
         var inFileOption = new Option<string>("--in-file") { Description = "Path to the encrypted string JSON file", Required = true };
         var startOption = new Option<int>("--start") { Description = "Zero-based index of the first character to replace", Required = true };
-        var replacementOption = new Option<string>("--replacement") { Description = "Plaintext replacement characters", Required = true };
+        var replacementOption = new Option<string>("--replacement-file") { Description = "Path to a UTF-8 text file containing the plaintext replacement (no NUL), or '-' to read stdin. One trailing line ending is stripped", Required = true };
         var outFileOption = new Option<string>("--out-file") { Description = "Path to write the updated encrypted string JSON file", Required = true };
 
         command.Add(inFileOption);
@@ -374,7 +373,7 @@ public static class CryptoCommand
             {
                 var inFile = parseResult.GetValue(inFileOption)!;
                 var start = parseResult.GetValue(startOption);
-                var replacement = parseResult.GetValue(replacementOption)!;
+                var replacement = await ReadTextInputAsync(parseResult.GetValue(replacementOption)!, cancellationToken);
                 var outFile = parseResult.GetValue(outFileOption)!;
 
                 var encJson = await File.ReadAllTextAsync(inFile);
@@ -399,7 +398,7 @@ public static class CryptoCommand
 
     private static Command CreateSubstringCommand()
     {
-        var command = new Command("substring", "Extract a slice of an encrypted string by position without decrypting it");
+        var command = new Command("substring", "Extract a slice of an encrypted string (padded to 100 characters) by position without decrypting it");
 
         var inFileOption = new Option<string>("--in-file") { Description = "Path to the encrypted string JSON file", Required = true };
         var startOption = new Option<int>("--start") { Description = "Zero-based index of the first character to include", Required = true };
@@ -428,7 +427,7 @@ public static class CryptoCommand
                 var substring = component.SubstringEncrypted(encrypted, start, length);
 
                 await File.WriteAllTextAsync(outFile, JsonSerializer.Serialize(substring, JsonOptions));
-                AnsiConsole.MarkupLine($"[green]Encrypted substring ({substring.Characters.Length} characters) written to '{Markup.Escape(outFile)}'[/]");
+                AnsiConsole.MarkupLine($"[green]Encrypted substring written to '{Markup.Escape(outFile)}'[/]");
             }
             catch (Exception ex)
             {
@@ -438,6 +437,37 @@ public static class CryptoCommand
         });
 
         return command;
+    }
+
+    private const string GenericDecryptionError = "Decryption failed: input is invalid or was not encrypted with this key.";
+
+    // File access problems keep their specific message; every other failure (bad JSON, wrong key, ...)
+    // is reported with one fixed message so nothing about the failure mode leaks.
+    private static void ReportDecryptionError(Exception ex)
+    {
+        var message = ex is IOException or UnauthorizedAccessException ? ex.Message : GenericDecryptionError;
+        AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(message)}");
+        Environment.Exit(1);
+    }
+
+    private static async Task<string> ReadTextInputAsync(string path, CancellationToken cancellationToken)
+    {
+        string text;
+        if (path == "-")
+        {
+            using var reader = new StreamReader(Console.OpenStandardInput(), new UTF8Encoding(false), detectEncodingFromByteOrderMarks: true);
+            text = await reader.ReadToEndAsync(cancellationToken);
+        }
+        else
+        {
+            text = await File.ReadAllTextAsync(path, new UTF8Encoding(false), cancellationToken);
+        }
+
+        if (text.EndsWith("\r\n", StringComparison.Ordinal))
+            return text[..^2];
+        if (text.EndsWith('\n'))
+            return text[..^1];
+        return text;
     }
 
     private static async Task WriteOwnerOnlyTextAsync(string path, string contents)

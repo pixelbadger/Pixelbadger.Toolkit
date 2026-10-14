@@ -12,6 +12,8 @@ public class HomomorphicStringBenchmarks
     private PaillierKeyPair _keyPair = null!;
     private EncryptedString _encryptedShort = null!;
     private EncryptedString _encryptedLong = null!;
+    private EncryptedNumber _encryptedA = null!;
+    private EncryptedNumber _encryptedB = null!;
 
     [GlobalSetup]
     public void Setup()
@@ -21,12 +23,17 @@ public class HomomorphicStringBenchmarks
         _publicKey = new PaillierPublicKey { N = _keyPair.N };
         _encryptedShort = _component.EncryptString(ShortPlaintext, _publicKey);
         _encryptedLong = _component.EncryptString(LongPlaintext, _publicKey);
+        _encryptedA = _component.Encrypt(42, _publicKey);
+        _encryptedB = _component.Encrypt(7, _publicKey);
     }
 
     [Params("hello", "hello, world!")]
     public string ShortPlaintext { get; set; } = "hello";
 
     public string LongPlaintext => "The quick brown fox jumps over the lazy dog. Pack my box!";
+
+    // Every encrypted string is padded to MaxStringLength entries, so a full-length input costs the same as a short one.
+    public string MaxPlaintext => new('x', HomomorphicEncryptionComponent.MaxStringLength);
 
     [Benchmark]
     public EncryptedString EncryptString_Short() =>
@@ -35,6 +42,10 @@ public class HomomorphicStringBenchmarks
     [Benchmark]
     public EncryptedString EncryptString_Long() =>
         _component.EncryptString(LongPlaintext, _publicKey);
+
+    [Benchmark]
+    public EncryptedString EncryptString_Max() =>
+        _component.EncryptString(MaxPlaintext, _publicKey);
 
     [Benchmark]
     public string DecryptString_Short() =>
@@ -63,4 +74,21 @@ public class HomomorphicStringBenchmarks
     [Benchmark]
     public EncryptedString ReplaceInString_Word() =>
         _component.ReplaceInString(_encryptedLong, 4, "slow");
+
+    [Benchmark]
+    public EncryptedString ReplaceInString_IntoPadding() =>
+        _component.ReplaceInString(_encryptedShort, 90, "pad");
+
+    // Arithmetic results are re-randomised, so each operation pays one extra r^n mod n^2.
+    [Benchmark]
+    public EncryptedNumber AddEncrypted() =>
+        _component.AddEncrypted(_encryptedA, _encryptedB);
+
+    [Benchmark]
+    public EncryptedNumber SubtractEncrypted() =>
+        _component.SubtractEncrypted(_encryptedA, _encryptedB);
+
+    [Benchmark]
+    public EncryptedNumber MultiplyEncrypted_ByZero() =>
+        _component.MultiplyEncrypted(_encryptedA, 0);
 }
