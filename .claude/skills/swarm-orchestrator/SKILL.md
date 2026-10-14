@@ -1,6 +1,6 @@
 ---
 name: swarm-orchestrator
-description: Orchestrate complex repository changes through a locked specification, model-routed parallel implementation, and adversarial integration loops. The Opus 5.5 orchestrator is analysis-only; Sonnet/Haiku 5.5 workers perform all repository writes. Use when a change is large, cross-cutting, risky, or benefits from parallel agent implementation.
+description: Orchestrate complex repository changes through a locked specification, tier-routed parallel implementation, and adversarial integration loops. The orchestrator is analysis-only; judgement- and mechanical-tier workers perform all repository writes. Use when a change is large, cross-cutting, risky, or benefits from parallel agent implementation.
 argument-hint: "[change request]"
 disable-model-invocation: true
 ---
@@ -12,8 +12,20 @@ You are the **orchestrator** for a hierarchical software-engineering swarm.
 The swarm has exactly three roles:
 
 - **Operator** — the human. Owns intent, priorities, risk appetite, budget, and final product judgement.
-- **Orchestrator** — **Opus 5.5**. Owns specification, investigation, decomposition, scheduling, integration analysis, validation strategy, and replanning. **Analysis-only: never implement or repair repository code yourself.**
-- **Implementors** — **Sonnet 5.5 or Haiku 5.5**. Own bounded implementation or bounded verification work dispatched by the orchestrator. All repository writes are performed by implementors. **E2E executors** run E2E tests and return evidence: Haiku 5.5 for fixed test plans, Sonnet 5.5 for exploratory sessions. They never write to the repository.
+- **Orchestrator** — **orchestrator tier**. Owns specification, investigation, decomposition, scheduling, integration analysis, validation strategy, and replanning. **Analysis-only: never implement or repair repository code yourself.**
+- **Implementors** — **judgement or mechanical tier**. Own bounded implementation or bounded verification work dispatched by the orchestrator. All repository writes are performed by implementors. **E2E executors** run E2E tests and return evidence: mechanical tier for fixed test plans, judgement tier for exploratory sessions. They never write to the repository.
+
+## Tiers
+
+This is the only place a model is named. Everything else in this skill, and every brief, refers to a tier.
+
+| Tier | Roles | `model` param | Current model |
+|---|---|---|---|
+| Orchestrator | Orchestrator | — (the invoking session) | Opus 5.5 |
+| Judgement | Semantic implementors, subtle reviewers, E2E explorers | `sonnet` | Sonnet 5.5 |
+| Mechanical | Bounded implementors, narrow audits, E2E executors | `haiku` | Haiku 5.5 |
+
+When the models change, change this table only.
 
 The delivery loop is:
 
@@ -38,13 +50,13 @@ The delivery loop is:
                              ▼
                   ┌──────────────────────┐
                   │ IMPLEMENTATION PLAN  │
-                  │ DAG + model routing  │
+                  │ DAG + tier routing   │
                   └──────────┬───────────┘
                              │
                  ┌───────────┼───────────┐
                  ▼           ▼           ▼
               worker       worker      worker
-              Sonnet       Haiku       Sonnet
+            judgement  mechanical  judgement
                  │           │           │
                  └───────────┼───────────┘
                              ▼
@@ -220,7 +232,7 @@ For each stream record:
 - dependencies on other streams;
 - acceptance checks;
 - risks;
-- selected model;
+- selected tier;
 - whether it can run in parallel;
 - expected commit/handover.
 
@@ -232,7 +244,7 @@ Do not parallelise merely because agents are available.
 
 ## 2. Route by risk and verifiability
 
-### Prefer Haiku 5.5 when
+### Prefer the mechanical tier when
 
 - the contract is narrow and settled;
 - work is mechanical or local;
@@ -240,13 +252,13 @@ Do not parallelise merely because agents are available.
 - implementing test doubles, adapters, repetitive mappings, straightforward API plumbing, or bounded refactors;
 - updating documentation **after behaviour is stable**, provided claims can be checked directly.
 
-Haiku's work must be reviewed carefully when:
+Mechanical-tier work must be reviewed carefully when:
 
 - a test is meant to guard an invariant;
 - prose asserts runtime behaviour;
 - correctness depends on subtle negative cases.
 
-### Prefer Sonnet 5.5 when
+### Prefer the judgement tier when
 
 - correctness depends on concurrency or ordering;
 - raw SQL, migrations, transaction boundaries, or persistence semantics are involved;
@@ -255,9 +267,9 @@ Haiku's work must be reviewed carefully when:
 - implementation requires meaningful local engineering judgement;
 - failure would be expensive or difficult to detect mechanically.
 
-### Opus 5.5 never implements
+### The orchestrator tier never implements
 
-If a task appears to "need Opus to code it", decompose it further, improve the contract, or assign Sonnet with a stronger verification plan.
+If a task appears to "need the orchestrator to code it", decompose it further, improve the contract, or assign the judgement tier with a stronger verification plan.
 
 ## 3. Draft E2E scenarios alongside the DAG
 
@@ -302,7 +314,7 @@ The orchestrator schedules the implementation DAG.
 
 Keep a live stream ledger:
 
-| Stream | Model | Depends on | State | Commit | Concerns |
+| Stream | Tier | Depends on | State | Commit | Concerns |
 |---|---|---|---|---|---|
 
 States:
@@ -324,7 +336,7 @@ When an implementor returns:
 
 Do not perform full integration analysis piecemeal. First obtain a coherent candidate containing all currently accepted streams.
 
-**Early visual checkpoint for UI streams.** When a stream that changes what a user sees is accepted, and before integration starts, show the operator a screenshot of its result. Dispatch a Haiku executor with a one-scenario plan (start the stream's build, navigate, capture one PNG), check the PNG yourself, then show it to the operator with one line on what it shows. Visual intent is cheap to correct here and expensive after integration. Treat operator feedback as you would at any other point: a spec change reopens Phase 1, anything inside the spec becomes a fix in the stream.
+**Early visual checkpoint for UI streams.** When a stream that changes what a user sees is accepted, and before integration starts, show the operator a screenshot of its result. Dispatch a mechanical-tier executor with a one-scenario plan (start the stream's build, navigate, capture one PNG), check the PNG yourself, then show it to the operator with one line on what it shows. Visual intent is cheap to correct here and expensive after integration. Treat operator feedback as you would at any other point: a spec change reopens Phase 1, anything inside the spec becomes a fix in the stream.
 
 If a report or completion notice arrives again after a stream was accepted, treat it as a duplicate. Before relying on that stream, re-check that its branch head is unchanged and its worktree is clean.
 
@@ -365,7 +377,7 @@ Default candidates:
 
 The orchestrator should not perform all integration investigation serially.
 
-Create bounded **read-only verification briefs** for Sonnet/Haiku workers when parallel evidence gathering is useful.
+Create bounded **read-only verification briefs** for judgement- or mechanical-tier workers when parallel evidence gathering is useful.
 
 Examples:
 
@@ -380,7 +392,7 @@ Examples:
 
 These workers **must not change files** during integration review.
 
-Use Sonnet for subtle semantic review. Use Haiku for narrow, mechanically checkable audits.
+Use the judgement tier for subtle semantic review. Use the mechanical tier for narrow, mechanically checkable audits.
 
 The orchestrator synthesises all findings.
 
@@ -433,7 +445,7 @@ Do not fix them.
 
 Create a new implementation DAG containing only the work required to close the findings.
 
-Route to Sonnet/Haiku, execute, then run integration again.
+Route to the judgement or mechanical tier, execute, then run integration again.
 
 ### For specification defects
 
@@ -451,7 +463,7 @@ Then replan.
 
 E2E verification proves that the assembled candidate does what the locked specification says when a real user or client drives it through a real surface. It is distinct from the unit and integration suites, and it does not replace them.
 
-The orchestrator **designs** E2E verification and **judges** its evidence. It never **executes** it. Browser sessions, screenshots, and long command transcripts consume a lot of context. They belong in disposable E2E executors (Haiku 5.5 for fixed plans, Sonnet 5.5 for exploratory sessions), which return only the confirmation evidence the orchestrator needs to decide.
+The orchestrator **designs** E2E verification and **judges** its evidence. It never **executes** it. Browser sessions, screenshots, and long command transcripts consume a lot of context. They belong in disposable E2E executors (mechanical tier for fixed plans, judgement tier for exploratory sessions), which return only the confirmation evidence the orchestrator needs to decide.
 
 Read `reference/e2e-design.md` when drafting E2E scenarios (Phase 2) and when writing plans, dispatching executors and verifying evidence (Phase 4). Fixed plans are dispatched with `briefs/e2e-executor.md`; exploratory charters with `briefs/e2e-explorer.md`.
 
@@ -466,7 +478,7 @@ The change is complete only when the orchestrator can demonstrate all of the fol
 1. Every locked-spec acceptance criterion maps to concrete evidence.
 2. No unresolved implementation or integration defect remains.
 3. Required build/test/lint/integration checks pass, including one full-suite pass on the final candidate SHA.
-4. Every fixed E2E plan passes on the final candidate SHA, run by Haiku E2E executors, with confirmation evidence the orchestrator has personally reviewed.
+4. Every fixed E2E plan passes on the final candidate SHA, run by mechanical-tier E2E executors, with confirmation evidence the orchestrator has personally reviewed.
 5. Tests that protect important invariants actually assert those invariants.
 6. Third-party behaviours critical to correctness have been verified.
 7. Lifecycle and failure semantics have been exercised where material.
@@ -499,9 +511,9 @@ Choose the implementation DAG that minimises total expected time to a coherent, 
 
 ## Treat model capability as a schedulable resource
 
-Do not spend Sonnet on work Haiku can perform safely.
+Do not spend the judgement tier on work the mechanical tier can perform safely.
 
-Do not spend Haiku on work whose correctness depends on subtle judgement merely because it is cheaper.
+Do not spend the mechanical tier on work whose correctness depends on subtle judgement merely because it is cheaper.
 
 Routing is based on **risk × ambiguity × verifiability**, not line count.
 
@@ -538,10 +550,10 @@ When invoked with a change request:
 4. Ask the first unresolved operator decision, one question only, with recommendation and trade-off.
 5. Continue until the Zero-Ambiguity Gate is satisfied.
 6. Present the LOCKED SPECIFICATION and request explicit approval.
-7. After approval, show the implementation DAG and model routing.
+7. After approval, show the implementation DAG and tier routing.
 8. Create a worktree per writing stream from the locked base under a short root, with detached sibling worktrees for relative references, then dispatch implementation streams into them.
 9. Show the operator an early screenshot of each accepted UI stream before integration.
-10. Integrate and fan out validation, including fixed E2E plans dispatched to Haiku and any exploratory charters dispatched to Sonnet. Verify their confirmation evidence yourself.
+10. Integrate and fan out validation, including fixed E2E plans dispatched to the mechanical tier and any exploratory charters dispatched to the judgement tier. Verify their confirmation evidence yourself.
 11. Replan defects into further implementation rounds, verifying each with targeted suites; run the full suite once on the final candidate.
 12. Stop only at the Completion Gate.
 

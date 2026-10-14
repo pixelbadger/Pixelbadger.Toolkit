@@ -12,7 +12,7 @@ The major behaviours implemented.
 Acceptance criterion → validating evidence. For E2E: plan/scenario id, surface and tool, candidate SHA, and the key confirmation (element text and handover screenshot path, API status and response excerpt, CLI exit code and output excerpt).
 
 ### Swarm execution
-Streams, models, and notable routing decisions.
+Streams, tiers, and notable routing decisions.
 
 ### Integration findings
 Important defects discovered between streams and how later implementation rounds resolved them.

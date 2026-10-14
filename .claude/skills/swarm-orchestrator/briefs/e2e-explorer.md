@@ -1,6 +1,6 @@
 # E2E Explorer Brief
 
-Give the Sonnet executor a **charter** instead of a step list:
+Give the judgement-tier executor a **charter** instead of a step list:
 
 ```text
 E2E CHARTER <charter-id>

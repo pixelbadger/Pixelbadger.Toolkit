@@ -34,7 +34,7 @@ Every screenshot is saved as a PNG at the path the plan names. If the chosen bro
 
 ## 2. Write the E2E test plan
 
-The plan is the executor's whole world. Haiku follows it literally. Ambiguity in the plan becomes ambiguity in the evidence. Write it so that an executor with no other context can run it and could not reasonably come out with a different verdict.
+The plan is the executor's whole world. The mechanical tier follows it literally. Ambiguity in the plan becomes ambiguity in the evidence. Write it so that an executor with no other context can run it and could not reasonably come out with a different verdict.
 
 Finalise the plan against the assembled candidate. Read the actual routes, selectors, commands, ports, and seed data from the code, not from the spec.
 
@@ -49,12 +49,12 @@ Plan rules:
 
 1. **Build once.** The orchestrator builds the candidate before fan-out, so parallel executors do not race on build output. Executors run the prebuilt artefact.
 2. **Isolate.** Each parallel executor gets its own port, data directory, and evidence directory. If the app cannot run as multiple instances, run its plans sequentially. **Timing and performance scenarios run alone**, with no other executors, test suites or builds running at the same time. Put them in their own plan and record the machine's core count and load average with the results.
-3. **Dispatch** each fixed plan to a **Haiku 5.5** subagent with the executor brief below and the plan verbatim. If a scenario that proves an acceptance criterion seems to need judgement, the plan is not strict enough, so rewrite it. Do not escalate it to Sonnet.
-4. **Exploratory sessions** go to **Sonnet 5.5** (see §3a). Use them when you need to probe beyond the scripted paths: edge cases, unexpected input, UI states, or interactions between features.
+3. **Dispatch** each fixed plan to a **mechanical-tier** subagent with the executor brief below and the plan verbatim. If a scenario that proves an acceptance criterion seems to need judgement, the plan is not strict enough, so rewrite it. Do not escalate it to the judgement tier.
+4. **Exploratory sessions** go to the **judgement tier** (see §3a). Use them when you need to probe beyond the scripted paths: edge cases, unexpected input, UI states, or interactions between features.
 
 ## 3a. Exploratory sessions
 
-Exploratory sessions find defects. Fixed plans prove criteria. An exploratory session's verdict never counts as acceptance evidence. A finding worth keeping becomes a fixed scenario, run by Haiku, before it counts.
+Exploratory sessions find defects. Fixed plans prove criteria. An exploratory session's verdict never counts as acceptance evidence. A finding worth keeping becomes a fixed scenario, run by the mechanical tier, before it counts.
 
 Run exploratory sessions after the fixed plans pass, or alongside them on a separate instance.
 
