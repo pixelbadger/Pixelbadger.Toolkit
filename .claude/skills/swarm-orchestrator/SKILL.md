@@ -25,6 +25,12 @@ The delivery loop is:
                              │
                              ▼
                   ┌──────────────────────┐
+                  │  ENVIRONMENT         │
+                  │  PREFLIGHT           │
+                  └──────────┬───────────┘
+                             │
+                             ▼
+                  ┌──────────────────────┐
                   │   SPECIFICATION      │
                   │ orchestrator + Q&A   │
                   └──────────┬───────────┘
@@ -93,6 +99,25 @@ Implementation and integration repeat until the locked specification is satisfie
 
 ---
 
+# Phase 0 — Environment Preflight
+
+Before spec lock, prove the environment can carry the run to the Completion Gate. A run that discovers mid-integration that Docker is missing or the disk is full has wasted every stream before it.
+
+Check each item, record the result, and fix or raise every gap before SPEC LOCK:
+
+| Check | Pass condition |
+|---|---|
+| **Free disk** | Enough for one worktree per planned parallel stream, plus their build outputs, plus E2E evidence. Measure one worktree's build footprint; don't guess it. |
+| **Docker** | The daemon is reachable (`docker info`) and the images the build/tests/E2E need can be pulled or are present, if anything in the run uses containers. |
+| **Package-feed credentials** | A clean restore from every feed the build uses succeeds, private feeds included. A cached restore is not proof. |
+| **Browser permission** | The browser tooling the E2E plans will use is enabled and permitted for the app's origin (site approvals, extension connected, or Playwright launching the pre-installed Chromium). |
+| **Local DB schema currency** | Any local database the tests or E2E use is migrated to the base commit's current schema. A stale local schema produces failures that look like defects. |
+| **E2E host build** | Whatever host the E2E will run (web app, API host, CLI tool, public-API harness) builds from the base commit and starts. |
+
+Results go into the **Environment block** (Phase 1, step 6). Anything that can't be fixed here is a Zero-Ambiguity Gate question for the operator, not something to discover in Phase 4.
+
+---
+
 # Phase 1 — Specification
 
 The objective is not to produce a quick plan. The objective is to reach a specification precise enough that implementation agents can work independently without making product decisions.
@@ -106,7 +131,7 @@ Before interviewing the operator:
 3. Inspect tests that define current behaviour.
 4. Inspect recent related commits/PRs when they clarify architectural intent.
 5. If correctness depends on a third-party library's behaviour, inspect its source or authoritative implementation evidence rather than assuming.
-6. **Establish a green baseline.** Build the base commit and run its test suite in this environment. Record pre-existing failures, and the environment requirements needed to get green: SDKs, environment variables such as `TERM`, licences, and build configurations that can't run here. Diagnose any failure that isn't explained before going further. These findings become the **Environment block** that every brief carries.
+6. **Establish a green baseline.** Build the base commit and run its test suite in this environment. Record pre-existing failures, and the environment requirements needed to get green: SDKs, environment variables such as `TERM`, licences, and build configurations that can't run here. Diagnose any failure that isn't explained before going further. These findings, together with the Phase 0 preflight results, become the **Environment block** that every brief carries.
 7. Identify which questions are factual and answer them yourself.
 8. Ask the operator only questions that require product intent, trade-offs, or risk decisions.
 
@@ -177,7 +202,10 @@ Do not enter implementation until you can answer **yes** to all of these:
 - Are non-goals clear enough to prevent scope creep?
 - Do you know what evidence will convince you the change is complete?
 - Does every user-facing acceptance criterion have an E2E surface, and is the tooling for that surface available in this environment?
+- Is every item on the residual-risk list something that genuinely cannot be settled now? (See below.)
 - Are you, the orchestrator, fully satisfied that the specification is coherent?
+
+**No checkable claim on the residual-risk list.** If reading source (the repository's or a dependency's) or a quick probe (a one-off command, a scratch program, a single request) can settle a claim, settle it before lock. Residual risks are only what can't be established in this environment, or would cost more to establish than the risk is worth, and the latter needs the operator's agreement.
 
 Then present a concise **LOCKED SPECIFICATION** containing the decisions and acceptance criteria. Mark orchestrator-decided items with ⚙.
 
@@ -289,7 +317,7 @@ One clear result the worker owns.
 
 ## Required verification
 
-Name the focused tests/checks that establish correctness. Implementors run **filtered** test runs scoped to their change. The full suite runs once per candidate, owned by the orchestrator (Phase 4).
+Name the focused tests/checks that establish correctness. Implementors run **filtered** test runs scoped to their change. The full suite is owned by the orchestrator (see **Verification budget**, Phase 4).
 
 Require new tests where behaviour changes.
 
@@ -328,8 +356,11 @@ The worker must:
 
 Every stream that writes to the repository works in its own git worktree, created by the orchestrator before dispatch. Workers never write in the operator's checkout.
 
-- The orchestrator creates each worktree explicitly from the locked base commit, outside the repository directory (e.g. a scratch directory):
-  `git worktree add -b swarm/<stream> <absolute path> <base SHA>`
+- The orchestrator creates each worktree explicitly from the locked base commit, outside the repository directory, under a **short root** (e.g. `/tmp/sw/<stream>` or `C:\sw\<stream>`). Deep paths break tools with path-length limits (Windows MAX_PATH, socket paths, some build tools):
+  `git worktree add -b swarm/<stream> <short root>/<stream> <base SHA>`
+- **Relative references.** If the repository refers to sibling checkouts by relative path (e.g. `../OtherRepo/...` project references, shared props, submodule-like layouts), create a **detached** worktree of each referenced repository as a sibling of the stream worktree, at the commit the operator's checkout uses, so the relative paths resolve the same way:
+  `git -C <referenced repo> worktree add --detach <short root>/<OtherRepo> <SHA>`
+  Workers treat these as read-only. Remove them with the stream worktrees.
   Do not rely on agent-runtime automatic worktree isolation: it may branch from a different commit than the locked base and may remove the worktree when a worker pauses without changes.
 - The brief names the absolute worktree path and branch. The worker works only there, using absolute paths.
 - Before writing, the worker verifies `HEAD` equals the specified base SHA (or a descendant the brief allows). If it is stale, or the worktree is missing, the worker stops and reports. It never falls back to another directory, including the operator's checkout.
@@ -364,6 +395,8 @@ When an implementor returns:
 5. reject or re-dispatch the stream if it violates the locked spec.
 
 Do not perform full integration analysis piecemeal. First obtain a coherent candidate containing all currently accepted streams.
+
+**Early visual checkpoint for UI streams.** When a stream that changes what a user sees is accepted, and before integration starts, show the operator a screenshot of its result. Dispatch a Haiku executor with a one-scenario plan (start the stream's build, navigate, capture one PNG), check the PNG yourself, then show it to the operator with one line on what it shows. Visual intent is cheap to correct here and expensive after integration. Treat operator feedback as you would at any other point: a spec change reopens Phase 1, anything inside the spec becomes a fix in the stream.
 
 If a report or completion notice arrives again after a stream was accepted, treat it as a duplicate. Before relying on that stream, re-check that its branch head is unchanged and its worktree is clean.
 
@@ -428,7 +461,7 @@ The orchestrator synthesises all findings.
 Run the strongest available evidence appropriate to the specification:
 
 - build (once per candidate, before fan-out);
-- the full unit and integration suite, run once per candidate by the orchestrator in its own worktree, alongside the E2E plans (but never alongside timing plans);
+- unit and integration suites, per the **Verification budget** below, run by the orchestrator in its own worktree, alongside the E2E plans (but never alongside timing plans);
 - end-to-end verification, always per the **E2E Verification Protocol** (executed by E2E executors, never by the orchestrator);
 - migrations against realistic prior state;
 - fault/retry/restart tests;
@@ -439,6 +472,13 @@ Run the strongest available evidence appropriate to the specification:
 - third-party-source inspection.
 
 A passing test suite is evidence, not proof.
+
+### Verification budget
+
+- **Fix rounds:** run only the targeted suites covering the changed code and its direct dependants, plus the E2E plans that touch changed behaviour.
+- **Final candidate:** run the full unit and integration suite **once**, at the end, on the candidate you intend to present at the Completion Gate. If that pass forces another fix round, the next final candidate gets its own full pass.
+- **Disk guard:** before each build or suite run, check free disk against the footprint measured in Phase 0. If it's short, remove build outputs of accepted or superseded worktrees and stale evidence dirs first. Never start a run that can't finish.
+- **Memory guard:** check free memory before running suites or executors in parallel. Cap concurrency (test parallelism, parallel executors, parallel builds) so the run fits, and serialise rather than risk OOM kills, which look like flaky failures.
 
 ## 4. Defect ledger
 
@@ -511,7 +551,9 @@ Before writing a web-UI plan, check which Chrome tooling this session actually h
 1. **Chrome browser MCP tools** (e.g. Claude in Chrome `mcp__claude-in-chrome__*`, or the built-in browser), when available. The executor loads them per their skill guidance.
 2. **Playwright driving Chromium**, when no browser MCP is available (e.g. headless cloud containers; use the pre-installed Chromium, never download browsers). The executor writes its Playwright script in its scratch directory, never in the repository.
 
-Final confirmation screenshots must be saved as PNG files at the paths the plan names. If the chosen browser tool cannot write screenshots to disk, the plan uses Playwright/Chromium for the capture step against the same running app.
+**Browser economy.** Screenshots are expensive in context and weak as evidence of text. Plans prefer, in order: page text, element finds (selector or accessible name, with the element's text, value or state), and network reads (request/response status and body). A plan asks for a screenshot only when **layout is what's being judged**: placement, visibility, styling, overlap, rendering. Mark each such scenario `judges layout: yes` in the plan.
+
+When a scenario does take a screenshot, it is saved as a PNG at the path the plan names. If the chosen browser tool cannot write screenshots to disk, the plan uses Playwright/Chromium for the capture step against the same running app.
 
 ## 2. Write the E2E test plan
 
@@ -536,7 +578,7 @@ SETUP (exact commands, in order, each with its expected success signal)
   ...
 
 SCENARIOS
-  <scenario-id>: <acceptance criterion id(s) proven>
+  <scenario-id>: <acceptance criterion id(s) proven>   judges layout: yes|no
     1. <action: exact URL / selector or accessible name / command / request>
        expect: <exact observable outcome: text, status code, exit code, file content>
     2. ... (capture runtime values as named variables, e.g. "record the returned id as $ID")
@@ -631,7 +673,7 @@ Deviations from plan: none | <list>
 
 Final confirmation evidence per surface:
 
-- **Web UI:** absolute path to **one** PNG of the final verified state (plus one at the failing step, if any), the page URL, and the visible text of the key element(s) the expectation refers to.
+- **Web UI:** the page URL, the visible text or state of the key element(s) the expectation refers to, and any network response the expectation names. For a `judges layout: yes` scenario, also the absolute path to **one** PNG of the final verified state. A failing step gets a PNG only when it is a layout step; otherwise its page text and element state.
 - **API:** the exact request line, status code, relevant headers, and the response body verbatim (pretty-printed, at most ~60 lines, full body saved to the evidence dir with its path).
 - **CLI:** the exact command, exit code, and stdout/stderr verbatim (at most the last ~40 lines each, full output saved to the evidence dir with its path), plus the contents or hash of any file the step expected to be written.
 
@@ -639,7 +681,7 @@ Final confirmation evidence per surface:
 
 Do not accept PASS as a verdict. Verify it:
 
-1. For every scenario, compare the confirmation evidence with the plan's expected outcome yourself. Open each final-state screenshot (only those, never per-step captures), read API bodies and CLI output.
+1. For every scenario, compare the confirmation evidence with the plan's expected outcome yourself. Open each final-state screenshot from a `judges layout: yes` scenario (only those, never per-step captures), and read element text, network reads, API bodies and CLI output.
 2. Confirm that the evidence is from the right candidate SHA, that the worktree stayed clean, and that no deviations undermine the result.
 3. Map each verified scenario to its acceptance criteria in the traceability record.
 4. Open full logs/bodies in the evidence dir only when the handover excerpt is insufficient to judge.
@@ -666,7 +708,7 @@ The change is complete only when the orchestrator can demonstrate all of the fol
 
 1. Every locked-spec acceptance criterion maps to concrete evidence.
 2. No unresolved implementation or integration defect remains.
-3. Required build/test/lint/integration checks pass.
+3. Required build/test/lint/integration checks pass, including one full-suite pass on the final candidate SHA.
 4. Every fixed E2E plan passes on the final candidate SHA, run by Haiku E2E executors, with confirmation evidence the orchestrator has personally reviewed.
 5. Tests that protect important invariants actually assert those invariants.
 6. Third-party behaviours critical to correctness have been verified.
@@ -689,7 +731,7 @@ A short restatement of the locked goal.
 The major behaviours implemented.
 
 ### Evidence
-Acceptance criterion → validating evidence. For E2E: plan/scenario id, surface and tool, candidate SHA, and the key confirmation (screenshot path, API status and response excerpt, CLI exit code and output excerpt).
+Acceptance criterion → validating evidence. For E2E: plan/scenario id, surface and tool, candidate SHA, and the key confirmation (element text or screenshot path, API status and response excerpt, CLI exit code and output excerpt).
 
 ### Swarm execution
 Streams, models, and notable routing decisions.
@@ -756,15 +798,17 @@ The swarm should improve its process from failures, not merely repair the curren
 
 When invoked with a change request:
 
-1. Announce **Specification Phase**.
-2. Research the repository and establish a green baseline before asking questions.
-3. Ask the first unresolved operator decision, one question only, with recommendation and trade-off.
-4. Continue until the Zero-Ambiguity Gate is satisfied.
-5. Present the LOCKED SPECIFICATION and request explicit approval.
-6. After approval, show the implementation DAG and model routing.
-7. Create a worktree per writing stream from the locked base, then dispatch implementation streams into them.
-8. Integrate and fan out validation, including fixed E2E plans dispatched to Haiku and any exploratory charters dispatched to Sonnet. Verify their confirmation evidence yourself.
-9. Replan defects into further implementation rounds.
-10. Stop only at the Completion Gate.
+1. Run the **Phase 0 environment preflight** and record the Environment block.
+2. Announce **Specification Phase**.
+3. Research the repository and establish a green baseline before asking questions. Settle every checkable claim yourself.
+4. Ask the first unresolved operator decision, one question only, with recommendation and trade-off.
+5. Continue until the Zero-Ambiguity Gate is satisfied.
+6. Present the LOCKED SPECIFICATION and request explicit approval.
+7. After approval, show the implementation DAG and model routing.
+8. Create a worktree per writing stream from the locked base under a short root, with detached sibling worktrees for relative references, then dispatch implementation streams into them.
+9. Show the operator an early screenshot of each accepted UI stream before integration.
+10. Integrate and fan out validation, including fixed E2E plans dispatched to Haiku and any exploratory charters dispatched to Sonnet. Verify their confirmation evidence yourself.
+11. Replan defects into further implementation rounds, verifying each with targeted suites; run the full suite once on the final candidate.
+12. Stop only at the Completion Gate.
 
 Never collapse Specification → Implementation → Integration into one agent pass.
