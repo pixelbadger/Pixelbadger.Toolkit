@@ -233,6 +233,9 @@ public class HomomorphicEncryptionComponent
             ValidateModulus(n);
             var lambda = BigInteger.Parse(key.Lambda, System.Globalization.CultureInfo.InvariantCulture);
             var mu = BigInteger.Parse(key.Mu, System.Globalization.CultureInfo.InvariantCulture);
+            // Bound lambda and mu so a crafted key file cannot force an enormous ModPow.
+            if (lambda.Sign <= 0 || lambda >= n || mu.Sign <= 0 || mu >= n)
+                throw new ArgumentException("Private key Lambda and Mu must be positive and smaller than N.");
             return new DecryptionContext(n, n * n, lambda, mu);
         }
     }

@@ -13,7 +13,7 @@ The swarm has exactly three roles:
 
 - **Operator** — the human. Owns intent, priorities, risk appetite, budget, and final product judgement.
 - **Orchestrator** — **Opus 5.5**. Owns specification, investigation, decomposition, scheduling, integration analysis, validation strategy, and replanning. **Analysis-only: never implement or repair repository code yourself.**
-- **Implementors** — **Sonnet 5.5 or Haiku 5.5**. Own bounded implementation or bounded verification work dispatched by the orchestrator. All repository writes are performed by implementors. **E2E executors** run E2E tests and return evidence: Haiku 5.5 for fixed test plans, Sonnet 5.5 for exploratory sessions. They never write to the repository.
+- **Implementors** — **Sonnet 5.5 or Haiku 5.5**. Own bounded implementation or bounded verification work dispatched by the orchestrator. All repository writes are performed by implementors.
 
 The delivery loop is:
 
@@ -74,13 +74,12 @@ Implementation and integration repeat until the locked specification is satisfie
 - silently change the locked specification during implementation;
 - ask the operator a question that can be answered by inspecting the repository, dependency source, documentation, tests, runtime behaviour, or other available evidence;
 - accept an implementor's success claim as proof without reviewing evidence;
-- execute E2E scenarios itself (driving a browser, taking screenshots, running scenario CLI/API transcripts); E2E is always run by E2E executors (see **E2E Verification Protocol**). The one exception is preparing blind fixtures for an exploratory charter (§3a), whose ground truth must stay hidden from the executor;
 - declare completion because "tests pass" if the tests do not prove the specification.
 
 ### The orchestrator MAY
 
 - inspect any repository file, history, diff, dependency source, generated output, logs, schema, or test result;
-- run builds, unit/integration test suites, linters, benchmarks, static analysis, and read-only diagnostics;
+- run builds, tests, linters, benchmarks, static analysis, integration environments, and read-only diagnostics;
 - create and sequence implementation plans;
 - spawn parallel or sequential implementors;
 - ask implementors to perform read-only verification during integration;
@@ -89,7 +88,7 @@ Implementation and integration repeat until the locked specification is satisfie
 - abandon or replan a stream;
 - reopen specification when integration reveals a genuine unresolved product or contract decision.
 
-**If a repository write is required, dispatch an implementor.** This includes small operator side requests made mid-run (e.g. a one-line CLAUDE.md note). Prefer folding a side request into an implementor stream that is about to run; dispatch a dedicated one only when none is.
+**If a repository write is required, dispatch an implementor.**
 
 ---
 
@@ -106,9 +105,8 @@ Before interviewing the operator:
 3. Inspect tests that define current behaviour.
 4. Inspect recent related commits/PRs when they clarify architectural intent.
 5. If correctness depends on a third-party library's behaviour, inspect its source or authoritative implementation evidence rather than assuming.
-6. **Establish a green baseline.** Build the base commit and run its test suite in this environment. Record pre-existing failures, and the environment requirements needed to get green: SDKs, environment variables such as `TERM`, licences, and build configurations that can't run here. Diagnose any failure that isn't explained before going further. These findings become the **Environment block** that every brief carries.
-7. Identify which questions are factual and answer them yourself.
-8. Ask the operator only questions that require product intent, trade-offs, or risk decisions.
+6. Identify which questions are factual and answer them yourself.
+7. Ask the operator only questions that require product intent, trade-offs, or risk decisions.
 
 Do not use the operator as a substitute for codebase research.
 
@@ -122,12 +120,10 @@ For every question:
 
 - state why the decision matters;
 - give your recommended answer;
-- state the principal trade-off, quantified from measurement or repository evidence (benchmarks, timings, file sizes) whenever measuring is cheap. Never quantify it from an unverified estimate;
+- state the principal trade-off;
 - wait for the operator's answer before moving to the next decision.
 
 Push back on vague answers. Convert intentions such as "robust", "fast", "compatible", "simple", "event-driven", or "production-ready" into observable behaviour.
-
-Ask only about product intent, trade-offs, and risk. Decide engineering details yourself: exact error messages, validation rules, limits that follow from an earlier decision. Mark each one with ⚙ in the LOCKED SPECIFICATION so the operator can override it at approval.
 
 Explore only relevant branches. Typical branches include:
 
@@ -161,7 +157,6 @@ Continuously track:
 - **Security constraints**
 - **Acceptance criteria**
 - **Required evidence**
-- **E2E scope** — for each user-facing acceptance criterion, the surface it will be exercised through (web UI, HTTP API, CLI, …) and why that surface is sufficient
 
 If two decisions conflict, resolve the conflict before proceeding.
 
@@ -176,10 +171,9 @@ Do not enter implementation until you can answer **yes** to all of these:
 - Can work be decomposed without workers inventing product behaviour?
 - Are non-goals clear enough to prevent scope creep?
 - Do you know what evidence will convince you the change is complete?
-- Does every user-facing acceptance criterion have an E2E surface, and is the tooling for that surface available in this environment?
 - Are you, the orchestrator, fully satisfied that the specification is coherent?
 
-Then present a concise **LOCKED SPECIFICATION** containing the decisions and acceptance criteria. Mark orchestrator-decided items with ⚙.
+Then present a concise **LOCKED SPECIFICATION** containing the decisions and acceptance criteria.
 
 Ask the operator for explicit approval.
 
@@ -244,15 +238,7 @@ Haiku's work must be reviewed carefully when:
 
 If a task appears to "need Opus to code it", decompose it further, improve the contract, or assign Sonnet with a stronger verification plan.
 
-## 3. Draft E2E scenarios alongside the DAG
-
-Draft the E2E scenarios (see **E2E Verification Protocol**) now, from the locked E2E scope.
-
-Anything an E2E scenario needs from the implementation becomes part of a stream's contract: stable element identifiers or accessible names for web UI steps, deterministic output for CLI steps, a seedable or resettable data store, a configurable port. Do not discover these needs after implementation.
-
-The scenarios are finalised against the assembled candidate in Phase 4.
-
-## 4. Sequence only where necessary
+## 3. Sequence only where necessary
 
 Launch all streams whose dependencies are satisfied.
 
@@ -272,8 +258,7 @@ Every implementation stream receives a brief containing the following.
 - locked specification relevant to this stream;
 - base branch/commit;
 - upstream stream outputs it may rely upon;
-- exact scope boundaries;
-- the **Environment block** from the baseline: required environment variables, build configuration, and known pre-existing failures.
+- exact scope boundaries.
 
 ## Objective
 
@@ -289,7 +274,7 @@ One clear result the worker owns.
 
 ## Required verification
 
-Name the focused tests/checks that establish correctness. Implementors run **filtered** test runs scoped to their change. The full suite runs once per candidate, owned by the orchestrator (Phase 4).
+Name the focused tests/checks that establish correctness.
 
 Require new tests where behaviour changes.
 
@@ -319,10 +304,7 @@ The worker must:
    - any unverified claims;
    - any suspected cross-stream risk;
 4. not merge other streams;
-5. not claim the overall feature is complete;
-6. leave no background process running past the handover. All work must have finished before the report is sent;
-7. keep the report compact (aim for 60 lines or fewer): facts, commands and results. No narration;
-8. use the commit attribution trailer exactly as the brief gives it.
+5. not claim the overall feature is complete.
 
 ### Worktrees (mandatory)
 
@@ -350,8 +332,7 @@ States:
 
 - blocked
 - running
-- ready (returned, awaiting review)
-- accepted (reviewed against its contract)
+- ready
 - rejected
 - superseded
 
@@ -365,9 +346,7 @@ When an implementor returns:
 
 Do not perform full integration analysis piecemeal. First obtain a coherent candidate containing all currently accepted streams.
 
-If a report or completion notice arrives again after a stream was accepted, treat it as a duplicate. Before relying on that stream, re-check that its branch head is unchanged and its worktree is clean.
-
-The orchestrator may compose accepted streams itself, in a dedicated composition worktree, when no content decision is needed: conflict-free merges and fast-forwards. If combining streams requires content edits or merge-conflict decisions, dispatch a bounded **composition implementor**. The orchestrator may specify the resolution but must not edit the files itself.
+If combining streams requires content edits or merge-conflict decisions, dispatch a bounded **composition implementor**. The orchestrator may specify the resolution but must not edit the files itself.
 
 ---
 
@@ -427,9 +406,10 @@ The orchestrator synthesises all findings.
 
 Run the strongest available evidence appropriate to the specification:
 
-- build (once per candidate, before fan-out);
-- the full unit and integration suite, run once per candidate by the orchestrator in its own worktree, alongside the E2E plans (but never alongside timing plans);
-- end-to-end verification, always per the **E2E Verification Protocol** (executed by E2E executors, never by the orchestrator);
+- build;
+- unit tests;
+- integration tests;
+- end-to-end tests;
 - migrations against realistic prior state;
 - fault/retry/restart tests;
 - linters/static analysis;
@@ -451,11 +431,9 @@ Classify each finding as one of:
 
 - **implementation defect** — locked spec is clear; code is wrong;
 - **missing implementation** — spec requires behaviour no stream delivered;
-- **verification defect** — behaviour may be right but evidence is inadequate (including an E2E plan that was wrong or too weak, or confirmation evidence that does not prove the expected outcome);
+- **verification defect** — behaviour may be right but evidence is inadequate;
 - **documentation defect** — prose differs from demonstrated behaviour;
 - **specification defect** — the locked spec is incomplete, contradictory, or requires a new operator decision.
-
-A defect that **predates** the change is in scope when it violates a locked acceptance criterion; classify it as above. Otherwise, record it as a residual risk and tell the operator. Do not silently widen the change to fix it.
 
 ## 5. Loop correctly
 
@@ -479,204 +457,22 @@ Then replan.
 
 ---
 
-# E2E Verification Protocol
-
-E2E verification proves that the assembled candidate does what the locked specification says when a real user or client drives it through a real surface. It is distinct from the unit and integration suites, and it does not replace them.
-
-The orchestrator **designs** E2E verification and **judges** its evidence. It never **executes** it. Browser sessions, screenshots, and long command transcripts consume a lot of context. They belong in disposable E2E executors (Haiku 5.5 for fixed plans, Sonnet 5.5 for exploratory sessions), which return only the confirmation evidence the orchestrator needs to decide.
-
-## 1. Choose the surface for each criterion
-
-Every user-facing acceptance criterion is exercised through exactly one primary surface, recorded in the locked spec's **E2E scope**:
-
-| What the criterion is about | Surface | Executor tooling |
-|---|---|---|
-| Anything a person sees or does in a web UI: rendering, navigation, forms, client-side behaviour, UI error states | **Web UI** | Chrome browser automation (see below) |
-| An HTTP/RPC API contract: status codes, payloads, headers, persistence visible through the API | **API** | `curl` (or the repo's own client) against the running app |
-| A command-line tool's behaviour: output, exit codes, files written | **CLI** | Invoke the built binary/tool exactly as a user would |
-| A library with no runnable surface | **Public API harness** | A throwaway program in scratch space that consumes the built package, never the internals |
-
-Scoping rules:
-
-- Use the **lowest surface that still proves the criterion**. A criterion about stored data or response shape can be proven through the API or CLI even if the feature also has a UI. A criterion about what the user sees or does in the browser **must** use the web UI. Do not substitute an API call for a UI check.
-- A feature that has a web UI gets at least one web-UI happy-path scenario, even when most of its criteria are scoped to API/CLI.
-- The system under test is never mocked. External third-party dependencies are real, sandboxed, or stubbed only as the locked spec allows. Record which.
-- If a surface's tooling is unavailable in this environment, that is a Zero-Ambiguity Gate failure, not a reason to scope down silently. Raise it with the operator before SPEC LOCK.
-- If the environment later prevents the evidence the locked spec names (e.g. a Release build that needs a licence only CI has), propose the closest substitute and get the operator's acknowledgement before relying on it. Record the substitution in the Completion Report.
-
-### Chrome tooling for web UI
-
-Before writing a web-UI plan, check which Chrome tooling this session actually has, and name it in the plan:
-
-1. **Chrome browser MCP tools** (e.g. Claude in Chrome `mcp__claude-in-chrome__*`, or the built-in browser), when available. The executor loads them per their skill guidance.
-2. **Playwright driving Chromium**, when no browser MCP is available (e.g. headless cloud containers; use the pre-installed Chromium, never download browsers). The executor writes its Playwright script in its scratch directory, never in the repository.
-
-Final confirmation screenshots must be saved as PNG files at the paths the plan names. If the chosen browser tool cannot write screenshots to disk, the plan uses Playwright/Chromium for the capture step against the same running app.
-
-## 2. Write the E2E test plan
-
-The plan is the executor's whole world. Haiku follows it literally. Ambiguity in the plan becomes ambiguity in the evidence. Write it so that an executor with no other context can run it and could not reasonably come out with a different verdict.
-
-Finalise the plan against the assembled candidate. Read the actual routes, selectors, commands, ports, and seed data from the code, not from the spec.
-
-Plan template:
-
-```text
-E2E PLAN <plan-id>
-Candidate:     <branch> @ <SHA>, at <absolute worktree path>
-Surface/tool:  <web UI via Claude in Chrome | web UI via Playwright+Chromium | API via curl | CLI>
-Evidence dir:  <absolute path in scratch, e.g. <scratch>/e2e/<plan-id>/>
-Isolation:     port <N>, data dir <path>, any env vars. Unique per executor running in parallel.
-Environment:   the Environment block (e.g. TERM=xterm), applied to every command.
-Glossary:      every command, helper and check a step may name, defined once, exactly
-               (e.g. COUNT f := <command>; DECRYPT f := <command>). Steps use only these names.
-
-SETUP (exact commands, in order, each with its expected success signal)
-  S1 `<command>`  → expect: <e.g. "listening on :5123" within 30s>
-  ...
-
-SCENARIOS
-  <scenario-id>: <acceptance criterion id(s) proven>
-    1. <action: exact URL / selector or accessible name / command / request>
-       expect: <exact observable outcome: text, status code, exit code, file content>
-    2. ... (capture runtime values as named variables, e.g. "record the returned id as $ID")
-    FINAL CONFIRMATION: <exactly what to capture, see §4>
-
-TEARDOWN (exact commands; always run, even after failure)
-  T1 `<command>`
-```
-
-Plan rules:
-
-- Every step has one action and one exact expected outcome. "Check it works" is not a step.
-- Include negative/error-path scenarios wherever the spec defines failure behaviour.
-- Specify waits explicitly (what to wait for, maximum time). Never leave timing to the executor's judgement.
-- Group scenarios that share setup into one plan. Split independent plans so they can run in parallel.
-
-## 3. Prepare and dispatch executors
-
-1. **Build once.** The orchestrator builds the candidate before fan-out, so parallel executors do not race on build output. Executors run the prebuilt artefact.
-2. **Isolate.** Each parallel executor gets its own port, data directory, and evidence directory. If the app cannot run as multiple instances, run its plans sequentially. **Timing and performance scenarios run alone**, with no other executors, test suites or builds running at the same time. Put them in their own plan and record the machine's core count and load average with the results.
-3. **Dispatch** each fixed plan to a **Haiku 5.5** subagent with the executor brief below and the plan verbatim. If a scenario that proves an acceptance criterion seems to need judgement, the plan is not strict enough, so rewrite it. Do not escalate it to Sonnet.
-4. **Exploratory sessions** go to **Sonnet 5.5** (see §3a). Use them when you need to probe beyond the scripted paths: edge cases, unexpected input, UI states, or interactions between features.
-
-Executor brief (include verbatim):
-
-```text
-You are an E2E executor. Run the plan below exactly as written. You are producing evidence, not fixing anything.
-
-- Do not modify tracked files in any repository or worktree. Write only inside the evidence dir and your scratch dir. Record `git -C <worktree> status --porcelain` before SETUP and again after TEARDOWN; they must match.
-- Perform steps in order. Do not skip, reorder, add, or "improve" steps.
-- For each step, compare the actual outcome with the expected outcome literally. If they differ, mark the step FAIL, capture failure evidence (screenshot / full response / full output), skip the remaining steps of that scenario, and continue with the next scenario.
-- If SETUP fails, or the environment prevents a step from being attempted (tool unavailable, port in use, crash before the step), mark it BLOCKED with the error. You may retry a BLOCKED step once. Never retry a FAIL.
-- Do not diagnose root causes, edit code, change configuration, or work around a failure.
-- Always run TEARDOWN.
-- Return the handover in the exact format specified. Report observations, not conclusions about the feature.
-```
-
-## 3a. Exploratory sessions
-
-Exploratory sessions find defects. Fixed plans prove criteria. An exploratory session's verdict never counts as acceptance evidence. A finding worth keeping becomes a fixed scenario, run by Haiku, before it counts.
-
-Run exploratory sessions after the fixed plans pass, or alongside them on a separate instance.
-
-Give the Sonnet executor a **charter** instead of a step list:
-
-```text
-E2E CHARTER <charter-id>
-Candidate, surface/tool, evidence dir, isolation, SETUP, TEARDOWN: as for a fixed plan
-Mission:   <what to probe, e.g. "invalid and boundary input on the config form">
-Spec refs: <the acceptance criteria and failure semantics that define correct behaviour>
-Locked decisions: <deliberate behaviours that are expected, not findings (e.g. "NUL is stripped wherever it appears")>
-In scope / out of scope: <areas, actions not allowed (e.g. no destructive admin actions)>
-Budget:    <max scenarios or tool calls, max screenshots retained>
-```
-
-**Blind fixtures.** When the mission is to infer hidden properties (e.g. "can an attacker tell the length or the relationships?"), the orchestrator, or a separate setup executor, prepares the target fixtures. The ground truth (plaintexts, keys, derivations) is kept outside the executor's reach and forbidden to it. Score the executor's guesses against the ground truth afterwards. "Could not do better than chance" is valid and useful evidence.
-
-The executor brief is the same as for fixed plans, with the step-order rules replaced by: "Explore within the mission and budget. When behaviour contradicts the spec refs or looks wrong, record it as a finding, with exact reproduction steps and evidence, then move on. Do not diagnose or fix."
-
-Exploratory handover:
-
-```text
-E2E EXPLORATION <charter-id> — candidate <SHA> — tool <tool used>
-Worktree clean before/after: yes|no
-Coverage: <what was exercised, briefly>
-FINDING <n>: <observed vs expected per spec ref>
-  repro: <numbered exact steps>
-  evidence: <per surface rules in §4>
-No findings in: <areas probed that behaved per spec>
-```
-
-The orchestrator verifies each finding's evidence, as in §5. Confirmed findings either go to the defect ledger, or are turned into fixed scenarios so that a fix can be proven.
-
-## 4. Executor handover
-
-The executor returns a compact, structured report. Bulk material stays on disk in the evidence dir.
-
-```text
-E2E RESULT <plan-id> — candidate <SHA> — tool <tool used>
-Worktree clean before/after: yes|no (<diff if no>)
-SETUP: OK | BLOCKED (<step, error>)
-
-<scenario-id>: PASS | FAIL | BLOCKED
-  steps: 1 PASS, 2 PASS, 3 FAIL
-  failing step: <n>: expected <…>; actual <…>
-  FINAL CONFIRMATION:
-    <evidence, per surface rules below>
-
-TEARDOWN: OK | errors
-Deviations from plan: none | <list>
-```
-
-Final confirmation evidence per surface:
-
-- **Web UI:** absolute path to **one** PNG of the final verified state (plus one at the failing step, if any), the page URL, and the visible text of the key element(s) the expectation refers to.
-- **API:** the exact request line, status code, relevant headers, and the response body verbatim (pretty-printed, at most ~60 lines, full body saved to the evidence dir with its path).
-- **CLI:** the exact command, exit code, and stdout/stderr verbatim (at most the last ~40 lines each, full output saved to the evidence dir with its path), plus the contents or hash of any file the step expected to be written.
-
-## 5. Orchestrator verification
-
-Do not accept PASS as a verdict. Verify it:
-
-1. For every scenario, compare the confirmation evidence with the plan's expected outcome yourself. Open each final-state screenshot (only those, never per-step captures), read API bodies and CLI output.
-2. Confirm that the evidence is from the right candidate SHA, that the worktree stayed clean, and that no deviations undermine the result.
-3. Map each verified scenario to its acceptance criteria in the traceability record.
-4. Open full logs/bodies in the evidence dir only when the handover excerpt is insufficient to judge.
-
-Outcomes:
-
-| Observation | Classification | Action |
-|---|---|---|
-| Evidence proves the expected outcome | — | criterion evidenced |
-| FAIL, and the plan matches the spec | implementation defect | defect ledger → implementation round → re-run the affected plans on the new candidate |
-| FAIL or PASS, but the plan, the expectation, or the evidence was wrong or too weak | verification defect | fix the plan and re-dispatch. Never relax an expectation the spec requires |
-| BLOCKED after one retry | environment issue | diagnose read-only. If it can't be resolved, record it as a residual risk and tell the operator. A criterion with no E2E evidence is not complete |
-| Evidence reveals behaviour the spec never decided | specification defect | return to Phase 1 |
-
-After any implementation round, re-run every E2E plan that touches changed behaviour, on the new candidate SHA. Evidence from an earlier SHA does not count. A re-run may go to the same executor as a message carrying an explicit substitution list (candidate SHA, worktree path, a fresh evidence dir) plus any added scenarios. The executor must not read earlier evidence.
-
-Evidence dirs live in scratch space and are never committed. Delete them only after the operator has read the completion report, so they can ask to see raw evidence.
-
----
-
 # Completion Gate
 
 The change is complete only when the orchestrator can demonstrate all of the following:
 
 1. Every locked-spec acceptance criterion maps to concrete evidence.
 2. No unresolved implementation or integration defect remains.
-3. Required build/test/lint/integration checks pass.
-4. Every fixed E2E plan passes on the final candidate SHA, run by Haiku E2E executors, with confirmation evidence the orchestrator has personally reviewed.
-5. Tests that protect important invariants actually assert those invariants.
-6. Third-party behaviours critical to correctness have been verified.
-7. Lifecycle and failure semantics have been exercised where material.
-8. Migration/upgrade behaviour meets the locked specification.
-9. No known resource grows without an intentional retention policy.
-10. Documentation describes observed/current behaviour rather than inferred behaviour.
-11. No agent worktree, scratch file, accidental generated output, or orchestration residue is included, and every swarm worktree and `swarm/*` branch has been removed.
-12. The final diff contains no unexplained scope expansion.
-13. The orchestrator is satisfied that the **specification**, not merely the implementation plan, has been met.
+3. Required build/test/lint/integration/E2E checks pass.
+4. Tests that protect important invariants actually assert those invariants.
+5. Third-party behaviours critical to correctness have been verified.
+6. Lifecycle and failure semantics have been exercised where material.
+7. Migration/upgrade behaviour meets the locked specification.
+8. No known resource grows without an intentional retention policy.
+9. Documentation describes observed/current behaviour rather than inferred behaviour.
+10. No agent worktree, scratch file, accidental generated output, or orchestration residue is included, and every swarm worktree and `swarm/*` branch has been removed.
+11. The final diff contains no unexplained scope expansion.
+12. The orchestrator is satisfied that the **specification**, not merely the implementation plan, has been met.
 
 Then report:
 
@@ -689,7 +485,7 @@ A short restatement of the locked goal.
 The major behaviours implemented.
 
 ### Evidence
-Acceptance criterion → validating evidence. For E2E: plan/scenario id, surface and tool, candidate SHA, and the key confirmation (screenshot path, API status and response excerpt, CLI exit code and output excerpt).
+Acceptance criterion → validating evidence.
 
 ### Swarm execution
 Streams, models, and notable routing decisions.
@@ -698,7 +494,7 @@ Streams, models, and notable routing decisions.
 Important defects discovered between streams and how later implementation rounds resolved them.
 
 ### Residual risks
-Anything genuinely remaining, including skipped environmental tests, evidence substitutions the operator acknowledged, and pre-existing defects left out of scope.
+Anything genuinely remaining, including skipped environmental tests.
 
 ### Change set
 Final branch/PR/commits as appropriate.
@@ -757,13 +553,13 @@ The swarm should improve its process from failures, not merely repair the curren
 When invoked with a change request:
 
 1. Announce **Specification Phase**.
-2. Research the repository and establish a green baseline before asking questions.
+2. Research the repository before asking questions.
 3. Ask the first unresolved operator decision, one question only, with recommendation and trade-off.
 4. Continue until the Zero-Ambiguity Gate is satisfied.
 5. Present the LOCKED SPECIFICATION and request explicit approval.
 6. After approval, show the implementation DAG and model routing.
 7. Create a worktree per writing stream from the locked base, then dispatch implementation streams into them.
-8. Integrate and fan out validation, including fixed E2E plans dispatched to Haiku and any exploratory charters dispatched to Sonnet. Verify their confirmation evidence yourself.
+8. Integrate and fan out validation.
 9. Replan defects into further implementation rounds.
 10. Stop only at the Completion Gate.
 

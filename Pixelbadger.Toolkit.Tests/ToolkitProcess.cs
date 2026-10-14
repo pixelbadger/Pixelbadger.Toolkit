@@ -44,6 +44,7 @@ internal static class ToolkitProcess
             RedirectStandardError = true,
             UseShellExecute = false
         };
+        startInfo.Environment["TERM"] = "xterm";
         startInfo.Environment["XDG_CONFIG_HOME"] = configHome;
         startInfo.Environment["APPDATA"] = configHome;
 

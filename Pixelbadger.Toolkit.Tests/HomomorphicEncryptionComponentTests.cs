@@ -488,6 +488,50 @@ public class HomomorphicEncryptionComponentTests
             .WithMessage("*non-negative*");
     }
 
+    [Fact]
+    public void SubstringEncrypted_ShouldReturnEmptyString_WhenStartEqualsStringLength()
+    {
+        var key = TestKey.Value;
+        var encrypted = _component.EncryptString("hello", new PaillierPublicKey { N = key.N });
+
+        var substring = _component.SubstringEncrypted(encrypted, 100);
+
+        substring.Characters.Should().HaveCount(100);
+        _component.DecryptString(substring, key).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void SubstringEncrypted_ShouldReturnEmptyString_WhenInputIsEmptyString()
+    {
+        var key = TestKey.Value;
+        var encrypted = _component.EncryptString("", new PaillierPublicKey { N = key.N });
+
+        var substring = _component.SubstringEncrypted(encrypted, 0);
+
+        _component.DecryptString(substring, key).Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData("0", null)]
+    [InlineData("-5", null)]
+    [InlineData("N", null)]
+    [InlineData(null, "0")]
+    [InlineData(null, "-5")]
+    [InlineData(null, "N")]
+    public void Decrypt_ShouldThrowUniformCryptographicException_WhenLambdaOrMuOutOfBounds(string? lambda, string? mu)
+    {
+        var key = TestKey.Value;
+        var bad = new PaillierKeyPair
+        {
+            N = key.N,
+            Lambda = (lambda == "N" ? key.N : lambda) ?? key.Lambda,
+            Mu = (mu == "N" ? key.N : mu) ?? key.Mu
+        };
+
+        AssertDecryptionFails(() => _component.Decrypt(Good(), bad));
+        AssertDecryptionFails(() => _component.DecryptString(HelloWorld.Value, bad));
+    }
+
     // ---- Fixtures and helpers ----
 
     private static readonly Lazy<EncryptedString> HelloWorld = new(() =>
