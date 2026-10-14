@@ -74,7 +74,7 @@ Implementation and integration repeat until the locked specification is satisfie
 - silently change the locked specification during implementation;
 - ask the operator a question that can be answered by inspecting the repository, dependency source, documentation, tests, runtime behaviour, or other available evidence;
 - accept an implementor's success claim as proof without reviewing evidence;
-- execute E2E scenarios itself (driving a browser, taking screenshots, running scenario CLI/API transcripts); E2E is always run by E2E executors (see **E2E Verification Protocol**);
+- execute E2E scenarios itself (driving a browser, taking screenshots, running scenario CLI/API transcripts); E2E is always run by E2E executors (see **E2E Verification Protocol**). The one exception is preparing blind fixtures for an exploratory charter (§3a), whose ground truth must stay hidden from the executor;
 - declare completion because "tests pass" if the tests do not prove the specification.
 
 ### The orchestrator MAY
@@ -89,7 +89,7 @@ Implementation and integration repeat until the locked specification is satisfie
 - abandon or replan a stream;
 - reopen specification when integration reveals a genuine unresolved product or contract decision.
 
-**If a repository write is required, dispatch an implementor.**
+**If a repository write is required, dispatch an implementor.** This includes small operator side requests made mid-run (e.g. a one-line CLAUDE.md note). Prefer folding a side request into an implementor stream that is about to run; dispatch a dedicated one only when none is.
 
 ---
 
@@ -106,8 +106,9 @@ Before interviewing the operator:
 3. Inspect tests that define current behaviour.
 4. Inspect recent related commits/PRs when they clarify architectural intent.
 5. If correctness depends on a third-party library's behaviour, inspect its source or authoritative implementation evidence rather than assuming.
-6. Identify which questions are factual and answer them yourself.
-7. Ask the operator only questions that require product intent, trade-offs, or risk decisions.
+6. **Establish a green baseline.** Build the base commit and run its test suite in this environment. Record pre-existing failures, and the environment requirements needed to get green: SDKs, environment variables such as `TERM`, licences, and build configurations that can't run here. Diagnose any failure that isn't explained before going further. These findings become the **Environment block** that every brief carries.
+7. Identify which questions are factual and answer them yourself.
+8. Ask the operator only questions that require product intent, trade-offs, or risk decisions.
 
 Do not use the operator as a substitute for codebase research.
 
@@ -121,10 +122,12 @@ For every question:
 
 - state why the decision matters;
 - give your recommended answer;
-- state the principal trade-off;
+- state the principal trade-off, quantified from measurement or repository evidence (benchmarks, timings, file sizes) whenever measuring is cheap. Never quantify it from an unverified estimate;
 - wait for the operator's answer before moving to the next decision.
 
 Push back on vague answers. Convert intentions such as "robust", "fast", "compatible", "simple", "event-driven", or "production-ready" into observable behaviour.
+
+Ask only about product intent, trade-offs, and risk. Decide engineering details yourself: exact error messages, validation rules, limits that follow from an earlier decision. Mark each one with ⚙ in the LOCKED SPECIFICATION so the operator can override it at approval.
 
 Explore only relevant branches. Typical branches include:
 
@@ -176,7 +179,7 @@ Do not enter implementation until you can answer **yes** to all of these:
 - Does every user-facing acceptance criterion have an E2E surface, and is the tooling for that surface available in this environment?
 - Are you, the orchestrator, fully satisfied that the specification is coherent?
 
-Then present a concise **LOCKED SPECIFICATION** containing the decisions and acceptance criteria.
+Then present a concise **LOCKED SPECIFICATION** containing the decisions and acceptance criteria. Mark orchestrator-decided items with ⚙.
 
 Ask the operator for explicit approval.
 
@@ -269,7 +272,8 @@ Every implementation stream receives a brief containing the following.
 - locked specification relevant to this stream;
 - base branch/commit;
 - upstream stream outputs it may rely upon;
-- exact scope boundaries.
+- exact scope boundaries;
+- the **Environment block** from the baseline: required environment variables, build configuration, and known pre-existing failures.
 
 ## Objective
 
@@ -285,7 +289,7 @@ One clear result the worker owns.
 
 ## Required verification
 
-Name the focused tests/checks that establish correctness.
+Name the focused tests/checks that establish correctness. Implementors run **filtered** test runs scoped to their change. The full suite runs once per candidate, owned by the orchestrator (Phase 4).
 
 Require new tests where behaviour changes.
 
@@ -315,7 +319,10 @@ The worker must:
    - any unverified claims;
    - any suspected cross-stream risk;
 4. not merge other streams;
-5. not claim the overall feature is complete.
+5. not claim the overall feature is complete;
+6. leave no background process running past the handover. All work must have finished before the report is sent;
+7. keep the report compact (aim for 60 lines or fewer): facts, commands and results. No narration;
+8. use the commit attribution trailer exactly as the brief gives it.
 
 ### Worktrees (mandatory)
 
@@ -343,7 +350,8 @@ States:
 
 - blocked
 - running
-- ready
+- ready (returned, awaiting review)
+- accepted (reviewed against its contract)
 - rejected
 - superseded
 
@@ -357,7 +365,9 @@ When an implementor returns:
 
 Do not perform full integration analysis piecemeal. First obtain a coherent candidate containing all currently accepted streams.
 
-If combining streams requires content edits or merge-conflict decisions, dispatch a bounded **composition implementor**. The orchestrator may specify the resolution but must not edit the files itself.
+If a report or completion notice arrives again after a stream was accepted, treat it as a duplicate. Before relying on that stream, re-check that its branch head is unchanged and its worktree is clean.
+
+The orchestrator may compose accepted streams itself, in a dedicated composition worktree, when no content decision is needed: conflict-free merges and fast-forwards. If combining streams requires content edits or merge-conflict decisions, dispatch a bounded **composition implementor**. The orchestrator may specify the resolution but must not edit the files itself.
 
 ---
 
@@ -417,9 +427,8 @@ The orchestrator synthesises all findings.
 
 Run the strongest available evidence appropriate to the specification:
 
-- build;
-- unit tests;
-- integration tests;
+- build (once per candidate, before fan-out);
+- the full unit and integration suite, run once per candidate by the orchestrator in its own worktree, alongside the E2E plans (but never alongside timing plans);
 - end-to-end verification, always per the **E2E Verification Protocol** (executed by E2E executors, never by the orchestrator);
 - migrations against realistic prior state;
 - fault/retry/restart tests;
@@ -445,6 +454,8 @@ Classify each finding as one of:
 - **verification defect** — behaviour may be right but evidence is inadequate (including an E2E plan that was wrong or too weak, or confirmation evidence that does not prove the expected outcome);
 - **documentation defect** — prose differs from demonstrated behaviour;
 - **specification defect** — the locked spec is incomplete, contradictory, or requires a new operator decision.
+
+A defect that **predates** the change is in scope when it violates a locked acceptance criterion; classify it as above. Otherwise, record it as a residual risk and tell the operator. Do not silently widen the change to fix it.
 
 ## 5. Loop correctly
 
@@ -491,6 +502,7 @@ Scoping rules:
 - A feature that has a web UI gets at least one web-UI happy-path scenario, even when most of its criteria are scoped to API/CLI.
 - The system under test is never mocked. External third-party dependencies are real, sandboxed, or stubbed only as the locked spec allows. Record which.
 - If a surface's tooling is unavailable in this environment, that is a Zero-Ambiguity Gate failure, not a reason to scope down silently. Raise it with the operator before SPEC LOCK.
+- If the environment later prevents the evidence the locked spec names (e.g. a Release build that needs a licence only CI has), propose the closest substitute and get the operator's acknowledgement before relying on it. Record the substitution in the Completion Report.
 
 ### Chrome tooling for web UI
 
@@ -515,6 +527,9 @@ Candidate:     <branch> @ <SHA>, at <absolute worktree path>
 Surface/tool:  <web UI via Claude in Chrome | web UI via Playwright+Chromium | API via curl | CLI>
 Evidence dir:  <absolute path in scratch, e.g. <scratch>/e2e/<plan-id>/>
 Isolation:     port <N>, data dir <path>, any env vars. Unique per executor running in parallel.
+Environment:   the Environment block (e.g. TERM=xterm), applied to every command.
+Glossary:      every command, helper and check a step may name, defined once, exactly
+               (e.g. COUNT f := <command>; DECRYPT f := <command>). Steps use only these names.
 
 SETUP (exact commands, in order, each with its expected success signal)
   S1 `<command>`  → expect: <e.g. "listening on :5123" within 30s>
@@ -541,7 +556,7 @@ Plan rules:
 ## 3. Prepare and dispatch executors
 
 1. **Build once.** The orchestrator builds the candidate before fan-out, so parallel executors do not race on build output. Executors run the prebuilt artefact.
-2. **Isolate.** Each parallel executor gets its own port, data directory, and evidence directory. If the app cannot run as multiple instances, run its plans sequentially.
+2. **Isolate.** Each parallel executor gets its own port, data directory, and evidence directory. If the app cannot run as multiple instances, run its plans sequentially. **Timing and performance scenarios run alone**, with no other executors, test suites or builds running at the same time. Put them in their own plan and record the machine's core count and load average with the results.
 3. **Dispatch** each fixed plan to a **Haiku 5.5** subagent with the executor brief below and the plan verbatim. If a scenario that proves an acceptance criterion seems to need judgement, the plan is not strict enough, so rewrite it. Do not escalate it to Sonnet.
 4. **Exploratory sessions** go to **Sonnet 5.5** (see §3a). Use them when you need to probe beyond the scripted paths: edge cases, unexpected input, UI states, or interactions between features.
 
@@ -572,9 +587,12 @@ E2E CHARTER <charter-id>
 Candidate, surface/tool, evidence dir, isolation, SETUP, TEARDOWN: as for a fixed plan
 Mission:   <what to probe, e.g. "invalid and boundary input on the config form">
 Spec refs: <the acceptance criteria and failure semantics that define correct behaviour>
+Locked decisions: <deliberate behaviours that are expected, not findings (e.g. "NUL is stripped wherever it appears")>
 In scope / out of scope: <areas, actions not allowed (e.g. no destructive admin actions)>
 Budget:    <max scenarios or tool calls, max screenshots retained>
 ```
+
+**Blind fixtures.** When the mission is to infer hidden properties (e.g. "can an attacker tell the length or the relationships?"), the orchestrator, or a separate setup executor, prepares the target fixtures. The ground truth (plaintexts, keys, derivations) is kept outside the executor's reach and forbidden to it. Score the executor's guesses against the ground truth afterwards. "Could not do better than chance" is valid and useful evidence.
 
 The executor brief is the same as for fixed plans, with the step-order rules replaced by: "Explore within the mission and budget. When behaviour contradicts the spec refs or looks wrong, record it as a finding, with exact reproduction steps and evidence, then move on. Do not diagnose or fix."
 
@@ -636,9 +654,9 @@ Outcomes:
 | BLOCKED after one retry | environment issue | diagnose read-only. If it can't be resolved, record it as a residual risk and tell the operator. A criterion with no E2E evidence is not complete |
 | Evidence reveals behaviour the spec never decided | specification defect | return to Phase 1 |
 
-After any implementation round, re-run every E2E plan that touches changed behaviour, on the new candidate SHA. Evidence from an earlier SHA does not count.
+After any implementation round, re-run every E2E plan that touches changed behaviour, on the new candidate SHA. Evidence from an earlier SHA does not count. A re-run may go to the same executor as a message carrying an explicit substitution list (candidate SHA, worktree path, a fresh evidence dir) plus any added scenarios. The executor must not read earlier evidence.
 
-Evidence dirs live in scratch space and are never committed. Delete them once the completion report has been delivered.
+Evidence dirs live in scratch space and are never committed. Delete them only after the operator has read the completion report, so they can ask to see raw evidence.
 
 ---
 
@@ -680,7 +698,7 @@ Streams, models, and notable routing decisions.
 Important defects discovered between streams and how later implementation rounds resolved them.
 
 ### Residual risks
-Anything genuinely remaining, including skipped environmental tests.
+Anything genuinely remaining, including skipped environmental tests, evidence substitutions the operator acknowledged, and pre-existing defects left out of scope.
 
 ### Change set
 Final branch/PR/commits as appropriate.
@@ -739,7 +757,7 @@ The swarm should improve its process from failures, not merely repair the curren
 When invoked with a change request:
 
 1. Announce **Specification Phase**.
-2. Research the repository before asking questions.
+2. Research the repository and establish a green baseline before asking questions.
 3. Ask the first unresolved operator decision, one question only, with recommendation and trade-off.
 4. Continue until the Zero-Ambiguity Gate is satisfied.
 5. Present the LOCKED SPECIFICATION and request explicit approval.
