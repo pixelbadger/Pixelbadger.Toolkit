@@ -8,9 +8,22 @@ namespace Pixelbadger.Toolkit.Tests;
 
 public class HomomorphicEncryptionComponentTests
 {
-    private readonly HomomorphicEncryptionComponent _component = new();
-    private static readonly Lazy<PaillierKeyPair> TestKey = new(() => new HomomorphicEncryptionComponent().GenerateKey());
-    private static readonly Lazy<PaillierKeyPair> SecondTestKey = new(() => new HomomorphicEncryptionComponent().GenerateKey());
+    // Fast tests use small keys via the internal minimum-key-size seam; _strict enforces the real 2048-bit minimum.
+    private static HomomorphicEncryptionComponent NewFast() => new(512);
+    private readonly HomomorphicEncryptionComponent _component = NewFast();
+    private readonly HomomorphicEncryptionComponent _strict = new();
+    private static readonly Lazy<PaillierKeyPair> TestKey = new(() => NewFast().GenerateKey(512));
+    private static readonly Lazy<PaillierKeyPair> SecondTestKey = new(() => NewFast().GenerateKey(512));
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<(string N, string Text), string> EncryptedStringCache = new();
+
+    // Encrypting a string costs 100 modular exponentiations; tests that only need an input
+    // ciphertext share one encryption per (key, text) and each get an independent copy.
+    private EncryptedString CachedEncrypt(string text, PaillierPublicKey publicKey)
+    {
+        var json = EncryptedStringCache.GetOrAdd((publicKey.N, text),
+            k => System.Text.Json.JsonSerializer.Serialize(_component.EncryptString(k.Text, publicKey)));
+        return System.Text.Json.JsonSerializer.Deserialize<EncryptedString>(json)!;
+    }
 
     [Fact]
     public void GenerateKey_ShouldReturnKeyPairWithValidPositiveBigIntegerStrings()
@@ -207,7 +220,7 @@ public class HomomorphicEncryptionComponentTests
         var key = TestKey.Value;
         var publicKey = new PaillierPublicKey { N = key.N };
 
-        var encrypted = _component.EncryptString("hello world", publicKey);
+        var encrypted = CachedEncrypt("hello world", publicKey);
         var replaced = _component.ReplaceInString(encrypted, 6, "there");
         var decrypted = _component.DecryptString(replaced, key);
 
@@ -220,7 +233,7 @@ public class HomomorphicEncryptionComponentTests
         var key = TestKey.Value;
         var publicKey = new PaillierPublicKey { N = key.N };
 
-        var encrypted = _component.EncryptString("hello", publicKey);
+        var encrypted = CachedEncrypt("hello", publicKey);
         var replaced = _component.ReplaceInString(encrypted, 0, "H");
         var decrypted = _component.DecryptString(replaced, key);
 
@@ -233,7 +246,7 @@ public class HomomorphicEncryptionComponentTests
         var key = TestKey.Value;
         var publicKey = new PaillierPublicKey { N = key.N };
 
-        var encrypted = _component.EncryptString("hello", publicKey);
+        var encrypted = CachedEncrypt("hello", publicKey);
         var replaced = _component.ReplaceInString(encrypted, 3, "p!");
         var decrypted = _component.DecryptString(replaced, key);
 
@@ -246,7 +259,7 @@ public class HomomorphicEncryptionComponentTests
         var key = TestKey.Value;
         var publicKey = new PaillierPublicKey { N = key.N };
 
-        var encrypted = _component.EncryptString("abcde", publicKey);
+        var encrypted = CachedEncrypt("abcde", publicKey);
 
         var replaced = _component.ReplaceInString(encrypted, 2, "X");
 
@@ -263,7 +276,7 @@ public class HomomorphicEncryptionComponentTests
         var key = TestKey.Value;
         var publicKey = new PaillierPublicKey { N = key.N };
 
-        var encrypted = _component.EncryptString("hi", publicKey);
+        var encrypted = CachedEncrypt("hi", publicKey);
 
         var act = () => _component.ReplaceInString(encrypted, 99, "xy");
 
@@ -359,7 +372,7 @@ public class HomomorphicEncryptionComponentTests
     [Fact]
     public void GenerateKey_ShouldThrowArgumentException_WhenBitLengthIsBelowSecurityMinimum()
     {
-        var act = () => _component.GenerateKey(HomomorphicEncryptionComponent.MinimumKeyBitLength - 8);
+        var act = () => _strict.GenerateKey(HomomorphicEncryptionComponent.MinimumKeyBitLength - 8);
 
         act.Should().Throw<ArgumentException>()
             .WithMessage("*at least 2048 bits*");
@@ -371,7 +384,7 @@ public class HomomorphicEncryptionComponentTests
         var key = TestKey.Value;
         var publicKey = new PaillierPublicKey { N = key.N };
 
-        var encrypted = _component.EncryptString("hello world", publicKey);
+        var encrypted = CachedEncrypt("hello world", publicKey);
         var substring = _component.SubstringEncrypted(encrypted, 6, 5);
         var decrypted = _component.DecryptString(substring, key);
 
@@ -384,7 +397,7 @@ public class HomomorphicEncryptionComponentTests
         var key = TestKey.Value;
         var publicKey = new PaillierPublicKey { N = key.N };
 
-        var encrypted = _component.EncryptString("hello world", publicKey);
+        var encrypted = CachedEncrypt("hello world", publicKey);
         var substring = _component.SubstringEncrypted(encrypted, 6);
         var decrypted = _component.DecryptString(substring, key);
 
@@ -397,7 +410,7 @@ public class HomomorphicEncryptionComponentTests
         var key = TestKey.Value;
         var publicKey = new PaillierPublicKey { N = key.N };
 
-        var encrypted = _component.EncryptString("hello", publicKey);
+        var encrypted = CachedEncrypt("hello", publicKey);
         var substring = _component.SubstringEncrypted(encrypted, 0);
         var decrypted = _component.DecryptString(substring, key);
 
@@ -410,7 +423,7 @@ public class HomomorphicEncryptionComponentTests
         var key = TestKey.Value;
         var publicKey = new PaillierPublicKey { N = key.N };
 
-        var encrypted = _component.EncryptString("hello", publicKey);
+        var encrypted = CachedEncrypt("hello", publicKey);
         var substring = _component.SubstringEncrypted(encrypted, 2, 0);
 
         substring.Characters.Should().HaveCount(100);
@@ -423,7 +436,7 @@ public class HomomorphicEncryptionComponentTests
         var key = TestKey.Value;
         var publicKey = new PaillierPublicKey { N = key.N };
 
-        var encrypted = _component.EncryptString("hello", publicKey);
+        var encrypted = CachedEncrypt("hello", publicKey);
         var substring = _component.SubstringEncrypted(encrypted, 1, 1);
         var decrypted = _component.DecryptString(substring, key);
 
@@ -436,7 +449,7 @@ public class HomomorphicEncryptionComponentTests
         var key = TestKey.Value;
         var publicKey = new PaillierPublicKey { N = key.N };
 
-        var encrypted = _component.EncryptString("hello", publicKey);
+        var encrypted = CachedEncrypt("hello", publicKey);
         var substring = _component.SubstringEncrypted(encrypted, 0, 3);
 
         substring.Characters.Should().HaveCount(100);
@@ -452,7 +465,7 @@ public class HomomorphicEncryptionComponentTests
         var key = TestKey.Value;
         var publicKey = new PaillierPublicKey { N = key.N };
 
-        var encrypted = _component.EncryptString("hello", publicKey);
+        var encrypted = CachedEncrypt("hello", publicKey);
 
         var act = () => _component.SubstringEncrypted(encrypted, -1);
 
@@ -466,7 +479,7 @@ public class HomomorphicEncryptionComponentTests
         var key = TestKey.Value;
         var publicKey = new PaillierPublicKey { N = key.N };
 
-        var encrypted = _component.EncryptString("hello", publicKey);
+        var encrypted = CachedEncrypt("hello", publicKey);
 
         var act = () => _component.SubstringEncrypted(encrypted, 98, 5);
 
@@ -480,7 +493,7 @@ public class HomomorphicEncryptionComponentTests
         var key = TestKey.Value;
         var publicKey = new PaillierPublicKey { N = key.N };
 
-        var encrypted = _component.EncryptString("hello", publicKey);
+        var encrypted = CachedEncrypt("hello", publicKey);
 
         var act = () => _component.SubstringEncrypted(encrypted, 0, -1);
 
@@ -492,7 +505,7 @@ public class HomomorphicEncryptionComponentTests
     public void SubstringEncrypted_ShouldReturnEmptyString_WhenStartEqualsStringLength()
     {
         var key = TestKey.Value;
-        var encrypted = _component.EncryptString("hello", new PaillierPublicKey { N = key.N });
+        var encrypted = CachedEncrypt("hello", new PaillierPublicKey { N = key.N });
 
         var substring = _component.SubstringEncrypted(encrypted, 100);
 
@@ -535,7 +548,7 @@ public class HomomorphicEncryptionComponentTests
     // ---- Fixtures and helpers ----
 
     private static readonly Lazy<EncryptedString> HelloWorld = new(() =>
-        new HomomorphicEncryptionComponent().EncryptString("hello world", new PaillierPublicKey { N = TestKey.Value.N }));
+        NewFast().EncryptString("hello world", new PaillierPublicKey { N = TestKey.Value.N }));
 
     private const string DecryptionFailureMessage = "Decryption failed: input is invalid or was not encrypted with this key.";
 
@@ -547,7 +560,7 @@ public class HomomorphicEncryptionComponentTests
 
     private static EncryptedString Legacy(string text, PaillierKeyPair key)
     {
-        var c = new HomomorphicEncryptionComponent();
+        var c = NewFast();
         var pk = new PaillierPublicKey { N = key.N };
         return new EncryptedString
         {
@@ -664,7 +677,7 @@ public class HomomorphicEncryptionComponentTests
     public void ReplaceInString_ShouldWriteIntoPadding_WhenStartIsPastRealEnd()
     {
         var key = TestKey.Value;
-        var encrypted = _component.EncryptString("hello", new PaillierPublicKey { N = key.N });
+        var encrypted = CachedEncrypt("hello", new PaillierPublicKey { N = key.N });
 
         var replaced = _component.ReplaceInString(encrypted, 7, "X");
 
@@ -834,11 +847,11 @@ public class HomomorphicEncryptionComponentTests
         var small = new EncryptedNumber { Ciphertext = "5", N = "15" };
         var good = Good();
 
-        new Action(() => _component.SubstringEncrypted(WithChars(small), 0, 1)).Should().Throw<ArgumentException>().WithMessage("*2048 bits*");
-        new Action(() => _component.ReplaceInString(WithChars(small), 0, "a")).Should().Throw<ArgumentException>().WithMessage("*2048 bits*");
-        new Action(() => _component.AddEncrypted(small, small)).Should().Throw<ArgumentException>().WithMessage("*2048 bits*");
-        new Action(() => _component.SubtractEncrypted(good, small)).Should().Throw<ArgumentException>().WithMessage("*2048 bits*");
-        new Action(() => _component.MultiplyEncrypted(small, 2)).Should().Throw<ArgumentException>().WithMessage("*2048 bits*");
+        new Action(() => _strict.SubstringEncrypted(WithChars(small), 0, 1)).Should().Throw<ArgumentException>().WithMessage("*2048 bits*");
+        new Action(() => _strict.ReplaceInString(WithChars(small), 0, "a")).Should().Throw<ArgumentException>().WithMessage("*2048 bits*");
+        new Action(() => _strict.AddEncrypted(small, small)).Should().Throw<ArgumentException>().WithMessage("*2048 bits*");
+        new Action(() => _strict.SubtractEncrypted(good, small)).Should().Throw<ArgumentException>().WithMessage("*2048 bits*");
+        new Action(() => _strict.MultiplyEncrypted(small, 2)).Should().Throw<ArgumentException>().WithMessage("*2048 bits*");
     }
 
     public static IEnumerable<object[]> BadCiphertexts()
@@ -981,7 +994,7 @@ public class HomomorphicEncryptionComponentTests
     [MemberData(nameof(BadModuli))]
     public void Encrypt_ShouldRejectModulus_WhenNotPositiveOdd(string n)
     {
-        var act = () => _component.Encrypt(1, new PaillierPublicKey { N = n });
+        var act = () => _strict.Encrypt(1, new PaillierPublicKey { N = n });
         act.Should().Throw<ArgumentException>().WithMessage($"*{ModulusMessage}*");
     }
 
@@ -989,7 +1002,7 @@ public class HomomorphicEncryptionComponentTests
     [MemberData(nameof(BadModuli))]
     public void EncryptString_ShouldRejectModulus_WhenNotPositiveOdd(string n)
     {
-        var act = () => _component.EncryptString("hi", new PaillierPublicKey { N = n });
+        var act = () => _strict.EncryptString("hi", new PaillierPublicKey { N = n });
         act.Should().Throw<ArgumentException>().WithMessage($"*{ModulusMessage}*");
     }
 
@@ -997,7 +1010,7 @@ public class HomomorphicEncryptionComponentTests
     [MemberData(nameof(BadModuli))]
     public void SubstringEncrypted_ShouldRejectModulus_WhenNotPositiveOdd(string n)
     {
-        var act = () => _component.SubstringEncrypted(BadModulusString(n), 0, 1);
+        var act = () => _strict.SubstringEncrypted(BadModulusString(n), 0, 1);
         act.Should().Throw<ArgumentException>().WithMessage($"*{ModulusMessage}*");
     }
 
@@ -1005,7 +1018,7 @@ public class HomomorphicEncryptionComponentTests
     [MemberData(nameof(BadModuli))]
     public void ReplaceInString_ShouldRejectModulus_WhenNotPositiveOdd(string n)
     {
-        var act = () => _component.ReplaceInString(BadModulusString(n), 0, "x");
+        var act = () => _strict.ReplaceInString(BadModulusString(n), 0, "x");
         act.Should().Throw<ArgumentException>().WithMessage($"*{ModulusMessage}*");
     }
 
@@ -1014,7 +1027,7 @@ public class HomomorphicEncryptionComponentTests
     public void AddEncrypted_ShouldRejectModulus_WhenNotPositiveOdd(string n)
     {
         var e = new EncryptedNumber { Ciphertext = "5", N = n };
-        var act = () => _component.AddEncrypted(e, e);
+        var act = () => _strict.AddEncrypted(e, e);
         act.Should().Throw<ArgumentException>().WithMessage($"*{ModulusMessage}*");
     }
 
@@ -1023,7 +1036,7 @@ public class HomomorphicEncryptionComponentTests
     public void SubtractEncrypted_ShouldRejectModulus_WhenNotPositiveOdd(string n)
     {
         var e = new EncryptedNumber { Ciphertext = "5", N = n };
-        var act = () => _component.SubtractEncrypted(e, e);
+        var act = () => _strict.SubtractEncrypted(e, e);
         act.Should().Throw<ArgumentException>().WithMessage($"*{ModulusMessage}*");
     }
 
@@ -1032,7 +1045,7 @@ public class HomomorphicEncryptionComponentTests
     public void MultiplyEncrypted_ShouldRejectModulus_WhenNotPositiveOdd(string n)
     {
         var e = new EncryptedNumber { Ciphertext = "5", N = n };
-        var act = () => _component.MultiplyEncrypted(e, 3);
+        var act = () => _strict.MultiplyEncrypted(e, 3);
         act.Should().Throw<ArgumentException>().WithMessage($"*{ModulusMessage}*");
     }
 
@@ -1041,7 +1054,7 @@ public class HomomorphicEncryptionComponentTests
     public void Decrypt_ShouldThrowUniformException_WhenKeyModulusNotPositiveOdd(string n)
     {
         var key = new PaillierKeyPair { N = n, Lambda = "3", Mu = "5" };
-        var act = () => _component.Decrypt(new EncryptedNumber { Ciphertext = "5", N = n }, key);
+        var act = () => _strict.Decrypt(new EncryptedNumber { Ciphertext = "5", N = n }, key);
         act.Should().Throw<CryptographicException>().WithMessage(DecryptFailureMessage);
     }
 
@@ -1050,7 +1063,7 @@ public class HomomorphicEncryptionComponentTests
     public void DecryptString_ShouldThrowUniformException_WhenKeyModulusNotPositiveOdd(string n)
     {
         var key = new PaillierKeyPair { N = n, Lambda = "3", Mu = "5" };
-        var act = () => _component.DecryptString(BadModulusString(n), key);
+        var act = () => _strict.DecryptString(BadModulusString(n), key);
         act.Should().Throw<CryptographicException>().WithMessage(DecryptFailureMessage);
     }
 
@@ -1058,7 +1071,7 @@ public class HomomorphicEncryptionComponentTests
     public void SubstringEncrypted_ShouldReportRangeError_WhenStartExceedsLengthAndLengthOmitted()
     {
         var key = TestKey.Value;
-        var encrypted = _component.EncryptString("hello", new PaillierPublicKey { N = key.N });
+        var encrypted = CachedEncrypt("hello", new PaillierPublicKey { N = key.N });
 
         var act = () => _component.SubstringEncrypted(encrypted, 101);
 

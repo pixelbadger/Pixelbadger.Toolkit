@@ -9,6 +9,21 @@ public class HomomorphicEncryptionComponent
     public const int DefaultKeyBitLength = 2048;
     public const int MinimumKeyBitLength = 2048;
 
+    private readonly int _minimumKeyBitLength;
+
+    public HomomorphicEncryptionComponent() : this(MinimumKeyBitLength)
+    {
+    }
+
+    // Test seam: lets tests use small keys. Production callers use the parameterless constructor,
+    // and a smaller minimum can never be configured below 512 bits.
+    internal HomomorphicEncryptionComponent(int minimumKeyBitLength)
+    {
+        if (minimumKeyBitLength < 512)
+            throw new ArgumentOutOfRangeException(nameof(minimumKeyBitLength));
+        _minimumKeyBitLength = minimumKeyBitLength;
+    }
+
     public PaillierKeyPair GenerateKey(int bitLength = DefaultKeyBitLength)
     {
         ValidateKeyBitLength(bitLength);
@@ -56,7 +71,7 @@ public class HomomorphicEncryptionComponent
     {
         try
         {
-            var ctx = DecryptionContext.Create(key);
+            var ctx = DecryptionContext.Create(key, ValidateModulus);
             return DecryptCore(encryptedNumber, ctx);
         }
         catch
@@ -99,7 +114,7 @@ public class HomomorphicEncryptionComponent
             if (chars.Length > MaxStringLength)
                 throw new CryptographicException();
 
-            var ctx = DecryptionContext.Create(key);
+            var ctx = DecryptionContext.Create(key, ValidateModulus);
             var values = new int[chars.Length];
             Parallel.For(0, chars.Length, i =>
             {
@@ -227,10 +242,10 @@ public class HomomorphicEncryptionComponent
 
     private sealed record DecryptionContext(BigInteger N, BigInteger NSquared, BigInteger Lambda, BigInteger Mu)
     {
-        public static DecryptionContext Create(PaillierKeyPair key)
+        public static DecryptionContext Create(PaillierKeyPair key, Action<BigInteger> validateModulus)
         {
             var n = BigInteger.Parse(key.N, System.Globalization.CultureInfo.InvariantCulture);
-            ValidateModulus(n);
+            validateModulus(n);
             var lambda = BigInteger.Parse(key.Lambda, System.Globalization.CultureInfo.InvariantCulture);
             var mu = BigInteger.Parse(key.Mu, System.Globalization.CultureInfo.InvariantCulture);
             // Bound lambda and mu so a crafted key file cannot force an enormous ModPow.
@@ -241,7 +256,7 @@ public class HomomorphicEncryptionComponent
     }
 
     // Throws on any problem; callers translate to the uniform decryption failure.
-    private static BigInteger DecryptCore(EncryptedNumber encrypted, DecryptionContext ctx)
+    private BigInteger DecryptCore(EncryptedNumber encrypted, DecryptionContext ctx)
     {
         if (!TryParseInteger(encrypted.N, out var cn) || cn != ctx.N)
             throw new CryptographicException();
@@ -262,7 +277,7 @@ public class HomomorphicEncryptionComponent
             System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out value);
     }
 
-    private static BigInteger ParseModulus(string? text, string paramName)
+    private BigInteger ParseModulus(string? text, string paramName)
     {
         if (!TryParseInteger(text, out var n))
             throw new ArgumentException("Modulus N is not a valid integer.", paramName);
@@ -271,7 +286,7 @@ public class HomomorphicEncryptionComponent
     }
 
     // Validates a single ciphertext and returns its modulus and value.
-    private static (BigInteger N, BigInteger C) ValidateCiphertext(EncryptedNumber? e, string what)
+    private (BigInteger N, BigInteger C) ValidateCiphertext(EncryptedNumber? e, string what)
     {
         if (e is null)
             throw new ArgumentException($"The {what} is missing.");
@@ -279,7 +294,7 @@ public class HomomorphicEncryptionComponent
         return (n, ValidateCiphertextValue(e, n, what));
     }
 
-    private static BigInteger ValidateCiphertextValue(EncryptedNumber e, BigInteger n, string what)
+    private BigInteger ValidateCiphertextValue(EncryptedNumber e, BigInteger n, string what)
     {
         if (!TryParseInteger(e.Ciphertext, out var c))
             throw new ArgumentException($"The {what} is not a valid integer.");
@@ -290,7 +305,7 @@ public class HomomorphicEncryptionComponent
         return c;
     }
 
-    private static (BigInteger N, BigInteger A, BigInteger B) ValidatePair(EncryptedNumber a, EncryptedNumber b)
+    private (BigInteger N, BigInteger A, BigInteger B) ValidatePair(EncryptedNumber a, EncryptedNumber b)
     {
         var (na, ca) = ValidateCiphertext(a, "first ciphertext");
         var (nb, cb) = ValidateCiphertext(b, "second ciphertext");
@@ -299,7 +314,7 @@ public class HomomorphicEncryptionComponent
         return (na, ca, cb);
     }
 
-    private static (BigInteger N, BigInteger NSquared, BigInteger[] Values) ValidateString(
+    private (BigInteger N, BigInteger NSquared, BigInteger[] Values) ValidateString(
         EncryptedString? s, bool requireNonEmpty)
     {
         if (s?.Characters is null)
@@ -365,20 +380,20 @@ public class HomomorphicEncryptionComponent
 
     private static BigInteger L(BigInteger x, BigInteger n) => (x - 1) / n;
 
-    private static void ValidateKeyBitLength(int bitLength)
+    private void ValidateKeyBitLength(int bitLength)
     {
-        if (bitLength < MinimumKeyBitLength)
-            throw new ArgumentException($"Paillier keys must be at least {MinimumKeyBitLength} bits.", nameof(bitLength));
+        if (bitLength < _minimumKeyBitLength)
+            throw new ArgumentException($"Paillier keys must be at least {_minimumKeyBitLength} bits.", nameof(bitLength));
 
         if (bitLength % 2 != 0 || bitLength % 8 != 0)
             throw new ArgumentException("Paillier key bit length must be divisible by 8 and 2.", nameof(bitLength));
     }
 
-    private static void ValidateModulus(BigInteger n)
+    private void ValidateModulus(BigInteger n)
     {
-        if (n.Sign <= 0 || n.IsEven || n.GetBitLength() < MinimumKeyBitLength)
+        if (n.Sign <= 0 || n.IsEven || n.GetBitLength() < _minimumKeyBitLength)
             throw new ArgumentException(
-                $"Paillier modulus must be a positive odd integer of at least {MinimumKeyBitLength} bits.");
+                $"Paillier modulus must be a positive odd integer of at least {_minimumKeyBitLength} bits.");
     }
 
     private static BigInteger Lcm(BigInteger a, BigInteger b) =>

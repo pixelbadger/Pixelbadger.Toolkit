@@ -45,6 +45,7 @@ internal static class ToolkitProcess
             UseShellExecute = false
         };
         startInfo.Environment["TERM"] = "xterm";
+        startInfo.Environment["NO_COLOR"] = "1"; // plain text so assertions never see ANSI escapes
         startInfo.Environment["XDG_CONFIG_HOME"] = configHome;
         startInfo.Environment["APPDATA"] = configHome;
 

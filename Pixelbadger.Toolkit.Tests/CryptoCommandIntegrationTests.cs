@@ -471,8 +471,7 @@ public class CryptoCommandIntegrationTests : IDisposable
         var encFile = Path.Combine(_testDirectory, "number.enc");
         var sumFile = Path.Combine(_testDirectory, "sum.enc");
 
-        await RunToolkitCommandAsync("crypto", "generate-key",
-            "--public-key-file", publicKeyFile, "--private-key-file", privateKeyFile);
+        await WriteKeyFilesAsync(publicKeyFile, privateKeyFile);
         await RunToolkitCommandAsync("crypto", "encrypt",
             "--number", "5", "--public-key-file", publicKeyFile, "--out-file", encFile);
 
@@ -485,7 +484,24 @@ public class CryptoCommandIntegrationTests : IDisposable
 
     private const string GenericError = "Error: Decryption failed: input is invalid or was not encrypted with this key.";
 
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> EncryptedJsonCache = new();
+
+    // Setup helper: encrypts in-process (cached per text) so tests that exercise other commands
+    // don't each pay for a CLI launch plus 100 modular exponentiations.
     private async Task<(string Pub, string Priv, string Enc)> EncryptFileAsync(string content)
+    {
+        var pub = Path.Combine(_testDirectory, "test.pub");
+        var priv = Path.Combine(_testDirectory, "test.key");
+        var enc = Path.Combine(_testDirectory, "msg.estr");
+        await WriteKeyFilesAsync(pub, priv);
+        var json = EncryptedJsonCache.GetOrAdd(content, text => JsonSerializer.Serialize(
+            new HomomorphicEncryptionComponent().EncryptString(text, new PaillierPublicKey { N = TestKey.Value.N }), JsonOptions));
+        await File.WriteAllTextAsync(enc, json);
+        return (pub, priv, enc);
+    }
+
+    // Drives the CLI's encrypt-string command so file reading and line-ending handling are covered.
+    private async Task<(string Pub, string Priv, string Enc)> EncryptFileViaCliAsync(string content)
     {
         var pub = Path.Combine(_testDirectory, "test.pub");
         var priv = Path.Combine(_testDirectory, "test.key");
@@ -513,7 +529,7 @@ public class CryptoCommandIntegrationTests : IDisposable
     [InlineData(" hello ", " hello ")]
     public async Task EncryptString_ShouldStripExactlyOneTrailingLineEnding_WhenReadingFromFile(string content, string expected)
     {
-        var (_, priv, enc) = await EncryptFileAsync(content);
+        var (_, priv, enc) = await EncryptFileViaCliAsync(content);
 
         (await DecryptStringAsync(enc, priv)).Should().Be(expected);
     }
@@ -521,7 +537,7 @@ public class CryptoCommandIntegrationTests : IDisposable
     [Fact]
     public async Task EncryptString_ShouldWriteExactly100Characters_WhenEncrypting()
     {
-        var (_, _, enc) = await EncryptFileAsync("hello");
+        var (_, _, enc) = await EncryptFileViaCliAsync("hello");
 
         var parsed = JsonSerializer.Deserialize<EncryptedString>(await File.ReadAllTextAsync(enc));
         parsed!.Characters.Should().HaveCount(100);
