@@ -27,6 +27,23 @@ This is the only place a model is named. Everything else in this skill, and ever
 
 When the models change, change this table only.
 
+## Skill files
+
+Only this file is read up front. Each other file is read at the phase that needs it.
+
+| File | Read | Contents |
+|---|---|---|
+| `reference/environment-checks.md` | Phase 0, end of research, before each fan-out | Staged environment checks, heal allow-lists, Environment block format |
+| `reference/e2e-design.md` | Phase 2 §3, Phase 4 | E2E surface selection, plan rules, dispatch, evidence verification |
+| `reference/completion-report.md` | Completion Gate | Completion Report template |
+| `briefs/implementor.md` | Each implementation or composition dispatch | Implementor brief |
+| `briefs/test-executor.md` | Each test-suite run | Test executor brief |
+| `briefs/reviewer.md` | Each read-only integration review | Reviewer brief |
+| `briefs/e2e-executor.md` | Each fixed E2E plan | E2E executor brief |
+| `briefs/e2e-explorer.md` | Each exploratory charter | E2E explorer brief |
+
+**Briefs are handed over whole.** Each brief is self-contained: a worker given only the filled brief has everything it needs, and never needs this file. To dispatch, read the brief, replace every `{{PLACEHOLDER}}` listed in its header comment, confirm none remains (search the filled text for `{{`), and pass the result on unchanged. Never paraphrase or abridge a brief.
+
 The delivery loop is:
 
 ```text
@@ -332,7 +349,7 @@ When a stream exposes a missing prerequisite:
 
 # Implementor Handoff Contract
 
-The implementor brief is `briefs/implementor.md`. Fill it and hand it to every implementation stream.
+Every implementation stream, and every composition implementor, is dispatched with `briefs/implementor.md`, filled per **Briefs are handed over whole**. The brief carries the stream's locked spec, contract, worktree, Environment block, focused verification and commit trailer.
 
 ### Worktrees (mandatory)
 
@@ -378,7 +395,7 @@ When an implementor returns:
 
 Do not perform full integration analysis piecemeal. First obtain a coherent candidate containing all currently accepted streams.
 
-**Early visual checkpoint for UI streams.** Visual intent is cheap to correct here and expensive after integration. When a stream that changes what a user sees returns, and before integration starts, dispatch a mechanical-tier executor with a one-scenario plan (start the stream's build, navigate, capture one PNG). Judge the PNG yourself against the locked spec and decide: if it contradicts the spec, reject the stream and re-dispatch it with the discrepancy; otherwise it can be accepted. Show the operator the PNG with one line on what it shows and what you decided, but do not wait for a reply. If operator feedback arrives later, treat it as you would at any other point: a spec change reopens Phase 1, anything inside the spec becomes a fix in the stream.
+**Early visual checkpoint for UI streams.** Visual intent is cheap to correct here and expensive after integration. When a stream that changes what a user sees returns, and before integration starts, dispatch a mechanical-tier executor with `briefs/e2e-executor.md` and a one-scenario plan (start the stream's build, navigate, capture one PNG). Judge the PNG yourself against the locked spec and decide: if it contradicts the spec, reject the stream and re-dispatch it with the discrepancy; otherwise it can be accepted. Show the operator the PNG with one line on what it shows and what you decided, but do not wait for a reply. If operator feedback arrives later, treat it as you would at any other point: a spec change reopens Phase 1, anything inside the spec becomes a fix in the stream.
 
 If a report or completion notice arrives again after a stream was accepted, treat it as a duplicate. Before relying on that stream, re-check that its branch head is unchanged and its worktree is clean.
 
@@ -419,7 +436,7 @@ Default candidates:
 
 The orchestrator should not perform all integration investigation serially.
 
-Create bounded **read-only verification briefs** for judgement- or mechanical-tier workers when parallel evidence gathering is useful. They run within the concurrency cap (see **Concurrency policy**).
+Dispatch bounded **read-only reviews** to judgement- or mechanical-tier workers with `briefs/reviewer.md`, one per dimension, when parallel evidence gathering is useful. They run within the concurrency cap (see **Concurrency policy**).
 
 Examples:
 

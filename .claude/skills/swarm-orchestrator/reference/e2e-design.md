@@ -28,7 +28,7 @@ Before writing a web-UI plan, check which Chrome tooling this session actually h
 
 **Browser economy.** Screenshots are expensive in context and weak as evidence of text. Plans prefer, in order: page text, element finds (selector or accessible name, with the element's text, value or state), and network reads (request/response status and body). A step takes a screenshot only when **layout is what's being judged**: placement, visibility, styling, overlap, rendering. Mark each such scenario `judges layout: yes` in the plan. Those captures stay in the evidence dir.
 
-The web-UI handover carries images on a fixed budget (§4): **one** PNG of the final state the plan names, plus one PNG per identified UI defect. Nothing else is handed over as an image.
+The web-UI handover carries images on a fixed budget (see Handover in `briefs/e2e-executor.md`): **one** PNG of the final state the plan names, plus one PNG per identified UI defect. Nothing else is handed over as an image.
 
 Every screenshot is saved as a PNG at the path the plan names. If the chosen browser tool cannot write screenshots to disk, the plan uses Playwright/Chromium for the capture step against the same running app.
 
@@ -36,7 +36,7 @@ Every screenshot is saved as a PNG at the path the plan names. If the chosen bro
 
 The plan is the executor's whole world. The mechanical tier follows it literally. Ambiguity in the plan becomes ambiguity in the evidence. Write it so that an executor with no other context can run it and could not reasonably come out with a different verdict.
 
-Finalise the plan against the assembled candidate. Read the actual routes, selectors, commands, ports, and seed data from the code, not from the spec.
+Write the plan in the plan format given in `briefs/e2e-executor.md`. Finalise the plan against the assembled candidate. Read the actual routes, selectors, commands, ports, and seed data from the code, not from the spec.
 
 Plan rules:
 
@@ -49,20 +49,20 @@ Plan rules:
 
 1. **Build once.** The orchestrator builds the candidate before fan-out, so parallel executors do not race on build output. Executors run the prebuilt artefact.
 2. **Isolate.** Each parallel executor gets its own port, data directory, and evidence directory. If the app cannot run as multiple instances, run its plans sequentially. How many executors run at once is set by the concurrency cap in SKILL.md (**Concurrency policy**). **Timing and performance scenarios run alone**, with no other unit running. Put them in their own plan and record the machine's core count and load average with the results.
-3. **Dispatch** each fixed plan to a **mechanical-tier** subagent with the executor brief below and the plan verbatim. If a scenario that proves an acceptance criterion seems to need judgement, the plan is not strict enough, so rewrite it. Do not escalate it to the judgement tier.
-4. **Exploratory sessions** go to the **judgement tier** (see §3a). Use them when you need to probe beyond the scripted paths: edge cases, unexpected input, UI states, or interactions between features.
+3. **Dispatch** each fixed plan to a **mechanical-tier** subagent with `briefs/e2e-executor.md`, its `{{PLAN}}` filled with the plan verbatim. If a scenario that proves an acceptance criterion seems to need judgement, the plan is not strict enough, so rewrite it. Do not escalate it to the judgement tier.
+4. **Exploratory sessions** go to the **judgement tier** (see §3a), with `briefs/e2e-explorer.md`. Use them when you need to probe beyond the scripted paths: edge cases, unexpected input, UI states, or interactions between features.
 
 ## 3a. Exploratory sessions
 
 Exploratory sessions find defects. Fixed plans prove criteria. An exploratory session's verdict never counts as acceptance evidence. A finding worth keeping becomes a fixed scenario, run by the mechanical tier, before it counts.
 
-Run exploratory sessions after the fixed plans pass, or alongside them on a separate instance.
+Run exploratory sessions after the fixed plans pass, or alongside them on a separate instance. Write each charter in the charter format given in `briefs/e2e-explorer.md`, and fill its `{{CHARTER}}` with it.
 
 **Blind fixtures.** When the mission is to infer hidden properties (e.g. "can an attacker tell the length or the relationships?"), the orchestrator, or a separate setup executor, prepares the target fixtures in scratch space. Fixtures are scratch files, not mutation. The ground truth (plaintexts, keys, derivations) is kept outside the executor's reach and forbidden to it. Score the executor's guesses against the ground truth afterwards. "Could not do better than chance" is valid and useful evidence.
 
-The orchestrator verifies each finding's evidence, as in §5. Confirmed findings either go to the defect ledger, or are turned into fixed scenarios so that a fix can be proven.
+The orchestrator verifies each finding's evidence, as in §4. Confirmed findings either go to the defect ledger, or are turned into fixed scenarios so that a fix can be proven.
 
-## 5. Orchestrator verification
+## 4. Orchestrator verification
 
 Do not accept PASS as a verdict. Verify it:
 
