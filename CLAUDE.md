@@ -274,11 +274,15 @@ Each topic command follows the pattern:
 Topic commands are registered in Program.cs by calling their static `Create()` methods and adding them to the root command.
 
 Available topics and actions:
-- **strings**: reverse, levenshtein-distance, abjadify
+- **strings**: reverse, levenshtein-distance, abjadify, flesch-reading-ease, report
 - **interpreters**: brainfuck, ook, bf-to-ook
-- **images**: steganography, display
+- **images**: display, steganography
 - **web**: serve-html
-- **llm**: chat, translate, ocaaar, corpospeak, generate-image
+- **llm**: chat, translate, ocaaar, corpospeak, generate-image, history (list, delete)
+- **oauth**: token, profile (add, update, delete)
+- **crypto**: generate-key, encrypt, decrypt, add, subtract, multiply, encrypt-string, decrypt-string, replace, substring
+- **markov**: train, complete
+- **demoscene**: showcase
 - **gpt**: train, complete
 - **config**: mirrors every topic/group/action; sets, shows (bare) and unsets (--unset) per-user option defaults
 
