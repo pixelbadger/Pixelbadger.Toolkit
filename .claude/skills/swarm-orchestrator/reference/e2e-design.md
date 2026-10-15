@@ -48,7 +48,7 @@ Plan rules:
 ## 3. Prepare and dispatch executors
 
 1. **Build once.** The orchestrator builds the candidate before fan-out, so parallel executors do not race on build output. Executors run the prebuilt artefact.
-2. **Isolate.** Each parallel executor gets its own port, data directory, and evidence directory. If the app cannot run as multiple instances, run its plans sequentially. How many executors run at once is set by the concurrency cap in SKILL.md (**Concurrency policy**). **Timing and performance scenarios run alone**, with no other unit running. Put them in their own plan and record the machine's core count and load average with the results.
+2. **Isolate.** Each parallel executor gets its own port, data directory, and evidence directory, and its own browser: browser-MCP plans run one at a time (see SKILL.md, Concurrency policy). If the app cannot run as multiple instances, run its plans sequentially. How many executors run at once is set by the concurrency cap in SKILL.md (**Concurrency policy**). **Timing and performance scenarios run alone**, with no other unit running. Put them in their own plan and record the machine's core count and load average with the results.
 3. **Dispatch** each fixed plan to a **mechanical-tier** subagent with `briefs/e2e-executor.md`, its `{{PLAN}}` filled with the plan verbatim. If a scenario that proves an acceptance criterion seems to need judgement, the plan is not strict enough, so rewrite it. Do not escalate it to the judgement tier.
 4. **Exploratory sessions** go to the **judgement tier** (see §3a), with `briefs/e2e-explorer.md`. Use them when you need to probe beyond the scripted paths: edge cases, unexpected input, UI states, or interactions between features.
 

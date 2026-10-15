@@ -115,7 +115,7 @@ A **mutation** is any change that could alter the behaviour of the system under 
 
 These change nothing the system does and land nothing in the final diff, so the orchestrator performs them itself:
 
-- **git plumbing**: creating and removing worktrees and `swarm/*` branches, conflict-free merges and fast-forwards into a composition worktree, and cleanup;
+- **git plumbing**: creating and removing worktrees and `swarm/*` branches, conflict-free merges and fast-forwards into a composition worktree, and cleanup. Record every worktree, branch, build output and evidence dir you create in a run manifest in scratch: it defines what this run may delete;
 - **scratch files** outside the repository: plans, ledgers, briefs, E2E plans and charters, and blind fixtures with their ground truth;
 - **environment self-heals** within each check's allow-list in `reference/environment-checks.md`.
 
@@ -157,6 +157,7 @@ This is the only concurrency cap in the skill. Every other mention of running th
 - **Applies to** every concurrent unit: implementor streams, test executors, reviewers, E2E executors, and builds. Each running unit counts as one. A unit's own internal parallelism (e.g. test-runner workers) is part of its measured footprint, not extra units.
 - **Recomputed** before each fan-out by re-running Stage C. If dispatching a unit would exceed the cap, queue it and dispatch it when a running unit finishes. Serialise rather than risk OOM kills, which look like flaky failures.
 - **Timing and performance plans still run alone**, with no other unit running.
+- **Browser-MCP plans run one at a time.** They share a single browser, so at most one plan or charter using Chrome browser MCP tools runs at once, whatever the cap. When several web-UI plans need to run in parallel, write them for Playwright driving the pre-installed Chromium, which gives each executor its own browser.
 
 ---
 
@@ -180,7 +181,7 @@ Before interviewing the operator:
 4. Inspect recent related commits/PRs when they clarify architectural intent.
 5. If correctness depends on a third-party library's behaviour, inspect its source or authoritative implementation evidence rather than assuming.
 6. Run environment **Stage B (stack)** from `reference/environment-checks.md`. It comes before the baseline because the tests may need Docker or a current local database.
-7. **Establish a green baseline.** Build the base commit, measuring the build's peak memory and disk use with the Stage A measurement method. Then dispatch a test executor (see **Test executors**, Phase 4) to run the base commit's test suite, measuring footprint. The baseline runs **alone**: Stage C hasn't run yet, so the Environment block it carries says `Stage C: not yet run`, and nothing else runs alongside it. Record pre-existing failures from its result, and the environment requirements needed to get green: SDKs, environment variables such as `TERM`, licences, and build configurations that can't run here. Together, the build's and the test run's figures are the per-unit footprint for the concurrency policy. Diagnose any failure that isn't explained before going further. These findings complete the **Environment block** that every later brief carries.
+7. **Establish a green baseline.** Build the base commit. Build it in a detached base worktree (`git worktree add --detach <short root>/base <base SHA>`), not the operator's checkout. Keep it built until the Completion Gate: new-failure confirmation (Phase 4) runs against it. Measure the build's peak memory and disk use with the Stage A measurement method. Then dispatch a test executor (see **Test executors**, Phase 4) to run the base commit's test suite, measuring footprint. The baseline runs **alone**: Stage C hasn't run yet, so the Environment block it carries says `Stage C: not yet run`, and nothing else runs alongside it. Record pre-existing failures from its result, and the environment requirements needed to get green: SDKs, environment variables such as `TERM`, licences, and build configurations that can't run here. Together, the build's and the test run's figures are the per-unit footprint for the concurrency policy. Diagnose any failure that isn't explained before going further. These findings complete the **Environment block** that every later brief carries.
 8. Identify which questions are factual and answer them yourself.
 9. Ask the operator only questions that require product intent, trade-offs, or risk decisions.
 
@@ -480,6 +481,11 @@ The executor interprets but does not diagnose. It reports totals, each failure w
 
 Do not accept a test result as a verdict. Before accepting one, check that it is consistent: the totals agree with the log tail, every failure in the tail is listed, the candidate SHA and worktree cleanliness are confirmed, and nothing marked pre-existing is missing from the baseline list. Open the full log only when the handover is insufficient to judge. An environmental signature is an environment issue to diagnose read-only (re-run Stage C if it is OOM or disk), not a defect.
 
+**Confirm new failures before ledgering.** For each failure marked new, dispatch one test executor running only that test, filtered, twice on the candidate and once on the base worktree. This is a fresh dispatch, not a retry.
+- Fails on the base: pre-existing. Add it to the known pre-existing failures list.
+- Passes on the base, fails both times on the candidate: a defect. Ledger it.
+- Anything else: flaky. Add it to the pre-existing list marked `flaky`, record it as a residual risk, and don't ledger it.
+
 Implementors still run their own filtered tests while they work, since that output stays in their context.
 
 ### Verification budget
@@ -557,7 +563,7 @@ The change is complete only when the orchestrator can demonstrate all of the fol
 8. Migration/upgrade behaviour meets the locked specification.
 9. No known resource grows without an intentional retention policy.
 10. Documentation describes observed/current behaviour rather than inferred behaviour.
-11. No agent worktree, scratch file, accidental generated output, or orchestration residue is included, and every swarm worktree and `swarm/*` branch has been removed.
+11. No agent worktree, scratch file, accidental generated output, or orchestration residue is included, and every swarm worktree (the base worktree included) and `swarm/*` branch has been removed.
 12. The final diff contains no unexplained scope expansion.
 13. The orchestrator is satisfied that the **specification**, not merely the implementation plan, has been met.
 
