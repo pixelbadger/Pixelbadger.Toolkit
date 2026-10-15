@@ -1,7 +1,7 @@
 # E2E Explorer Brief
 
 <!--
-Placeholders. Replace every {{NAME}} below with its value before dispatch; none may remain.
+Placeholders. Each NAME below appears in the brief wrapped in double braces. Replace every one with its value before dispatch; none may remain. This comment contains no braces, so it can stay.
   CHARTER_ID  the charter's id
   CHARTER     the complete charter, in the charter format below, verbatim
 -->

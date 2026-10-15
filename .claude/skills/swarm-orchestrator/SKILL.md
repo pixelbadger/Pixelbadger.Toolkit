@@ -34,7 +34,7 @@ Only this file is read up front. Each other file is read at the phase that needs
 | File | Read | Contents |
 |---|---|---|
 | `reference/environment-checks.md` | Phase 0, end of research, before each fan-out | Staged environment checks, heal allow-lists, Environment block format |
-| `reference/e2e-design.md` | Phase 2 §3, Phase 4 | E2E surface selection, plan rules, dispatch, evidence verification |
+| `reference/e2e-design.md` | Phase 1 §3 (its §1 only), Phase 2 §3, Phase 4 | E2E surface selection, plan rules, dispatch, evidence verification |
 | `reference/completion-report.md` | Completion Gate | Completion Report template |
 | `briefs/implementor.md` | Each implementation or composition dispatch | Implementor brief |
 | `briefs/test-executor.md` | Each test-suite run | Test executor brief |
@@ -42,7 +42,7 @@ Only this file is read up front. Each other file is read at the phase that needs
 | `briefs/e2e-executor.md` | Each fixed E2E plan | E2E executor brief |
 | `briefs/e2e-explorer.md` | Each exploratory charter | E2E explorer brief |
 
-**Briefs are handed over whole.** Each brief is self-contained: a worker given only the filled brief has everything it needs, and never needs this file. To dispatch, read the brief, replace every `{{PLACEHOLDER}}` listed in its header comment, confirm none remains (search the filled text for `{{`), and pass the result on unchanged. Never paraphrase or abridge a brief.
+**Briefs are handed over whole.** Each brief is self-contained: a worker given only the filled brief has everything it needs, and never needs this file. To dispatch, read the brief, replace every placeholder listed in its header comment, confirm none remains (search the filled text for `{{`; the header comment itself contains none), and pass the result on unchanged, header comment included. Never paraphrase or abridge a brief.
 
 The delivery loop is:
 
@@ -153,7 +153,7 @@ If an action fits neither list, treat it as mutation.
 
 This is the only concurrency cap in the skill. Every other mention of running things in parallel defers to it.
 
-- **Computed** at environment Stage C (`reference/environment-checks.md`) from free memory and free disk, each divided by the measured per-unit footprint (one build's peak memory and disk use, measured at the baseline). Leave headroom for the orchestrator and the OS ⚙ (about a fifth of free memory). The cap is the smaller of the two quotients.
+- **Computed** at environment Stage C (`reference/environment-checks.md`) from free memory and free disk, each divided by the measured per-unit footprint (one build's peak memory and disk use, measured at the baseline). Leave headroom for the orchestrator and the OS ⚙ (about a fifth of free memory). The cap is the smaller of the two quotients. If a footprint figure has not been measured yet, its quotient can't be computed and the cap is **1** ⚙ until it is: measure the next build or test run instead, rather than rebuilding only to measure.
 - **Applies to** every concurrent unit: implementor streams, test executors, reviewers, E2E executors, and builds. Each running unit counts as one. A unit's own internal parallelism (e.g. test-runner workers) is part of its measured footprint, not extra units.
 - **Recomputed** before each fan-out by re-running Stage C. If dispatching a unit would exceed the cap, queue it and dispatch it when a running unit finishes. Serialise rather than risk OOM kills, which look like flaky failures.
 - **Timing and performance plans still run alone**, with no other unit running.
@@ -162,7 +162,7 @@ This is the only concurrency cap in the skill. Every other mention of running th
 
 # Phase 0 — Environment Preflight
 
-Run **Stage A (host)** of `reference/environment-checks.md` at invocation, before research. Stage B runs at the end of research (Phase 1 §1), and Stage C after the implementation DAG (Phase 2 §4). Each check is detect → one heal → re-check → record.
+Run **Stage A (host)** of `reference/environment-checks.md` at invocation, before research. Stage B runs at the end of research, before the baseline (Phase 1 §1), and Stage C after the implementation DAG (Phase 2 §4). Each check is detect → one heal → re-check → record.
 
 ---
 
@@ -174,13 +174,13 @@ The objective is not to produce a quick plan. The objective is to reach a specif
 
 Before interviewing the operator:
 
-1. Read the repository's `CLAUDE.md` and relevant project guidance.
+1. Read the repository's `CLAUDE.md` and relevant project guidance. Note its delivery rules (branch naming, version bumps, required docs, PR conventions, commit attribution): they become acceptance criteria or delivery steps (see **Delivery**).
 2. Inspect the current implementation around the requested change.
 3. Inspect tests that define current behaviour.
 4. Inspect recent related commits/PRs when they clarify architectural intent.
 5. If correctness depends on a third-party library's behaviour, inspect its source or authoritative implementation evidence rather than assuming.
-6. **Establish a green baseline.** Build the base commit, then dispatch a test executor (see **Test executors**, Phase 4) to run its test suite in this environment, measuring footprint. Record pre-existing failures from its result, and the environment requirements needed to get green: SDKs, environment variables such as `TERM`, licences, and build configurations that can't run here. Measure the build's peak memory and disk use yourself, and take the test run's from the executor: together they are the per-unit footprint for the concurrency policy. Diagnose any failure that isn't explained before going further. These findings, together with the Stage A and Stage B results, become the **Environment block** that every brief carries.
-7. Run environment **Stage B (stack)** from `reference/environment-checks.md`.
+6. Run environment **Stage B (stack)** from `reference/environment-checks.md`. It comes before the baseline because the tests may need Docker or a current local database.
+7. **Establish a green baseline.** Build the base commit, measuring the build's peak memory and disk use with the Stage A measurement method. Then dispatch a test executor (see **Test executors**, Phase 4) to run the base commit's test suite, measuring footprint. The baseline runs **alone**: Stage C hasn't run yet, so the Environment block it carries says `Stage C: not yet run`, and nothing else runs alongside it. Record pre-existing failures from its result, and the environment requirements needed to get green: SDKs, environment variables such as `TERM`, licences, and build configurations that can't run here. Together, the build's and the test run's figures are the per-unit footprint for the concurrency policy. Diagnose any failure that isn't explained before going further. These findings complete the **Environment block** that every later brief carries.
 8. Identify which questions are factual and answer them yourself.
 9. Ask the operator only questions that require product intent, trade-offs, or risk decisions.
 
@@ -235,7 +235,7 @@ Continuously track:
 - **Security constraints**
 - **Acceptance criteria**
 - **Required evidence**
-- **E2E scope** — for each user-facing acceptance criterion, the surface it will be exercised through (web UI, HTTP API, CLI, …) and why that surface is sufficient
+- **E2E scope** — for each user-facing acceptance criterion, the surface it will be exercised through (web UI, HTTP API, CLI, …) and why that surface is sufficient. Choose surfaces by §1 of `reference/e2e-design.md`: read that section now, when you first fill this item
 - **Budget** — overall, per phase, or both, in units the orchestrator can observe: implementation rounds, streams dispatched, subagents dispatched, wall-clock time
 
 If two decisions conflict, resolve the conflict before proceeding.
@@ -383,7 +383,7 @@ States:
 - rejected
 - superseded
 
-Below the ledger, keep a running **spend line** against each budget item, e.g. `Spend: round 2 of 4 · 9 of 20 subagents · 1h40 of 4h`. Update it at every dispatch. When the next dispatch would exceed any budget item, stop before dispatching and ask the operator, with the spend so far, what remains, and a recommendation.
+Below the ledger, keep a running **spend line** against each budget item, e.g. `Spend: round 2 of 4 · 9 of 20 subagents · 1h40 of 4h`. Update it at every dispatch. Dispatches made before SPEC LOCK (the baseline test executor, pre-lock probes) happen before any budget exists: list them on the spend line as `pre-lock`, but don't count them against the budget ⚙. When the next dispatch would exceed any budget item, stop before dispatching and ask the operator, with the spend so far, what remains, and a recommendation.
 
 When an implementor returns:
 
@@ -561,6 +561,15 @@ The change is complete only when the orchestrator can demonstrate all of the fol
 12. The final diff contains no unexplained scope expansion.
 13. The orchestrator is satisfied that the **specification**, not merely the implementation plan, has been met.
 
+## Delivery
+
+`swarm/*` branches are internal to the run. The result reaches the repository the way the repository's own rules say:
+
+- **Repository rules are spec items.** Rules from `CLAUDE.md` or contribution guidance that the change itself must satisfy (version bump, docs to update, tests to add) are acceptance criteria in the locked spec, delivered by implementors like any other.
+- **Target branch.** Deliver the final candidate onto the branch the operator or session designates. If none is designated, use the repository's convention (e.g. `feature/<name>`), and confirm the name with the operator at SPEC LOCK. Moving the accepted composition there by fast-forward or a conflict-free merge is git plumbing. Then remove the swarm worktrees and `swarm/*` branches.
+- **Pull requests.** Open one only if the operator asked for it, following the repository's PR template and conventions.
+- **Commit attribution.** The orchestrator decides the trailer and puts it in each implementor brief, so implementors never choose. The operator's own instructions win, then the repository's rules, then the session's attribution instructions.
+
 Then report:
 
 Use the template in `reference/completion-report.md`.
@@ -612,17 +621,18 @@ When invoked with a change request:
 
 1. Run environment **Stage A** and start the Environment block.
 2. Announce **Specification Phase**.
-3. Research the repository and establish a green baseline before asking questions. Settle every checkable claim yourself.
-4. Run environment **Stage B** and complete the Environment block.
-5. Ask the first unresolved operator decision, one question only, with recommendation and trade-off.
-6. Continue until the Zero-Ambiguity Gate is satisfied. If no budget has been given, ask for one as its own question.
-7. Present the LOCKED SPECIFICATION and request explicit approval.
-8. After approval, show the implementation DAG and tier routing.
-9. Run environment **Stage C** and compute the concurrency cap.
-10. Create a worktree per writing stream from the locked base under a short root, with detached sibling worktrees for relative references, then dispatch implementation streams into them, up to the cap.
-11. Judge an early screenshot of each returned UI stream against the spec before integration, and show it to the operator without waiting.
-12. Integrate and fan out validation, including fixed E2E plans dispatched to the mechanical tier and any exploratory charters dispatched to the judgement tier. Verify their confirmation evidence yourself.
-13. Replan defects into further implementation rounds, verifying each with targeted suites run by test executors; dispatch one full-suite run on the final candidate.
-14. Stop only at the Completion Gate.
+3. Research the repository before asking questions. Settle every checkable claim yourself.
+4. Run environment **Stage B**.
+5. Establish a green baseline, run alone, and complete the Environment block.
+6. Ask the first unresolved operator decision, one question only, with recommendation and trade-off.
+7. Continue until the Zero-Ambiguity Gate is satisfied. If no budget has been given, ask for one as its own question.
+8. Present the LOCKED SPECIFICATION and request explicit approval.
+9. After approval, show the implementation DAG and tier routing.
+10. Run environment **Stage C** and compute the concurrency cap.
+11. Create a worktree per writing stream from the locked base under a short root, with detached sibling worktrees for relative references, then dispatch implementation streams into them, up to the cap.
+12. Judge an early screenshot of each returned UI stream against the spec before integration, and show it to the operator without waiting.
+13. Integrate and fan out validation, including fixed E2E plans dispatched to the mechanical tier and any exploratory charters dispatched to the judgement tier. Verify their confirmation evidence yourself.
+14. Replan defects into further implementation rounds, verifying each with targeted suites run by test executors; dispatch one full-suite run on the final candidate.
+15. Stop only at the Completion Gate, then deliver per **Delivery**.
 
 Never collapse Specification → Implementation → Integration into one agent pass.

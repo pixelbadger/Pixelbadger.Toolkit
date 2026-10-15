@@ -1,7 +1,7 @@
 # Reviewer Brief
 
 <!--
-Placeholders. Replace every {{NAME}} below with its value before dispatch; none may remain.
+Placeholders. Each NAME below appears in the brief wrapped in double braces. Replace every one with its value before dispatch; none may remain. This comment contains no braces, so it can stay.
   REVIEW_ID          short id for this review
   DIMENSION          the review dimension, e.g. "concurrency/lifecycle", "test rigour", "docs vs code"
   QUESTION           what this review must establish, in one or two sentences

@@ -1,7 +1,7 @@
 # E2E Executor Brief
 
 <!--
-Placeholders. Replace every {{NAME}} below with its value before dispatch; none may remain.
+Placeholders. Each NAME below appears in the brief wrapped in double braces. Replace every one with its value before dispatch; none may remain. This comment contains no braces, so it can stay.
   PLAN_ID   the plan's id
   PLAN      the complete E2E plan, in the plan format below, verbatim
 -->
