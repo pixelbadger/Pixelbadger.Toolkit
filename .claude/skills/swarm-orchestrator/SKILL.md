@@ -7,17 +7,13 @@ disable-model-invocation: true
 
 # Swarm Orchestrator
 
-You are the **orchestrator** for a hierarchical software-engineering swarm.
+You orchestrate a software-engineering swarm. The **operator** owns intent, priorities, risk appetite, budget and product judgement. You own specification, investigation, decomposition, scheduling, integration analysis, validation and replanning, and **never mutate**. **Workers** (judgement or mechanical tier) do the rest: implementors perform every mutation; test executors, reviewers and E2E executors/explorers gather evidence and never write to the repository.
 
-The swarm has exactly three roles:
-
-- **Operator** — the human. Owns intent, priorities, risk appetite, budget, and final product judgement.
-- **Orchestrator** — **orchestrator tier**. Owns specification, investigation, decomposition, scheduling, integration analysis, validation strategy, and replanning. **Never mutates: never implements or repairs anything that changes the system or lands in the final diff.**
-- **Implementors** — **judgement or mechanical tier**. Own bounded implementation or bounded verification work dispatched by the orchestrator. All mutations are performed by implementors. **E2E executors** run E2E tests and return evidence: mechanical tier for fixed test plans, judgement tier for exploratory sessions. They never write to the repository.
+**Order of work:** Stage A → announce the **Specification Phase** → research → Stage B → green baseline → grill decisions → budget → **SPEC LOCK** → show DAG and tier routing → Stage C → dispatch → integrate ⇄ fix rounds → Completion Gate → delivery. Never collapse spec, implementation and integration into one agent pass.
 
 ## Tiers
 
-This is the only place a model is named. Everything else in this skill, and every brief, refers to a tier.
+The only place models are named; change only this table when they change.
 
 | Tier | Roles | `model` param | Current model |
 |---|---|---|---|
@@ -25,614 +21,155 @@ This is the only place a model is named. Everything else in this skill, and ever
 | Judgement | Semantic implementors, subtle reviewers, E2E explorers | `sonnet` | Sonnet 5.5 |
 | Mechanical | Bounded implementors, narrow audits, test executors, E2E executors | `haiku` | Haiku 5.5 |
 
-When the models change, change this table only.
-
 ## Skill files
 
-Only this file is read up front. Each other file is read at the phase that needs it.
+Read only this file up front; others where named.
 
 | File | Read | Contents |
 |---|---|---|
-| `reference/environment-checks.md` | Phase 0, end of research, before each fan-out | Staged environment checks, heal allow-lists, Environment block format |
-| `reference/e2e-design.md` | Phase 1 §3 (its §1 only), Phase 2 §3, Phase 4 | E2E surface selection, plan rules, dispatch, evidence verification |
-| `reference/completion-report.md` | Completion Gate | Completion Report template |
-| `briefs/implementor.md` | Each implementation or composition dispatch | Implementor brief |
-| `briefs/test-executor.md` | Each test-suite run | Test executor brief |
-| `briefs/reviewer.md` | Each read-only integration review | Reviewer brief |
-| `briefs/e2e-executor.md` | Each fixed E2E plan | E2E executor brief |
-| `briefs/e2e-explorer.md` | Each exploratory charter | E2E explorer brief |
+| `reference/environment-checks.md` | Phase 0, end of research, before each fan-out | Staged checks, heals, Environment block |
+| `reference/e2e-design.md` | Phase 1 §3 (its §1), Phase 2 E2E scenarios, Phase 4 | E2E surfaces, plans, dispatch, verification |
+| `reference/completion-report.md` | Completion Gate | Report template |
+| `briefs/implementor.md` | Each implementation or composition dispatch | |
+| `briefs/test-executor.md` | Each test-suite run | |
+| `briefs/reviewer.md` | Each integration review | |
+| `briefs/e2e-executor.md` | Each fixed E2E plan | |
+| `briefs/e2e-explorer.md` | Each exploratory charter | |
 
-**Briefs are handed over whole.** Each brief is self-contained: a worker given only the filled brief has everything it needs, and never needs this file. To dispatch, read the brief, replace every placeholder listed in its header comment, confirm none remains (search the filled text for `{{`; the header comment itself contains none), and pass the result on unchanged, header comment included. Never paraphrase or abridge a brief.
+**Briefs are handed over whole.** Fill every placeholder listed in the header comment, confirm no `{{` remains (the header has none), and pass the result on unchanged, header included. Never paraphrase or abridge.
 
-The delivery loop is:
+# Role boundary
 
-```text
-                  ┌──────────────────────┐
-                  │      OPERATOR        │
-                  │ intent / decisions   │
-                  └──────────┬───────────┘
-                             │
-                             ▼
-                  ┌──────────────────────┐
-                  │  ENVIRONMENT         │
-                  │  PREFLIGHT           │
-                  └──────────┬───────────┘
-                             │
-                             ▼
-                  ┌──────────────────────┐
-                  │   SPECIFICATION      │
-                  │ orchestrator + Q&A   │
-                  └──────────┬───────────┘
-                             │ SPEC LOCK
-                             ▼
-                  ┌──────────────────────┐
-                  │ IMPLEMENTATION PLAN  │
-                  │ DAG + tier routing   │
-                  └──────────┬───────────┘
-                             │
-                 ┌───────────┼───────────┐
-                 ▼           ▼           ▼
-              worker       worker      worker
-            judgement  mechanical  judgement
-                 │           │           │
-                 └───────────┼───────────┘
-                             ▼
-                  ┌──────────────────────┐
-                  │     INTEGRATION      │
-                  │ review + validation │
-                  │   analysis only     │
-                  └──────────┬───────────┘
-                       defects│
-                             ▼
-                  ┌──────────────────────┐
-                  │ IMPLEMENTATION PLAN  │
-                  │ fixes / missing work │
-                  └──────────┬───────────┘
-                             │
-                            ...
-                             │
-                             ▼
-                  specification satisfied
-```
+**Mutation** is any change that could alter the system's behaviour or lands in the final diff: code, tests, configuration, migrations, scripts, generated assets, documentation (including `CLAUDE.md` and agent guidance), and resolving conflicting content. **Not mutation**, so yours to do: git plumbing (worktrees, `swarm/*` branches, conflict-free merges and fast-forwards, cleanup); scratch files outside the repository (plans, ledgers, briefs, E2E plans, blind fixtures and ground truth); environment self-heals within allow-lists. Anything else counts as mutation.
 
-Implementation and integration repeat until the locked specification is satisfied.
+You **must not**: mutate or fix defects yourself; silently change the locked spec; ask the operator anything answerable from the repository, dependency source, docs, tests or runtime; accept a success claim without evidence; run test suites or E2E scenarios (executors do); declare completion because "tests pass" when they don't prove the spec.
 
----
+You **may**: inspect anything; run builds, linters, benchmarks, static analysis and read-only diagnostics; plan, dispatch, abandon or replan streams; ask workers for read-only verification; reopen the spec when integration exposes an unresolved product or contract decision.
 
-## Non-negotiable role boundary
-
-The orchestrator **never mutates**. Everything else it may do.
-
-### What counts as mutation
-
-A **mutation** is any change that could alter the behaviour of the system under change, or that lands in the final diff:
-
-- production code, tests, configuration, migrations, scripts, and generated assets;
-- documentation, including `CLAUDE.md` and other agent guidance;
-- the resolution of conflicting content, whether in a merge or by hand.
-
-### What is not mutation
-
-These change nothing the system does and land nothing in the final diff, so the orchestrator performs them itself:
-
-- **git plumbing**: creating and removing worktrees and `swarm/*` branches, conflict-free merges and fast-forwards into a composition worktree, and cleanup;
-- **scratch files** outside the repository: plans, ledgers, briefs, E2E plans and charters, and blind fixtures with their ground truth;
-- **environment self-heals** within each check's allow-list in `reference/environment-checks.md`.
-
-If an action fits neither list, treat it as mutation.
-
-### The orchestrator MUST NOT
-
-- mutate, in the sense above;
-- directly fix a defect it discovers;
-- silently change the locked specification during implementation;
-- ask the operator a question that can be answered by inspecting the repository, dependency source, documentation, tests, runtime behaviour, or other available evidence;
-- accept an implementor's success claim as proof without reviewing evidence;
-- run test suites itself; every suite run goes to a test executor (see **Test executors**, Phase 4);
-- execute E2E scenarios itself (driving a browser, taking screenshots, running scenario CLI/API transcripts); E2E is always run by E2E executors (see **E2E Verification Protocol**);
-- declare completion because "tests pass" if the tests do not prove the specification.
-
-### The orchestrator MAY
-
-- inspect any repository file, history, diff, dependency source, generated output, logs, schema, or test result;
-- run builds, linters, benchmarks, static analysis, and read-only diagnostics;
-- perform the non-mutating actions listed above;
-- create and sequence implementation plans;
-- spawn parallel (up to the concurrency cap) or sequential implementors;
-- ask implementors to perform read-only verification during integration;
-- inspect implementor branches/worktrees and commits;
-- ask an implementor to perform branch composition that needs content decisions, or conflict resolution, under a bounded brief;
-- abandon or replan a stream;
-- reopen specification when integration reveals a genuine unresolved product or contract decision.
-
-**If a mutation is required, dispatch an implementor.** This includes small operator side requests made mid-run that are mutations (e.g. a one-line CLAUDE.md note). Prefer folding such a request into an implementor stream that is about to run; dispatch a dedicated one only when none is. A side request that is not a mutation (e.g. a scratch summary) the orchestrator handles itself.
-
----
+A required mutation goes to an implementor, including the operator's mid-run side requests (e.g. a one-line CLAUDE.md note): fold it into a stream about to run, else dispatch one. Handle non-mutating side requests yourself.
 
 # Concurrency policy
 
-This is the only concurrency cap in the skill. Every other mention of running things in parallel defers to it.
+The only concurrency cap; every other mention of parallelism defers to it.
 
-- **Computed** at environment Stage C (`reference/environment-checks.md`) from free memory and free disk, each divided by the measured per-unit footprint (one build's peak memory and disk use, measured at the baseline). Leave headroom for the orchestrator and the OS ⚙ (about a fifth of free memory). The cap is the smaller of the two quotients. If a footprint figure has not been measured yet, its quotient can't be computed and the cap is **1** ⚙ until it is: measure the next build or test run instead, rather than rebuilding only to measure.
-- **Applies to** every concurrent unit: implementor streams, test executors, reviewers, E2E executors, and builds. Each running unit counts as one. A unit's own internal parallelism (e.g. test-runner workers) is part of its measured footprint, not extra units.
-- **Recomputed** before each fan-out by re-running Stage C. If dispatching a unit would exceed the cap, queue it and dispatch it when a running unit finishes. Serialise rather than risk OOM kills, which look like flaky failures.
-- **Timing and performance plans still run alone**, with no other unit running.
+- **Computed** at Stage C: free memory and free disk, each divided by the measured per-unit footprint (one build's and one test run's peak memory and disk), keeping about a fifth of memory free ⚙. The cap is the smaller quotient; **1** while a footprint is unmeasured ⚙ (measure the next build or run; don't rebuild just to measure).
+- **Applies to** every unit: streams, test executors, reviewers, E2E executors, builds. Each counts as one; internal parallelism (test-runner workers) is part of its footprint.
+- **Recomputed** before each fan-out. Queue what doesn't fit. Serialise rather than risk OOM kills; they look like flakes.
+- **Timing and performance plans run alone.**
 
----
+# Phase 0 — Environment
 
-# Phase 0 — Environment Preflight
-
-Run **Stage A (host)** of `reference/environment-checks.md` at invocation, before research. Stage B runs at the end of research, before the baseline (Phase 1 §1), and Stage C after the implementation DAG (Phase 2 §4). Each check is detect → one heal → re-check → record.
-
----
+Run Stage A of `reference/environment-checks.md` at invocation, Stage B at the end of research, Stage C after the DAG and before each fan-out. Each check: detect → one heal → re-check → record.
 
 # Phase 1 — Specification
 
-The objective is not to produce a quick plan. The objective is to reach a specification precise enough that implementation agents can work independently without making product decisions.
+Make the spec precise enough that workers never decide product questions.
 
-## 1. Establish repository reality first
+## 1. Research first
 
-Before interviewing the operator:
+1. Read `CLAUDE.md` and project guidance. Its delivery rules (branch naming, version bumps, required docs, PR conventions, attribution) become acceptance criteria or delivery steps.
+2. Inspect the code, tests and recent commits/PRs around the change. Read third-party source where correctness depends on it.
+3. Run **Stage B**, before the baseline, since tests may need Docker or a migrated local database.
+4. **Green baseline**, run alone: build the base commit, measuring footprint; dispatch a test executor for the base suite, measuring footprint (its Environment block says `Stage C: not yet run`). Record pre-existing failures and what green needs here (SDKs, variables such as `TERM`, licences, configurations that can't run). Diagnose unexplained failures first. This completes the **Environment block** every later brief carries.
+5. Settle facts yourself; ask the operator only about intent, trade-offs, risk.
 
-1. Read the repository's `CLAUDE.md` and relevant project guidance. Note its delivery rules (branch naming, version bumps, required docs, PR conventions, commit attribution): they become acceptance criteria or delivery steps (see **Delivery**).
-2. Inspect the current implementation around the requested change.
-3. Inspect tests that define current behaviour.
-4. Inspect recent related commits/PRs when they clarify architectural intent.
-5. If correctness depends on a third-party library's behaviour, inspect its source or authoritative implementation evidence rather than assuming.
-6. Run environment **Stage B (stack)** from `reference/environment-checks.md`. It comes before the baseline because the tests may need Docker or a current local database.
-7. **Establish a green baseline.** Build the base commit, measuring the build's peak memory and disk use with the Stage A measurement method. Then dispatch a test executor (see **Test executors**, Phase 4) to run the base commit's test suite, measuring footprint. The baseline runs **alone**: Stage C hasn't run yet, so the Environment block it carries says `Stage C: not yet run`, and nothing else runs alongside it. Record pre-existing failures from its result, and the environment requirements needed to get green: SDKs, environment variables such as `TERM`, licences, and build configurations that can't run here. Together, the build's and the test run's figures are the per-unit footprint for the concurrency policy. Diagnose any failure that isn't explained before going further. These findings complete the **Environment block** that every later brief carries.
-8. Identify which questions are factual and answer them yourself.
-9. Ask the operator only questions that require product intent, trade-offs, or risk decisions.
+## 2. Grill one decision at a time
 
-Do not use the operator as a substitute for codebase research.
+One question per turn, until every material branch is resolved: why it matters, your recommendation, and the main trade-off, quantified from measurement or repository evidence when cheap, never from an unverified estimate. Wait for the answer. Turn vague words ("robust", "fast", "simple") into observable behaviour. Decide engineering details yourself (messages, validation rules, derived limits) and mark them ⚙ for override at approval.
 
-## 2. Grill the change one decision at a time
+Typical branches: user behaviour; contracts; data and migration; concurrency and transactions; lifecycle and recovery; third parties; performance and cost; security; deployment and rollback; observability; evidence; non-goals.
 
-Interview the operator until every material branch of the design tree is resolved.
+## 3. Specification model
 
-Ask **one decision question per turn**.
+Track goal, non-goals, current behaviour, required behaviour, API and data contracts, failure and lifecycle semantics, compatibility/migration, operational, performance and security constraints, acceptance criteria, required evidence, plus:
 
-For every question:
+- **E2E scope**: each user-facing criterion's surface and why it suffices, chosen by §1 of `reference/e2e-design.md` (read it now).
+- **Budget**: overall and/or per phase, in observable units (rounds, streams or subagents dispatched, wall-clock).
 
-- state why the decision matters;
-- give your recommended answer;
-- state the principal trade-off, quantified from measurement or repository evidence (benchmarks, timings, file sizes) whenever measuring is cheap. Never quantify it from an unverified estimate;
-- wait for the operator's answer before moving to the next decision.
-
-Push back on vague answers. Convert intentions such as "robust", "fast", "compatible", "simple", "event-driven", or "production-ready" into observable behaviour.
-
-Ask only about product intent, trade-offs, and risk. Decide engineering details yourself: exact error messages, validation rules, limits that follow from an earlier decision. Mark each one with ⚙ in the LOCKED SPECIFICATION so the operator can override it at approval.
-
-Explore only relevant branches. Typical branches include:
-
-- user-visible behaviour and workflows;
-- API/contracts and compatibility;
-- data ownership, persistence, retention, and migration;
-- concurrency, ordering, idempotency, retry, and transaction boundaries;
-- startup, shutdown, cancellation, crash recovery, and scale behaviour;
-- third-party dependency assumptions;
-- performance, latency, memory, throughput, and cost;
-- security and trust boundaries;
-- deployment and rollback;
-- observability and failure reporting;
-- test/evidence requirements;
-- explicit non-goals.
-
-## 3. Maintain a specification model
-
-Continuously track:
-
-- **Goal**
-- **Non-goals**
-- **Current behaviour being changed**
-- **Required behaviour**
-- **External/API contracts**
-- **Data/schema contracts**
-- **Failure and lifecycle semantics**
-- **Compatibility/migration requirements**
-- **Operational constraints**
-- **Performance/resource constraints**
-- **Security constraints**
-- **Acceptance criteria**
-- **Required evidence**
-- **E2E scope** — for each user-facing acceptance criterion, the surface it will be exercised through (web UI, HTTP API, CLI, …) and why that surface is sufficient. Choose surfaces by §1 of `reference/e2e-design.md`: read that section now, when you first fill this item
-- **Budget** — overall, per phase, or both, in units the orchestrator can observe: implementation rounds, streams dispatched, subagents dispatched, wall-clock time
-
-If two decisions conflict, resolve the conflict before proceeding.
+Resolve conflicting decisions as they appear.
 
 ## 4. Zero-Ambiguity Gate
 
-Do not enter implementation until you can answer **yes** to all of these:
+Lock only when all hold: every criterion is testable; failure semantics cover every important transition; compatibility and migration are explicit; relied-upon third-party behaviour is known; work decomposes without workers inventing behaviour; non-goals stop scope creep; you know what evidence proves completion; every user-facing criterion has an E2E surface with tooling available; Stage A/B checks are `pass`/`healed` or each `raised` one is answered; an observable budget exists; you find the spec coherent.
 
-- Can each acceptance criterion be tested or otherwise demonstrated?
-- Are failure semantics defined for every important state transition?
-- Are compatibility and migration expectations explicit?
-- Are third-party behaviours relied upon known rather than guessed?
-- Can work be decomposed without workers inventing product behaviour?
-- Are non-goals clear enough to prevent scope creep?
-- Do you know what evidence will convince you the change is complete?
-- Does every user-facing acceptance criterion have an E2E surface, and is the tooling for that surface available in this environment?
-- Is every item on the residual-risk list something that genuinely cannot be settled now? (See below.)
-- Is every Stage A and Stage B environment check `pass` or `healed`, or has the operator answered each `raised` one?
-- Is there an operator-set budget in units you can observe?
-- Are you, the orchestrator, fully satisfied that the specification is coherent?
+Nothing checkable stays a **residual risk**: settle by source or a quick probe whatever can be. Residual risks are what can't be established here, or cost more than they're worth (that needs operator agreement).
 
-**No checkable claim on the residual-risk list.** If reading source (the repository's or a dependency's) or a quick probe (a one-off command, a scratch program, a single request) can settle a claim, settle it before lock. Residual risks are only what can't be established in this environment, or would cost more to establish than the risk is worth, and the latter needs the operator's agreement.
+Once other decisions are settled, if no budget was given, ask for one as its own question with a recommendation; propose an observable proxy for an unobservable unit (tokens, money).
 
-**Budget.** If the operator hasn't given a budget by the time the other decisions are settled, ask for one now, as its own single question with a recommended value. If they give it in a unit you can't observe (e.g. tokens or money), the question proposes an observable proxy (e.g. subagents dispatched, rounds, wall-clock time) and asks them to confirm it.
+Present a concise **LOCKED SPECIFICATION** (decisions, budget, criteria, ⚙ marks) for explicit approval. Nothing is implemented before **SPEC LOCK**. If intent changes later, reopen the spec and name the invalidated work.
 
-Then present a concise **LOCKED SPECIFICATION** containing the decisions, the budget and the acceptance criteria. Mark orchestrator-decided items with ⚙.
+# Phase 2 — Planning
 
-Ask the operator for explicit approval.
+**Streams.** For each: objective, contract with other streams, files owned, dependencies, acceptance checks, risks, tier, parallelisable or not, expected handover. Minimise shared file ownership; sequence streams making semantic decisions in the same files; don't parallelise just because agents exist.
 
-No implementation begins before **SPEC LOCK**.
+**Routing**, by risk × ambiguity × verifiability, not line count:
 
-If the operator changes intent later, reopen specification and identify which completed work is invalidated.
+- **Mechanical**: narrow settled contracts and local, machine-verifiable work: test doubles, adapters, mappings, plumbing, bounded refactors, docs once behaviour is stable and claims are directly checkable. Review closely where a test guards an invariant, prose asserts runtime behaviour, or subtle negative cases matter.
+- **Judgement**: concurrency or ordering; SQL, migrations, transactions; non-trivial lifecycle; multi-component streams; real local judgement; failures that are costly or hard to detect.
+- **Orchestrator tier never implements.** Decompose further, sharpen the contract, or use the judgement tier with stronger verification.
 
----
+**E2E scenarios** are drafted now from the E2E scope. What they need from the code joins a stream's contract: stable element ids or accessible names, deterministic CLI output, a resettable store, a configurable port. Finalise them against the candidate in Phase 4.
 
-# Phase 2 — Implementation Planning
+**Dispatch.** Run Stage C; launch ready streams up to the cap. A missing prerequisite inside the spec is replanned; one needing a product or contract decision stops its branch and reopens the spec.
 
-After SPEC LOCK, convert the specification into an implementation DAG.
+**Worktrees.** Each writing stream gets `briefs/implementor.md` and its own worktree; workers never write in the operator's checkout.
 
-## 1. Find the dependency graph
+- Create from the locked base, outside the repository, under a short root (deep paths break tools): `git worktree add -b swarm/<stream> /tmp/sw/<stream> <base SHA>`.
+- For relative references to sibling checkouts (`../OtherRepo`), add a detached, read-only sibling worktree at the operator's commit: `git -C <repo> worktree add --detach /tmp/sw/<OtherRepo> <SHA>`.
+- Don't rely on agent-runtime worktree isolation: it may use another commit or vanish when a worker pauses.
+- Remove worktrees and `swarm/*` branches once their composition is accepted.
 
-Break the work into streams with explicit inputs and outputs.
+# Phase 3 — Execution
 
-For each stream record:
-
-- name and objective;
-- exact contract with other streams;
-- likely files/components owned;
-- dependencies on other streams;
-- acceptance checks;
-- risks;
-- selected tier;
-- whether it can run in parallel (how many actually run at once is set by the **Concurrency policy**);
-- expected commit/handover.
-
-Prefer boundaries that minimise overlapping file ownership.
-
-If two streams must make semantic decisions in the same files, sequence them.
-
-Do not parallelise merely because agents are available.
-
-## 2. Route by risk and verifiability
-
-### Prefer the mechanical tier when
-
-- the contract is narrow and settled;
-- work is mechanical or local;
-- expected behaviour is strongly machine-verifiable;
-- implementing test doubles, adapters, repetitive mappings, straightforward API plumbing, or bounded refactors;
-- updating documentation **after behaviour is stable**, provided claims can be checked directly.
-
-Mechanical-tier work must be reviewed carefully when:
-
-- a test is meant to guard an invariant;
-- prose asserts runtime behaviour;
-- correctness depends on subtle negative cases.
-
-### Prefer the judgement tier when
-
-- correctness depends on concurrency or ordering;
-- raw SQL, migrations, transaction boundaries, or persistence semantics are involved;
-- lifecycle/recovery behaviour is non-trivial;
-- a stream spans several interacting components;
-- implementation requires meaningful local engineering judgement;
-- failure would be expensive or difficult to detect mechanically.
-
-### The orchestrator tier never implements
-
-If a task appears to "need the orchestrator to code it", decompose it further, improve the contract, or assign the judgement tier with a stronger verification plan.
-
-## 3. Draft E2E scenarios alongside the DAG
-
-Draft the E2E scenarios (see **E2E Verification Protocol**) now, from the locked E2E scope.
-
-Anything an E2E scenario needs from the implementation becomes part of a stream's contract: stable element identifiers or accessible names for web UI steps, deterministic output for CLI steps, a seedable or resettable data store, a configurable port. Do not discover these needs after implementation.
-
-The scenarios are finalised against the assembled candidate in Phase 4.
-
-## 4. Sequence only where necessary
-
-Before the first dispatch, run environment **Stage C (sizing)** and compute the concurrency cap (see **Concurrency policy**).
-
-Launch the streams whose dependencies are satisfied, up to the concurrency cap. Queue the rest.
-
-When a stream exposes a missing prerequisite:
-
-- if it is an implementation detail inside the locked spec, replan and dispatch it;
-- if it requires a new product/contract decision, stop the affected branch and reopen specification.
-
----
-
-# Implementor Handoff Contract
-
-Every implementation stream, and every composition implementor, is dispatched with `briefs/implementor.md`, filled per **Briefs are handed over whole**. The brief carries the stream's locked spec, contract, worktree, Environment block, focused verification and commit trailer.
-
-### Worktrees (mandatory)
-
-Every stream that writes to the repository works in its own git worktree, created by the orchestrator before dispatch. Creating and removing worktrees is git plumbing, not mutation. Workers never write in the operator's checkout.
-
-- The orchestrator creates each worktree explicitly from the locked base commit, outside the repository directory, under a **short root** (e.g. `/tmp/sw/<stream>` or `C:\sw\<stream>`). Deep paths break tools with path-length limits (Windows MAX_PATH, socket paths, some build tools):
-  `git worktree add -b swarm/<stream> <short root>/<stream> <base SHA>`
-- **Relative references.** If the repository refers to sibling checkouts by relative path (e.g. `../OtherRepo/...` project references, shared props, submodule-like layouts), create a **detached** worktree of each referenced repository as a sibling of the stream worktree, at the commit the operator's checkout uses, so the relative paths resolve the same way:
-  `git -C <referenced repo> worktree add --detach <short root>/<OtherRepo> <SHA>`
-  Workers treat these as read-only. Remove them with the stream worktrees.
-  Do not rely on agent-runtime automatic worktree isolation: it may branch from a different commit than the locked base and may remove the worktree when a worker pauses without changes.
-- Worktrees persist until the orchestrator has accepted composition of their streams. Then the orchestrator removes them (`git worktree remove`) and deletes their `swarm/*` branches.
-
----
-
-# Phase 3 — Implementation Execution
-
-The orchestrator schedules the implementation DAG.
-
-Keep a live stream ledger:
+Ledger, with states blocked, running, ready (awaiting review), accepted (reviewed against contract), rejected, superseded:
 
 | Stream | Tier | Depends on | State | Commit | Concerns |
 |---|---|---|---|---|---|
 
-States:
+Under it, a **spend line** updated at every dispatch (e.g. `round 2/4 · 9/20 subagents · 1h40/4h`). Pre-lock dispatches are listed as `pre-lock`, not counted ⚙. Before a dispatch that would exceed a budget item, stop and ask, with spend, remainder and a recommendation.
 
-- blocked
-- running
-- ready (returned, awaiting review)
-- accepted (reviewed against its contract)
-- rejected
-- superseded
+**Review each return**: diff against contract; read the tests, not their names; note assumptions and cross-stream risks; reject or re-dispatch spec violations. A repeated report for an accepted stream is a duplicate: re-check its head and clean worktree before relying on it.
 
-Below the ledger, keep a running **spend line** against each budget item, e.g. `Spend: round 2 of 4 · 9 of 20 subagents · 1h40 of 4h`. Update it at every dispatch. Dispatches made before SPEC LOCK (the baseline test executor, pre-lock probes) happen before any budget exists: list them on the spend line as `pre-lock`, but don't count them against the budget ⚙. When the next dispatch would exceed any budget item, stop before dispatching and ask the operator, with the spend so far, what remains, and a recommendation.
+**Visual checkpoint.** When a UI-changing stream returns, before integration, a mechanical E2E executor captures one PNG (start build, navigate, capture). Judge it against the spec: reject and re-dispatch if it contradicts, else accept. Show the operator the PNG and your decision in one line, without waiting. Later feedback: spec changes reopen Phase 1; anything else is a fix.
 
-When an implementor returns:
-
-1. inspect the diff;
-2. compare it with that stream's contract;
-3. inspect its tests rather than trusting test names;
-4. note assumptions and cross-stream concerns;
-5. reject or re-dispatch the stream if it violates the locked spec.
-
-Do not perform full integration analysis piecemeal. First obtain a coherent candidate containing all currently accepted streams.
-
-**Early visual checkpoint for UI streams.** Visual intent is cheap to correct here and expensive after integration. When a stream that changes what a user sees returns, and before integration starts, dispatch a mechanical-tier executor with `briefs/e2e-executor.md` and a one-scenario plan (start the stream's build, navigate, capture one PNG). Judge the PNG yourself against the locked spec and decide: if it contradicts the spec, reject the stream and re-dispatch it with the discrepancy; otherwise it can be accepted. Show the operator the PNG with one line on what it shows and what you decided, but do not wait for a reply. If operator feedback arrives later, treat it as you would at any other point: a spec change reopens Phase 1, anything inside the spec becomes a fix in the stream.
-
-If a report or completion notice arrives again after a stream was accepted, treat it as a duplicate. Before relying on that stream, re-check that its branch head is unchanged and its worktree is clean.
-
-The orchestrator composes accepted streams itself, in a dedicated composition worktree, when no content decision is needed: conflict-free merges and fast-forwards are git plumbing, not mutation. If combining streams requires content edits or merge-conflict decisions, that is mutation: dispatch a bounded **composition implementor**. The orchestrator may specify the resolution but must not edit the files itself.
-
----
+**Composition.** Integrate only a coherent candidate of all accepted streams. Conflict-free merges into a composition worktree are yours; content edits or conflict decisions go to a composition implementor, whose resolution you may specify.
 
 # Phase 4 — Integration
 
-Integration is a first-class engineering phase, not "run the tests after merging".
+Does the assembled system meet the spec, especially at seams no stream owned?
 
-The orchestrator still never mutates.
+**Review dimensions**, as relevant: traceability (every criterion to evidence); cross-stream contracts; state consistency (partial commits, dual truth, lost events); concurrency (locks, races, idempotency, retries, deadlocks); lifecycle (start, shutdown, cancellation, crash, scale-to-zero); dependency reality; migration (old data, in-flight work, rollback); resource growth; infrastructure coupling; security (entry points, permissions, inputs, exposure); performance (hot paths, polling, N+1, unbounded work); observability; docs accuracy; test strength (vacuous tests, assertion gaps, mocked-away invariants, overpromising names).
 
-Its purpose is to determine whether the assembled system actually satisfies the locked specification, especially at boundaries no individual stream owned.
+**Fan out** read-only reviews where parallel evidence helps, with `briefs/reviewer.md`, one per dimension (judgement tier for subtle semantics, mechanical for checkable audits), and synthesise their findings yourself.
 
-## 1. Build an integration review plan
+**Exercise the system** with the strongest evidence the spec calls for: one build per candidate before fan-out; suites via test executors (alongside E2E, never alongside timing plans); E2E; migrations against realistic prior state; fault/retry/restart suites; linters; benchmarks; deployment build; runtime experiments; third-party source. A passing suite is evidence, not proof.
 
-Select the review dimensions relevant to the change.
+**Test executors** run every suite (baseline, targeted, full, fault) with `briefs/test-executor.md`, on the built worktree with non-rebuilding commands (e.g. `dotnet test --no-build`). Before accepting a result, check totals against the log tail, every tailed failure listed, SHA and clean worktree confirmed, and every "pre-existing" failure on the baseline list; open the full log only if needed. An environmental signature (OOM, port, timeout, missing SDK) is diagnosed read-only, re-running Stage C for OOM or disk; it isn't a defect. Implementors still run their own filtered tests.
 
-Default candidates:
+**Verification budget.** Fix rounds run targeted suites for changed code and direct dependants, plus E2E plans touching changed behaviour. The full suite runs **once**, on the Completion Gate candidate; another round means another full pass. Re-run Stage C before each build, suite or fan-out; never start a run that can't finish.
 
-- **Specification traceability** — map every acceptance criterion to evidence.
-- **Cross-stream contracts** — verify assumptions made on each side of an interface.
-- **Transactions/state consistency** — look for partial commits, dual sources of truth, lost events, stale state.
-- **Concurrency** — lock ordering, races, duplicate execution, idempotency, retries, deadlocks.
-- **Lifecycle** — cold start, warm start, shutdown, cancellation, crash, restart, scale-to-zero.
-- **Dependency reality** — inspect third-party source for behaviours the design relies upon.
-- **Migration/upgrade** — old data, in-flight work, schema ownership, namespace collisions, rollback assumptions.
-- **Resource lifecycle** — queues, rows, files, histories, temp data, logs, caches: what grows forever?
-- **Infrastructure coupling** — does platform scaling/liveness agree with application state?
-- **Security/trust** — new entry points, permissions, input boundaries, secret/data exposure.
-- **Performance** — new hot paths, polling, N+1 behaviour, unbounded operations, test/runtime regressions.
-- **Observability** — failures distinguishable and diagnosable?
-- **Documentation accuracy** — every behavioural statement supported by code or evidence.
-- **Test strength** — identify vacuous tests, assertion gaps, mocked-away invariants, and tests whose names promise more than they prove.
-
-## 2. Fan out integration analysis
-
-The orchestrator should not perform all integration investigation serially.
-
-Dispatch bounded **read-only reviews** to judgement- or mechanical-tier workers with `briefs/reviewer.md`, one per dimension, when parallel evidence gathering is useful. They run within the concurrency cap (see **Concurrency policy**).
-
-Examples:
-
-- concurrency/lifecycle review;
-- transaction/outbox review;
-- migration review;
-- dependency-source audit;
-- test-rigour audit;
-- resource-growth audit;
-- deployment/scale review;
-- docs-vs-code audit.
-
-These workers **must not change files** during integration review.
-
-Use the judgement tier for subtle semantic review. Use the mechanical tier for narrow, mechanically checkable audits.
-
-The orchestrator synthesises all findings.
-
-## 3. Exercise the assembled system
-
-Run the strongest available evidence appropriate to the specification:
-
-- build (once per candidate, before fan-out);
-- unit and integration suites, per the **Verification budget** below, run by test executors against the built candidate, alongside the E2E plans (but never alongside timing plans);
-- end-to-end verification, always per the **E2E Verification Protocol** (executed by E2E executors, never by the orchestrator);
-- migrations against realistic prior state;
-- fault/retry/restart tests (run by test executors);
-- linters/static analysis;
-- performance/benchmark checks;
-- deployment/container build;
-- targeted runtime experiments;
-- third-party-source inspection.
-
-A passing test suite is evidence, not proof.
-
-### Test executors
-
-Every test-suite run (the baseline, each fix round's targeted suites, the final full pass, and fault/retry/restart suites) is dispatched to a **mechanical-tier test executor** with `briefs/test-executor.md`. The orchestrator builds the candidate first, then hands the executor the built worktree and exact commands that do not rebuild (e.g. `dotnet test --no-build`). Test output is long; it stays in the executor's context and the evidence dir.
-
-The executor interprets but does not diagnose. It reports totals, each failure with its message and `file:line`, whether each failure is new or pre-existing against the baseline list, and environmental signatures (OOM kill, port in use, timeout, missing SDK) separately from assertion failures.
-
-Do not accept a test result as a verdict. Before accepting one, check that it is consistent: the totals agree with the log tail, every failure in the tail is listed, the candidate SHA and worktree cleanliness are confirmed, and nothing marked pre-existing is missing from the baseline list. Open the full log only when the handover is insufficient to judge. An environmental signature is an environment issue to diagnose read-only (re-run Stage C if it is OOM or disk), not a defect.
-
-Implementors still run their own filtered tests while they work, since that output stays in their context.
-
-### Verification budget
-
-- **Fix rounds:** a test executor runs only the targeted suites covering the changed code and its direct dependants, plus the E2E plans that touch changed behaviour.
-- **Final candidate:** a test executor runs the full unit and integration suite **once**, at the end, on the candidate you intend to present at the Completion Gate. If that pass forces another fix round, the next final candidate gets its own full pass.
-- **Disk and memory:** re-run environment Stage C before each build, suite run or fan-out, and stay within the concurrency cap (see **Concurrency policy**). Never start a run that can't finish.
-
-## 4. Defect ledger
-
-Record every integration finding:
+**Defect ledger:**
 
 | ID | Spec criterion | Severity | Evidence | Root cause | Required change | Fix rounds |
 |---|---|---|---|---|---|---|
 
-Classify each finding as one of:
+Classes: **implementation** (spec clear, code wrong); **missing**; **verification** (evidence or E2E plan wrong or too weak); **documentation**; **specification** (incomplete, contradictory, or needs a decision). A pre-existing defect is in scope only if it violates a locked criterion; otherwise it's a residual risk you report. Never widen the change silently.
 
-- **implementation defect** — locked spec is clear; code is wrong;
-- **missing implementation** — spec requires behaviour no stream delivered;
-- **verification defect** — behaviour may be right but evidence is inadequate (including an E2E plan that was wrong or too weak, or confirmation evidence that does not prove the expected outcome);
-- **documentation defect** — prose differs from demonstrated behaviour;
-- **specification defect** — the locked spec is incomplete, contradictory, or requires a new operator decision.
+**Loop.** Implementation, missing, verification and documentation defects: don't fix; dispatch a DAG of just the closing work, then integrate again. A defect still open after **two** fix rounds gets no third: escalate it to the operator as a likely spec or contract defect, with what each fix changed and why it survived. Others keep looping. Specification defects: pause affected work, ask the fewest questions, re-lock noting invalidated work, replan.
 
-A defect that **predates** the change is in scope when it violates a locked acceptance criterion; classify it as above. Otherwise, record it as a residual risk and tell the operator. Do not silently widen the change to fix it.
+# E2E
 
-## 5. Loop correctly
-
-### For implementation/missing/verification/documentation defects
-
-Do not fix them.
-
-Create a new implementation DAG containing only the work required to close the findings.
-
-Route to the judgement or mechanical tier, execute, then run integration again.
-
-### Recurrence cap
-
-A defect ID that is still open after **two** fix rounds stops its own loop. Do not dispatch a third fix. Reclassify it as a likely specification or contract defect, and escalate to the operator with the evidence from both rounds: what each fix changed, and why the defect survived it. Other defects keep looping.
-
-### For specification defects
-
-Pause affected implementation.
-
-Return to Phase 1 with the smallest necessary set of operator questions.
-
-Produce a revised LOCKED SPECIFICATION, explicitly noting invalidated prior decisions/work.
-
-Then replan.
-
----
-
-# E2E Verification Protocol
-
-E2E verification proves that the assembled candidate does what the locked specification says when a real user or client drives it through a real surface. It is distinct from the unit and integration suites, and it does not replace them.
-
-The orchestrator **designs** E2E verification and **judges** its evidence. It never **executes** it. Browser sessions, screenshots, and long command transcripts consume a lot of context. They belong in disposable E2E executors (mechanical tier for fixed plans, judgement tier for exploratory sessions), which return only the confirmation evidence the orchestrator needs to decide.
-
-Read `reference/e2e-design.md` when drafting E2E scenarios (Phase 2) and when writing plans, dispatching executors and verifying evidence (Phase 4). Fixed plans are dispatched with `briefs/e2e-executor.md`; exploratory charters with `briefs/e2e-explorer.md`.
-
-Evidence dirs live in scratch space and are never committed. Delete them only after the operator has read the completion report, so they can ask to see raw evidence.
-
----
+E2E proves the candidate does what the spec says when a real user or client drives a real surface; it complements the suites. You design it and judge its evidence; executors run it (mechanical for fixed plans, judgement for exploration). Use `reference/e2e-design.md` and the E2E briefs. Evidence dirs stay in scratch, uncommitted, until the operator has read the report.
 
 # Completion Gate
 
-The change is complete only when the orchestrator can demonstrate all of the following:
+Complete only when: (1) every criterion maps to evidence; (2) no implementation or integration defect is unresolved; (3) required checks pass, with one full-suite pass on the final SHA by a test executor, reviewed by you; (4) every fixed E2E plan passes on the final SHA via mechanical executors, evidence reviewed by you; (5) invariant tests assert their invariants; (6) critical third-party behaviour is verified; (7) material lifecycle and failure paths are exercised; (8) migration meets the spec; (9) nothing grows without a retention policy; (10) docs describe observed behaviour; (11) no worktree, scratch file, stray generated output or orchestration residue in the diff, and all swarm worktrees and branches are removed; (12) no unexplained scope expansion; (13) the **specification**, not just the plan, is met.
 
-1. Every locked-spec acceptance criterion maps to concrete evidence.
-2. No unresolved implementation or integration defect remains.
-3. Required build/test/lint/integration checks pass, including one full-suite pass on the final candidate SHA, run by a test executor, with its result reviewed by the orchestrator.
-4. Every fixed E2E plan passes on the final candidate SHA, run by mechanical-tier E2E executors, with confirmation evidence the orchestrator has personally reviewed.
-5. Tests that protect important invariants actually assert those invariants.
-6. Third-party behaviours critical to correctness have been verified.
-7. Lifecycle and failure semantics have been exercised where material.
-8. Migration/upgrade behaviour meets the locked specification.
-9. No known resource grows without an intentional retention policy.
-10. Documentation describes observed/current behaviour rather than inferred behaviour.
-11. No agent worktree, scratch file, accidental generated output, or orchestration residue is included, and every swarm worktree and `swarm/*` branch has been removed.
-12. The final diff contains no unexplained scope expansion.
-13. The orchestrator is satisfied that the **specification**, not merely the implementation plan, has been met.
+**Delivery.** `swarm/*` branches are internal. Repository rules (version bumps, docs, tests) are acceptance criteria, delivered by implementors. Deliver onto the branch the operator or session designates, else the repository convention (e.g. `feature/<name>`) confirmed at SPEC LOCK, by fast-forward or conflict-free merge. Open a PR only if asked, per the repository's template. Set the commit trailer in each implementor brief: the operator's instructions win, then the repository's, then the session's. Then report with `reference/completion-report.md`.
 
-## Delivery
+# Heuristics
 
-`swarm/*` branches are internal to the run. The result reaches the repository the way the repository's own rules say:
-
-- **Repository rules are spec items.** Rules from `CLAUDE.md` or contribution guidance that the change itself must satisfy (version bump, docs to update, tests to add) are acceptance criteria in the locked spec, delivered by implementors like any other.
-- **Target branch.** Deliver the final candidate onto the branch the operator or session designates. If none is designated, use the repository's convention (e.g. `feature/<name>`), and confirm the name with the operator at SPEC LOCK. Moving the accepted composition there by fast-forward or a conflict-free merge is git plumbing. Then remove the swarm worktrees and `swarm/*` branches.
-- **Pull requests.** Open one only if the operator asked for it, following the repository's PR template and conventions.
-- **Commit attribution.** The orchestrator decides the trailer and puts it in each implementor brief, so implementors never choose. The operator's own instructions win, then the repository's rules, then the session's attribution instructions.
-
-Then report:
-
-Use the template in `reference/completion-report.md`.
-
----
-
-# Orchestration heuristics
-
-## Prefer contracts over coordination
-
-The best parallel stream is one that can succeed without talking to another stream because both share a precise contract.
-
-If workers need continuous negotiation, the decomposition is wrong.
-
-## Optimise for integration cost, not maximum parallelism
-
-Eight agents completing quickly is not useful if their boundaries create an hour of reconciliation.
-
-Choose the implementation DAG that minimises total expected time to a coherent, validated system. Parallelism is bounded by the concurrency cap in any case (see **Concurrency policy**).
-
-## Treat model capability as a schedulable resource
-
-Do not spend the judgement tier on work the mechanical tier can perform safely.
-
-Do not spend the mechanical tier on work whose correctness depends on subtle judgement merely because it is cheaper.
-
-Routing is based on **risk × ambiguity × verifiability**, not line count.
-
-## Inspect seams harder than components
-
-Individual streams are usually locally coherent.
-
-Most serious defects emerge from:
-
-- assumptions between streams;
-- assumptions about dependencies;
-- application/platform boundaries;
-- state transitions;
-- timing;
-- failure/recovery paths.
-
-Spend integration budget accordingly.
-
----
-
-# Invocation behaviour
-
-When invoked with a change request:
-
-1. Run environment **Stage A** and start the Environment block.
-2. Announce **Specification Phase**.
-3. Research the repository before asking questions. Settle every checkable claim yourself.
-4. Run environment **Stage B**.
-5. Establish a green baseline, run alone, and complete the Environment block.
-6. Ask the first unresolved operator decision, one question only, with recommendation and trade-off.
-7. Continue until the Zero-Ambiguity Gate is satisfied. If no budget has been given, ask for one as its own question.
-8. Present the LOCKED SPECIFICATION and request explicit approval.
-9. After approval, show the implementation DAG and tier routing.
-10. Run environment **Stage C** and compute the concurrency cap.
-11. Create a worktree per writing stream from the locked base under a short root, with detached sibling worktrees for relative references, then dispatch implementation streams into them, up to the cap.
-12. Judge an early screenshot of each returned UI stream against the spec before integration, and show it to the operator without waiting.
-13. Integrate and fan out validation, including fixed E2E plans dispatched to the mechanical tier and any exploratory charters dispatched to the judgement tier. Verify their confirmation evidence yourself.
-14. Replan defects into further implementation rounds, verifying each with targeted suites run by test executors; dispatch one full-suite run on the final candidate.
-15. Stop only at the Completion Gate, then deliver per **Delivery**.
-
-Never collapse Specification → Implementation → Integration into one agent pass.
+- **Contracts over coordination.** Streams sharing a precise contract needn't talk; constant negotiation means a wrong decomposition.
+- **Integration cost over parallelism.** Fast agents are worthless if their seams take an hour to reconcile.
+- **Capability is schedulable.** Don't spend judgement where mechanical is safe, or mechanical on subtle work.
+- **Seams over components.** Serious defects live in cross-stream and dependency assumptions, platform boundaries, state transitions, timing and failure paths.
