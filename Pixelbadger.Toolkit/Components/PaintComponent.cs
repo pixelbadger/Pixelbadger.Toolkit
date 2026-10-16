@@ -6,7 +6,7 @@ namespace Pixelbadger.Toolkit.Components;
 
 public enum PaintEndReason { Finished, NoToolCalls, StepLimit }
 
-public sealed record PaintResult(int Steps, PaintEndReason EndReason, string? Summary, string? OutFile);
+public sealed record PaintResult(int Steps, PaintEndReason EndReason, string? Summary, string? OutFile, string? AnimationOut = null);
 
 /// <summary>Provider-neutral agentic loop in which an LLM paints a canvas through tools.</summary>
 public class PaintComponent
@@ -42,6 +42,7 @@ public class PaintComponent
         string? outFile,
         bool overwrite,
         IPaintRenderer renderer,
+        string? animationOut = null,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(prompt))
@@ -57,7 +58,18 @@ public class PaintComponent
                 throw new IOException($"Output file already exists: {fullPath}. Use --overwrite to replace it.");
         }
 
+        string? animationPath = null;
+        if (animationOut is not null)
+        {
+            animationPath = Path.GetFullPath(animationOut);
+            if (File.Exists(animationPath) && !overwrite)
+                throw new IOException($"Output file already exists: {animationPath}. Use --overwrite to replace it.");
+            if (fullPath is not null && string.Equals(fullPath, animationPath, StringComparison.Ordinal))
+                throw new ArgumentException("--out-file and --animation-out must be different paths.");
+        }
+
         var canvas = new PaintCanvas();
+        var recorder = animationPath is not null ? new PaintAnimationRecorder(PaintCanvas.Size) : null;
         var tools = new PaintTools(canvas);
         var messages = new List<ChatMessage>
         {
@@ -74,6 +86,7 @@ public class PaintComponent
         try
         {
             renderer.RenderFrame(canvas.Snapshot(), PaintCanvas.Size, $"Step 0/{maxSteps} · starting");
+            recorder?.AddFrame(canvas.Snapshot());
 
             for (var step = 1; step <= maxSteps; step++)
             {
@@ -107,6 +120,7 @@ public class PaintComponent
                         if (modelText.Length > 0)
                             status += $" · {modelText}";
                         renderer.RenderFrame(canvas.Snapshot(), PaintCanvas.Size, status);
+                        recorder?.AddFrame(canvas.Snapshot());
                     }
 
                     results.Add(outcome.Result);
@@ -143,7 +157,15 @@ public class PaintComponent
             await File.WriteAllBytesAsync(fullPath, canvas.ToPng(), cancellationToken);
         }
 
-        return new PaintResult(steps, reason, summary, fullPath);
+        if (recorder is not null && animationPath is not null)
+        {
+            var dir = Path.GetDirectoryName(animationPath);
+            if (!string.IsNullOrEmpty(dir))
+                Directory.CreateDirectory(dir);
+            await File.WriteAllBytesAsync(animationPath, recorder.ToGif(canvas.Snapshot()), cancellationToken);
+        }
+
+        return new PaintResult(steps, reason, summary, fullPath, animationPath);
     }
 
     private static string? ExtractSummary(FunctionCallContent call)

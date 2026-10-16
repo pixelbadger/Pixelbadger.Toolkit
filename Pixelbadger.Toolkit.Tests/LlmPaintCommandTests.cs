@@ -1,6 +1,7 @@
 using System.CommandLine;
 using System.Text.RegularExpressions;
 using FluentAssertions;
+using Pixelbadger.Toolkit.CommandLine;
 using Pixelbadger.Toolkit.Commands;
 
 namespace Pixelbadger.Toolkit.Tests;
@@ -29,6 +30,41 @@ public class LlmPaintCommandTests : IDisposable
         result.GetValue<string>("--provider").Should().Be("openai");
         result.GetValue<string?>("--out-file").Should().BeNull();
         result.GetValue<bool>("--overwrite").Should().BeFalse();
+        result.GetValue<string?>("--animation-out").Should().BeNull();
+    }
+
+    [Fact]
+    public void Create_ShouldDescribeAnimationOutAndMarkItImmutable_ForConfig()
+    {
+        var command = LlmCommand.CreatePaintCommand();
+        var option = command.Options.Single(o => o.Name == "--animation-out");
+
+        option.Description.Should().Be("Optional path to write an animated GIF of the painting");
+        option.HasImmutableDefault().Should().BeTrue();
+        command.Options.Single(o => o.Name == "--out-file").HasImmutableDefault().Should().BeTrue();
+        command.Options.Single(o => o.Name == "--overwrite").Description.Should().Be("Replace --out-file or --animation-out if it already exists");
+    }
+
+    [Fact]
+    public async Task Paint_ShouldListAnimationOut_InHelp()
+    {
+        var (exitCode, stdout, stderr) = await ToolkitProcess.RunAsync(null, "llm", "paint", "--help");
+
+        exitCode.Should().Be(0);
+        Normalise(stdout + stderr).Should().Contain("--animation-out").And.Contain("animated GIF");
+    }
+
+    [Fact]
+    public async Task Paint_ShouldRefuseExistingAnimationOut_WhenOverwriteNotSet()
+    {
+        var gif = Path.Combine(_dir, "exists.gif");
+        File.WriteAllText(gif, "keep");
+
+        var (exitCode, stdout, stderr) = await RunWithKeys("llm", "paint", "--prompt", "p", "--animation-out", gif);
+
+        exitCode.Should().Be(1);
+        Normalise(stdout + stderr).Should().Contain("Output file already exists:").And.Contain("Use --overwrite to replace it.");
+        File.ReadAllText(gif).Should().Be("keep");
     }
 
     [Theory]

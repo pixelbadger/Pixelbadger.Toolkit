@@ -258,7 +258,8 @@ public static class LlmCommand
         var modelOption = CreateModelOption();
         var providerOption = CreateProviderOption();
 
-        var overwriteOption = new Option<bool>("--overwrite") { Description = "Replace --out-file if it already exists" }.WithImmutableDefault();
+        var animationOutOption = new Option<string?>("--animation-out") { Description = "Optional path to write an animated GIF of the painting" }.WithImmutableDefault();
+        var overwriteOption = new Option<bool>("--overwrite") { Description = "Replace --out-file or --animation-out if it already exists" }.WithImmutableDefault();
 
         command.Add(promptOption);
         command.Add(outFileOption);
@@ -305,13 +306,15 @@ public static class LlmCommand
                 result.AddError("--max-steps must be between 1 and 200.");
         });
         var outFileOption = new Option<string?>("--out-file") { Description = "Optional path to write the final canvas to as a PNG" }.WithImmutableDefault();
-        var overwriteOption = new Option<bool>("--overwrite") { Description = "Replace --out-file if it already exists" }.WithImmutableDefault();
+        var animationOutOption = new Option<string?>("--animation-out") { Description = "Optional path to write an animated GIF of the painting" }.WithImmutableDefault();
+        var overwriteOption = new Option<bool>("--overwrite") { Description = "Replace --out-file or --animation-out if it already exists" }.WithImmutableDefault();
         var modelOption = CreateModelOption();
         var providerOption = CreateProviderOption();
 
         command.Add(promptOption);
         command.Add(maxStepsOption);
         command.Add(outFileOption);
+        command.Add(animationOutOption);
         command.Add(overwriteOption);
         command.Add(modelOption);
         command.Add(providerOption);
@@ -321,6 +324,7 @@ public static class LlmCommand
             var prompt = parseResult.GetValue(promptOption)!;
             var maxSteps = parseResult.GetValue(maxStepsOption);
             var outFile = parseResult.GetValue(outFileOption);
+            var animationOut = parseResult.GetValue(animationOutOption);
             var overwrite = parseResult.GetValue(overwriteOption);
 
             return RunLlmActionAsync(
@@ -333,7 +337,7 @@ public static class LlmCommand
                     using (var renderer = PaintRendererFactory.Create(AnsiConsole.Console))
                     {
                         result = await services.GetRequiredService<PaintComponent>()
-                            .PaintAsync(prompt, maxSteps, outFile, overwrite, renderer, cancellationToken);
+                            .PaintAsync(prompt, maxSteps, outFile, overwrite, renderer, animationOut, cancellationToken);
                     }
 
                     if (result.EndReason == PaintEndReason.StepLimit)
@@ -342,6 +346,8 @@ public static class LlmCommand
                         AnsiConsole.MarkupLine(Markup.Escape($"Finished: {result.Summary}"));
                     if (result.OutFile is not null)
                         AnsiConsole.MarkupLine($"[green]Image written to {Markup.Escape(result.OutFile)}[/]");
+                    if (result.AnimationOut is not null)
+                        AnsiConsole.MarkupLine($"[green]Animation written to {Markup.Escape(result.AnimationOut)}[/]");
                 });
         });
 

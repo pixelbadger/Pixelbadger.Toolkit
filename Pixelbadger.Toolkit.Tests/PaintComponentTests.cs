@@ -2,6 +2,7 @@ using FluentAssertions;
 using Microsoft.Extensions.AI;
 using Pixelbadger.Toolkit.Components;
 using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Gif;
 using SixLabors.ImageSharp.PixelFormats;
 
 namespace Pixelbadger.Toolkit.Tests;
@@ -70,8 +71,8 @@ public class PaintComponentTests : IDisposable
         => Call(id, "finish", ("summary", summary));
 
     private static Task<PaintResult> Run(ScriptedChatClient client, RecordingRenderer r, int maxSteps = 10,
-        string? outFile = null, bool overwrite = false, CancellationToken ct = default)
-        => new PaintComponent(client).PaintAsync("a badger", maxSteps, outFile, overwrite, r, ct);
+        string? outFile = null, bool overwrite = false, CancellationToken ct = default, string? animationOut = null)
+        => new PaintComponent(client).PaintAsync("a badger", maxSteps, outFile, overwrite, r, animationOut, ct);
 
     [Fact]
     public async Task PaintAsync_ShouldStopAfterRemainingCalls_WhenFinishCalledMidResponse()
@@ -322,5 +323,120 @@ public class PaintComponentTests : IDisposable
 
         await act.Should().ThrowAsync<ArgumentException>();
         renderer.Events.Should().BeEmpty();
+    }
+
+    private static List<(Rgb24 Pixel, int Delay)> DecodeGif(string path, out int repeatCount)
+    {
+        using var image = Image.Load<Rgb24>(path);
+        repeatCount = image.Metadata.GetGifMetadata().RepeatCount;
+        return image.Frames.Select(f => (f[0, 0], f.Metadata.GetGifMetadata().FrameDelay)).ToList();
+    }
+
+    [Fact]
+    public async Task PaintAsync_ShouldWriteGifWithOneFramePerPaintingCall_WhenAnimationOutSet()
+    {
+        var gif = Path.Combine(_dir, "sub", "a.gif");
+        var client = new ScriptedChatClient()
+            .Enqueue(Response(null, Fill("a", "#FF0000"), Call("b", "read_canvas"), Fill("c", "#00FF00")))
+            .Enqueue(Response(null, Call("d", "read_region", ("x", 0), ("y", 0), ("width", 2), ("height", 2)), Fill("e", "#0000FF"), Finish("f")));
+
+        var result = await Run(client, new RecordingRenderer(), animationOut: gif);
+
+        result.AnimationOut.Should().Be(Path.GetFullPath(gif));
+        var frames = DecodeGif(gif, out var repeat);
+        repeat.Should().Be(0);
+        frames.Select(f => f.Pixel).Should().Equal(
+            new Rgb24(255, 255, 255), new Rgb24(255, 0, 0), new Rgb24(0, 255, 0), new Rgb24(0, 0, 255));
+        frames.Select(f => f.Delay).Should().Equal(15, 15, 15, 200);
+    }
+
+    [Fact]
+    public async Task PaintAsync_ShouldWriteSingleBlankFrame_WhenNothingPainted()
+    {
+        var gif = Path.Combine(_dir, "a.gif");
+
+        await Run(new ScriptedChatClient().Enqueue(Response("hm")), new RecordingRenderer(), animationOut: gif);
+
+        var frames = DecodeGif(gif, out _);
+        frames.Should().Equal((new Rgb24(255, 255, 255), 200));
+    }
+
+    [Fact]
+    public async Task PaintAsync_ShouldNotWriteGif_WhenChatClientThrows()
+    {
+        var gif = Path.Combine(_dir, "a.gif");
+        var client = new ScriptedChatClient().EnqueueThrow(new InvalidOperationException("boom"));
+
+        var act = () => Run(client, new RecordingRenderer(), animationOut: gif);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+        File.Exists(gif).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task PaintAsync_ShouldNotWriteGif_WhenCancelled()
+    {
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        var gif = Path.Combine(_dir, "a.gif");
+
+        var act = () => Run(new ScriptedChatClient().Enqueue(Response("x")), new RecordingRenderer(), ct: cts.Token, animationOut: gif);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        File.Exists(gif).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task PaintAsync_ShouldRefuseBeforeBeginAndModelCall_WhenAnimationOutExists()
+    {
+        var gif = Path.Combine(_dir, "exists.gif");
+        File.WriteAllText(gif, "keep");
+        var client = new ScriptedChatClient().Enqueue(Response("x"));
+        var renderer = new RecordingRenderer();
+
+        var act = () => Run(client, renderer, animationOut: gif);
+
+        (await act.Should().ThrowAsync<IOException>())
+            .WithMessage($"Output file already exists: {Path.GetFullPath(gif)}. Use --overwrite to replace it.");
+        client.Requests.Should().BeEmpty();
+        renderer.Events.Should().BeEmpty();
+        File.ReadAllText(gif).Should().Be("keep");
+    }
+
+    [Fact]
+    public async Task PaintAsync_ShouldThrowBeforeBeginAndModelCall_WhenOutFileAndAnimationOutSamePath()
+    {
+        var client = new ScriptedChatClient().Enqueue(Response("x"));
+        var renderer = new RecordingRenderer();
+        var path = Path.Combine(_dir, "x.gif");
+
+        var act = () => Run(client, renderer, outFile: path, animationOut: Path.Combine(_dir, "sub", "..", "x.gif"));
+
+        (await act.Should().ThrowAsync<ArgumentException>()).WithMessage("--out-file and --animation-out must be different paths.");
+        client.Requests.Should().BeEmpty();
+        renderer.Events.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task PaintAsync_ShouldReplaceGif_WhenOverwriteSet()
+    {
+        var gif = Path.Combine(_dir, "exists.gif");
+        File.WriteAllText(gif, "old");
+
+        await Run(new ScriptedChatClient().Enqueue(Response("x")), new RecordingRenderer(), overwrite: true, animationOut: gif);
+
+        DecodeGif(gif, out _).Should().HaveCount(1);
+    }
+
+    [Fact]
+    public async Task PaintAsync_ShouldWriteBothFiles_WhenOutFileAndAnimationOutDiffer()
+    {
+        var png = Path.Combine(_dir, "o.png");
+        var gif = Path.Combine(_dir, "o.gif");
+
+        await Run(new ScriptedChatClient().Enqueue(Response(null, Fill("a"), Finish("f"))), new RecordingRenderer(), outFile: png, animationOut: gif);
+
+        File.Exists(png).Should().BeTrue();
+        DecodeGif(gif, out _).Should().HaveCount(2);
     }
 }
