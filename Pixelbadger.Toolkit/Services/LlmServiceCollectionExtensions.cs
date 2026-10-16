@@ -15,6 +15,7 @@ public static partial class LlmServiceCollectionExtensions
             ["low", "medium", "high"]));
         services.AddSingleton<ILlmClientService, OpenAiLlmClientService>();
         services.AddSingleton<IImageGenerationService, OpenAiImageGenerationService>();
+        services.AddSingleton<IChatReasoningConfigurator, OpenAiChatReasoningConfigurator>();
         services.AddSingleton<IChatClient>(sp =>
         {
             var key = Environment.GetEnvironmentVariable("OPENAI_API_KEY")

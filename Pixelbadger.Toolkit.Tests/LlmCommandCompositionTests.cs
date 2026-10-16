@@ -169,5 +169,6 @@ public class LlmCommandCompositionTests : IDisposable
 
         client.Should().NotBeNull();
         services.GetRequiredService<PaintComponent>().Should().NotBeNull();
+        services.GetRequiredService<IChatReasoningConfigurator>().Should().BeOfType<OpenAiChatReasoningConfigurator>();
     }
 }

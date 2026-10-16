@@ -70,7 +70,7 @@
         <tr><td>Image input</td><td><code>ocaaar</code>, <code>paint</code></td><td>Yes</td><td>Yes</td></tr>
         <tr><td>Image generation</td><td><code>generate-image</code></td><td>Yes</td><td>No</td></tr>
         <tr><td>Tool calling</td><td><code>paint</code></td><td>Yes</td><td>Yes</td></tr>
-        <tr><td><code>--reasoning-effort</code> values</td><td><code>chat</code></td><td><code>low</code>, <code>medium</code>, <code>high</code></td><td><code>low</code>, <code>medium</code>, <code>high</code>, <code>xhigh</code>, <code>max</code></td></tr>
+        <tr><td><code>--reasoning-effort</code> values</td><td><code>chat</code>, <code>paint</code></td><td><code>low</code>, <code>medium</code>, <code>high</code></td><td><code>low</code>, <code>medium</code>, <code>high</code>, <code>xhigh</code>, <code>max</code></td></tr>
       </tbody>
     </table>
   </section>
@@ -425,6 +425,13 @@ flowchart LR
       <span class="opt"> --animation-out</span> <span class="val">./badger.gif</span>
     </div>
 
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk llm paint</span>
+      <span class="opt"> --prompt</span> <span class="val">"A pixelbadger"</span>
+      <span class="opt"> --model</span> <span class="val">gpt-6.1-sol</span>
+      <span class="opt"> --reasoning-effort</span> <span class="val">high</span>
+    </div>
+
     <table>
       <thead><tr><th>Option</th><th>Required</th><th>Default</th><th>Description</th></tr></thead>
       <tbody>
@@ -435,6 +442,7 @@ flowchart LR
         <tr><td><code>--out-file</code></td><td>No</td><td>&mdash;</td><td>Write the final canvas to this PNG file</td></tr>
         <tr><td><code>--animation-out</code></td><td>No</td><td>&mdash;</td><td>Write an animated GIF of the painting to this file</td></tr>
         <tr><td><code>--overwrite</code></td><td>No</td><td>off</td><td>Replace <code>--out-file</code> or <code>--animation-out</code> if it already exists</td></tr>
+        <tr><td><code>--reasoning-effort</code></td><td>No</td><td>&mdash;</td><td>Reasoning effort level. Values depend on the provider: <code>openai</code> accepts <code>low</code>, <code>medium</code>, <code>high</code>; <code>claude</code> accepts <code>low</code>, <code>medium</code>, <code>high</code>, <code>xhigh</code>, <code>max</code></td></tr>
       </tbody>
     </table>
 
@@ -539,7 +547,7 @@ flowchart LR
         <tr>
           <td><code>llm paint</code></td>
           <td><code>--prompt</code></td>
-          <td><code>--provider</code> <code>--model</code> <code>--max-steps</code> <code>--out-file</code> <code>--animation-out</code> <code>--overwrite</code></td>
+          <td><code>--provider</code> <code>--model</code> <code>--max-steps</code> <code>--out-file</code> <code>--animation-out</code> <code>--overwrite</code> <code>--reasoning-effort</code></td>
           <td>Live canvas on the terminal; final image to the normal screen, to <code>--out-file</code> if given, and an animated GIF to <code>--animation-out</code> if given</td>
         </tr>
         <tr>

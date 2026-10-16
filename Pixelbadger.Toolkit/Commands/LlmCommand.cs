@@ -310,6 +310,7 @@ public static class LlmCommand
         var overwriteOption = new Option<bool>("--overwrite") { Description = "Replace --out-file or --animation-out if it already exists" }.WithImmutableDefault();
         var modelOption = CreateModelOption();
         var providerOption = CreateProviderOption();
+        var reasoningEffortOption = new Option<string?>("--reasoning-effort") { Description = "Reasoning effort level (supported values depend on --provider)" };
 
         command.Add(promptOption);
         command.Add(maxStepsOption);
@@ -318,6 +319,7 @@ public static class LlmCommand
         command.Add(overwriteOption);
         command.Add(modelOption);
         command.Add(providerOption);
+        command.Add(reasoningEffortOption);
 
         command.SetAction((parseResult, cancellationToken) =>
         {
@@ -330,14 +332,14 @@ public static class LlmCommand
             return RunLlmActionAsync(
                 parseResult.GetValue(providerOption)!,
                 parseResult.GetValue(modelOption),
-                new LlmActionRequirements("paint", new HashSet<LlmCapability> { LlmCapability.TextChat, LlmCapability.ImageInput, LlmCapability.ToolCalling }),
-                async (services, _) =>
+                new LlmActionRequirements("paint", new HashSet<LlmCapability> { LlmCapability.TextChat, LlmCapability.ImageInput, LlmCapability.ToolCalling }, parseResult.GetValue(reasoningEffortOption)),
+                async (services, compatibility) =>
                 {
                     PaintResult result;
                     using (var renderer = PaintRendererFactory.Create(AnsiConsole.Console))
                     {
                         result = await services.GetRequiredService<PaintComponent>()
-                            .PaintAsync(prompt, maxSteps, outFile, overwrite, renderer, animationOut, cancellationToken);
+                            .PaintAsync(prompt, maxSteps, outFile, overwrite, renderer, animationOut, compatibility.NormalisedReasoningEffort, cancellationToken);
                     }
 
                     if (result.EndReason == PaintEndReason.StepLimit)

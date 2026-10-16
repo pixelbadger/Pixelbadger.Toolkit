@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.AI;
+using Pixelbadger.Toolkit.Services;
 
 namespace Pixelbadger.Toolkit.Components;
 
@@ -15,10 +16,12 @@ public class PaintComponent
     public const int MaxSteps = 200;
 
     private readonly IChatClient _chatClient;
+    private readonly IChatReasoningConfigurator _reasoningConfigurator;
 
-    public PaintComponent(IChatClient chatClient)
+    public PaintComponent(IChatClient chatClient, IChatReasoningConfigurator reasoningConfigurator)
     {
         _chatClient = chatClient;
+        _reasoningConfigurator = reasoningConfigurator;
     }
 
     private static string SystemPrompt(int maxSteps) => $$"""
@@ -43,6 +46,7 @@ public class PaintComponent
         bool overwrite,
         IPaintRenderer renderer,
         string? animationOut = null,
+        string? reasoningEffort = null,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(prompt))
@@ -77,6 +81,8 @@ public class PaintComponent
             new(ChatRole.User, prompt)
         };
         var options = new ChatOptions { Tools = [.. tools.Tools], ToolMode = ChatToolMode.Auto };
+        if (reasoningEffort is not null)
+            _reasoningConfigurator.Apply(options, reasoningEffort);
 
         var steps = 0;
         PaintEndReason reason = PaintEndReason.StepLimit;

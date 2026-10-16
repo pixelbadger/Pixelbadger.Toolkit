@@ -39,6 +39,7 @@ public class ClaudeProviderCompositionTests : IDisposable
         capabilities.Capabilities.Should().BeEquivalentTo(new[] { LlmCapability.TextChat, LlmCapability.ImageInput, LlmCapability.ToolCalling });
         capabilities.SupportedReasoningEfforts.Should().Equal("low", "medium", "high", "xhigh", "max");
         services.GetRequiredService<ILlmCompatibilityValidator>().Should().BeOfType<LlmCompatibilityValidator>();
+        services.GetRequiredService<IChatReasoningConfigurator>().Should().BeOfType<ClaudeChatReasoningConfigurator>();
     }
 
     [Fact]

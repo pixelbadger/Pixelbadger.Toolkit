@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Microsoft.Extensions.AI;
 using Pixelbadger.Toolkit.Components;
+using Pixelbadger.Toolkit.Services;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Gif;
 using SixLabors.ImageSharp.PixelFormats;
@@ -71,8 +72,48 @@ public class PaintComponentTests : IDisposable
         => Call(id, "finish", ("summary", summary));
 
     private static Task<PaintResult> Run(ScriptedChatClient client, RecordingRenderer r, int maxSteps = 10,
-        string? outFile = null, bool overwrite = false, CancellationToken ct = default, string? animationOut = null)
-        => new PaintComponent(client).PaintAsync("a badger", maxSteps, outFile, overwrite, r, animationOut, ct);
+        string? outFile = null, bool overwrite = false, CancellationToken ct = default, string? animationOut = null, string? reasoningEffort = null, IChatReasoningConfigurator? configurator = null)
+        => new PaintComponent(client, configurator ?? new MarkerConfigurator()).PaintAsync("a badger", maxSteps, outFile, overwrite, r, animationOut, reasoningEffort, ct);
+
+    private sealed class MarkerConfigurator : IChatReasoningConfigurator
+    {
+        public List<string> Applied { get; } = new();
+        public void Apply(ChatOptions options, string reasoningEffort)
+        {
+            Applied.Add(reasoningEffort);
+            options.AdditionalProperties = new AdditionalPropertiesDictionary { ["effort"] = reasoningEffort };
+        }
+    }
+
+    [Fact]
+    public async Task PaintAsync_ShouldApplyEffortOnceAndSendItOnEveryCall_WhenEffortGiven()
+    {
+        var client = new ScriptedChatClient()
+            .Enqueue(Response(null, Fill("1")))
+            .Enqueue(Response(null, Fill("2")))
+            .Enqueue(Response(null, Finish("3")));
+        var configurator = new MarkerConfigurator();
+
+        await Run(client, new RecordingRenderer(), reasoningEffort: "high", configurator: configurator);
+
+        configurator.Applied.Should().Equal("high");
+        client.Options.Should().HaveCount(3);
+        client.Options.Should().OnlyContain(o => o!.AdditionalProperties!["effort"]!.Equals("high"));
+    }
+
+    [Fact]
+    public async Task PaintAsync_ShouldLeaveOptionsUntouched_WhenEffortNotGiven()
+    {
+        var client = new ScriptedChatClient().Enqueue(Response(null, Finish("1")));
+        var configurator = new MarkerConfigurator();
+
+        await Run(client, new RecordingRenderer(), configurator: configurator);
+
+        configurator.Applied.Should().BeEmpty();
+        client.Options.Single()!.AdditionalProperties.Should().BeNull();
+        client.Options.Single()!.Reasoning.Should().BeNull();
+        client.Options.Single()!.RawRepresentationFactory.Should().BeNull();
+    }
 
     [Fact]
     public async Task PaintAsync_ShouldStopAfterRemainingCalls_WhenFinishCalledMidResponse()
@@ -319,7 +360,7 @@ public class PaintComponentTests : IDisposable
     {
         var renderer = new RecordingRenderer();
 
-        var act = () => new PaintComponent(new ScriptedChatClient()).PaintAsync(prompt, 5, null, false, renderer);
+        var act = () => new PaintComponent(new ScriptedChatClient(), new MarkerConfigurator()).PaintAsync(prompt, 5, null, false, renderer);
 
         await act.Should().ThrowAsync<ArgumentException>();
         renderer.Events.Should().BeEmpty();

@@ -150,6 +150,38 @@ public class LlmPaintCommandTests : IDisposable
         File.ReadAllText(outFile).Should().Be("keep");
     }
 
+    [Fact]
+    public async Task Paint_ShouldRejectXhighEffortBeforeReadingKey_ForOpenAi()
+    {
+        var (exitCode, stdout, stderr) = await RunWithoutKeys("llm", "paint", "--prompt", "p", "--reasoning-effort", "xhigh");
+
+        exitCode.Should().Be(1);
+        var output = Normalise(stdout + stderr);
+        output.Should().Contain("Invalid reasoning effort 'xhigh' for provider 'openai'. Supported values: low, medium, high");
+        output.Should().NotContain("API_KEY");
+    }
+
+    [Fact]
+    public async Task Paint_ShouldPassEffortValidationAndReportMissingKey_WhenEffortValid()
+    {
+        var (exitCode, stdout, stderr) = await RunWithoutKeys("llm", "paint", "--prompt", "p", "--reasoning-effort", "High");
+
+        exitCode.Should().Be(1);
+        var output = Normalise(stdout + stderr);
+        output.Should().Contain("Error: OPENAI_API_KEY environment variable is not set.");
+        output.Should().NotContain("Invalid reasoning effort");
+    }
+
+    [Fact]
+    public void Create_ShouldDescribeReasoningEffortAndKeepItConfigurable()
+    {
+        var option = LlmCommand.CreatePaintCommand().Options.Single(o => o.Name == "--reasoning-effort");
+
+        option.Description.Should().Be("Reasoning effort level (supported values depend on --provider)");
+        option.HasImmutableDefault().Should().BeFalse();
+        option.Required.Should().BeFalse();
+    }
+
     private static Task<(int, string, string)> RunWithoutKeys(params string[] args)
         => RunWithEnv(null, null, args);
 
