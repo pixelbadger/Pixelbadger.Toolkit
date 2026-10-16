@@ -94,7 +94,7 @@ The project is .NET 10, and uses Microsoft's System.CommandLine library for buil
   - `pbtk gpt train --source corpus.txt --out ./.gpt --validation-split 0.1 --eval-interval 50`
   - `pbtk gpt complete --model ./.gpt --prompt "ROMEO:" --max-tokens 200`
   - `pbtk config llm --model claude-sonnet-5-5`
-  - `pbtk config llm chat --model gpt-5-nano`
+  - `pbtk config llm chat --model gpt-6-luna`
   - `pbtk config llm chat`
   - `pbtk config llm chat --unset model`
 
