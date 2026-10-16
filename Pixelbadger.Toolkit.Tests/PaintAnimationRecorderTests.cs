@@ -153,4 +153,92 @@ public class PaintAnimationRecorderTests
         decoded.Pixels.Should().HaveCount(252);
         decoded.Delays[^1].Should().Be(200);
     }
+
+    private static PixelColor[] Canvas(Func<int, int, PixelColor> f)
+    {
+        var px = new PixelColor[Size * Size];
+        for (var y = 0; y < Size; y++)
+        for (var x = 0; x < Size; x++) px[y * Size + x] = f(x, y);
+        return px;
+    }
+
+    private static void AssertFramesEqual(byte[] gif, IReadOnlyList<PixelColor[]> expected)
+    {
+        using var image = Image.Load<Rgb24>(gif);
+        image.Frames.Count.Should().Be(expected.Count);
+        for (var i = 0; i < expected.Count; i++)
+        {
+            for (var y = 0; y < Size; y++)
+            for (var x = 0; x < Size; x++)
+            {
+                var e = expected[i][y * Size + x];
+                image.Frames[i][x, y].Should().Be(new Rgb24(e.R, e.G, e.B), $"frame {i} pixel ({x},{y})");
+            }
+        }
+    }
+
+    [Fact]
+    public void ToGif_ShouldDecodeBlackPixelsExactly_WhenBlackAppearsInLaterFrames()
+    {
+        var white = Canvas((_, _) => new PixelColor(255, 255, 255));
+        var black = new PixelColor(0, 0, 0);
+        var f1 = Canvas((x, y) => x < 2 && y < 2 ? black : new PixelColor(255, 255, 255));
+        var f2 = Canvas((x, y) => x < 2 && y < 2 ? black : y >= 2 && x >= 2 ? new PixelColor(128, 128, 128) : new PixelColor(255, 255, 255));
+        var recorder = new PaintAnimationRecorder(Size);
+        recorder.AddFrame(white);
+        recorder.AddFrame(f1);
+        recorder.AddFrame(f2);
+
+        AssertFramesEqual(recorder.ToGif(f2), new[] { white, f1, f2 });
+    }
+
+    [Fact]
+    public void ToGif_ShouldDecodeAsBlack_WhenFirstFrameIsEntirelyBlack()
+    {
+        var black = Canvas((_, _) => new PixelColor(0, 0, 0));
+        var other = Canvas((x, _) => x == 0 ? new PixelColor(0, 0, 0) : new PixelColor(10, 20, 30));
+        var recorder = new PaintAnimationRecorder(Size);
+        recorder.AddFrame(black);
+
+        AssertFramesEqual(recorder.ToGif(other), new[] { black, other });
+    }
+
+    [Fact]
+    public void ToGif_ShouldDecodeExactly_WhenFrameUses256DistinctColoursIncludingBlackAndWhite()
+    {
+        var recorder = new PaintAnimationRecorder(16);
+        var first = new PixelColor[256];
+        var second = new PixelColor[256];
+        for (var i = 0; i < 256; i++)
+        {
+            first[i] = i == 0 ? new PixelColor(0, 0, 0) : i == 255 ? new PixelColor(255, 255, 255) : new PixelColor((byte)i, (byte)(255 - i), (byte)(i / 2));
+            second[i] = first[(i + 1) % 256];
+        }
+        recorder.AddFrame(first);
+
+        var gif = recorder.ToGif(second);
+        using var image = Image.Load<Rgb24>(gif);
+        image.Frames.Count.Should().Be(2);
+        foreach (var (frame, expected) in new[] { (image.Frames[0], first), (image.Frames[1], second) })
+            for (var i = 0; i < 256; i++)
+                frame[i % 16, i / 16].Should().Be(new Rgb24(expected[i].R, expected[i].G, expected[i].B), $"pixel {i}");
+    }
+
+    [Fact]
+    public void ToGif_ShouldDecodeExactly_WhenLaterFrameWith256ColoursMostlyMatchesPrevious()
+    {
+        var recorder = new PaintAnimationRecorder(16);
+        var first = new PixelColor[256];
+        for (var i = 0; i < 256; i++)
+            first[i] = i == 0 ? new PixelColor(0, 0, 0) : i == 255 ? new PixelColor(255, 255, 255) : new PixelColor((byte)i, (byte)(255 - i), (byte)(i / 2));
+        var second = (PixelColor[])first.Clone();
+        (second[3], second[200]) = (second[200], second[3]);
+        recorder.AddFrame(first);
+
+        using var image = Image.Load<Rgb24>(recorder.ToGif(second));
+        image.Frames.Count.Should().Be(2);
+        foreach (var (frame, expected) in new[] { (image.Frames[0], first), (image.Frames[1], second) })
+            for (var i = 0; i < 256; i++)
+                frame[i % 16, i / 16].Should().Be(new Rgb24(expected[i].R, expected[i].G, expected[i].B), $"pixel {i}");
+    }
 }

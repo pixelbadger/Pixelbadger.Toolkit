@@ -8,7 +8,7 @@ namespace Pixelbadger.Toolkit.Services;
 
 public class OpenAiLlmClientService : ILlmClientService
 {
-    public const string DefaultModel = "gpt-5-nano";
+    public const string DefaultModel = "gpt-6-luna";
 
     private readonly string _apiKey;
     private readonly string _model;
