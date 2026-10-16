@@ -391,6 +391,14 @@ flowchart LR
     </p>
 
     <p>
+      Pass <code>--animation-out</code> to also save an animated GIF of the painting. The first frame is the
+      blank canvas, and there is one more frame after every tool call that paints. Every frame is the full
+      256&times;256 canvas, whatever the size of the terminal. Each frame lasts 150&nbsp;ms, the final frame is
+      held for 2&nbsp;s, and the GIF loops forever. Runs keep at most 500 frames; longer runs keep every second
+      frame. Like the PNG, the GIF is written only when the run ends cleanly.
+    </p>
+
+    <p>
       On an interactive terminal that supports truecolour, the display uses the alternate screen and
       repaints only the cells that changed. When the run ends, the final image is printed to the normal
       screen so it stays in your scrollback. When output is redirected, or the terminal does not support
@@ -411,6 +419,12 @@ flowchart LR
       <span class="opt"> --out-file</span> <span class="val">./lighthouse.png</span>
     </div>
 
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk llm paint</span>
+      <span class="opt"> --prompt</span> <span class="val">"A pixelbadger"</span>
+      <span class="opt"> --animation-out</span> <span class="val">./badger.gif</span>
+    </div>
+
     <table>
       <thead><tr><th>Option</th><th>Required</th><th>Default</th><th>Description</th></tr></thead>
       <tbody>
@@ -419,14 +433,16 @@ flowchart LR
         <tr><td><code>--model</code></td><td>No</td><td>Provider default (<code>gpt-5-nano</code> or <code>claude-sonnet-5-5</code>)</td><td>Model to use (must support tool calling and image input)</td></tr>
         <tr><td><code>--max-steps</code></td><td>No</td><td><code>40</code></td><td>Maximum number of model turns (1&ndash;200)</td></tr>
         <tr><td><code>--out-file</code></td><td>No</td><td>&mdash;</td><td>Write the final canvas to this PNG file</td></tr>
-        <tr><td><code>--overwrite</code></td><td>No</td><td>off</td><td>Replace <code>--out-file</code> if it already exists</td></tr>
+        <tr><td><code>--animation-out</code></td><td>No</td><td>&mdash;</td><td>Write an animated GIF of the painting to this file</td></tr>
+        <tr><td><code>--overwrite</code></td><td>No</td><td>off</td><td>Replace <code>--out-file</code> or <code>--animation-out</code> if it already exists</td></tr>
       </tbody>
     </table>
 
     <div class="warning-box">
-      If <code>--out-file</code> already exists and <code>--overwrite</code> is not given, the command stops
-      before the first model call, for example:
+      If <code>--out-file</code> or <code>--animation-out</code> already exists and <code>--overwrite</code> is
+      not given, the command stops before the first model call, for example:
       <code>Error: Output file already exists: &lt;path&gt;. Use --overwrite to replace it.</code>
+      The two paths must differ: <code>--out-file</code> and <code>--animation-out</code> must be different paths.
     </div>
   </section>
 
@@ -523,8 +539,8 @@ flowchart LR
         <tr>
           <td><code>llm paint</code></td>
           <td><code>--prompt</code></td>
-          <td><code>--provider</code> <code>--model</code> <code>--max-steps</code> <code>--out-file</code> <code>--overwrite</code></td>
-          <td>Live canvas on the terminal; final image to the normal screen and to <code>--out-file</code> if given</td>
+          <td><code>--provider</code> <code>--model</code> <code>--max-steps</code> <code>--out-file</code> <code>--animation-out</code> <code>--overwrite</code></td>
+          <td>Live canvas on the terminal; final image to the normal screen, to <code>--out-file</code> if given, and an animated GIF to <code>--animation-out</code> if given</td>
         </tr>
         <tr>
           <td><code>llm history list</code></td>

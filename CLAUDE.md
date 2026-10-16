@@ -83,6 +83,7 @@ The project is .NET 10, and uses Microsoft's System.CommandLine library for buil
   - `pbtk llm ocaaar --image-path ./image.jpg`
   - `pbtk llm generate-image --prompt "A pirate ship at sunset" --out-file ./ship.png`
   - `pbtk llm paint --prompt "A pixelbadger"`
+  - `pbtk llm paint --prompt "A pixelbadger" --animation-out ./badger.gif`
   - `pbtk llm corpospeak --source "API performance is great" --audience "csuite"`
   - `pbtk llm corpospeak --source "New feature deployed" --audience "engineering" --user-messages "Hey team" "Let's ship this"`
   - `pbtk gpt train --source corpus.txt --out ./.gpt --steps 2000`
