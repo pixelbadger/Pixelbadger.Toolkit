@@ -23,6 +23,7 @@
   <a href="#ocaaar">ocaaar</a>
   <a href="#corpospeak">corpospeak</a>
   <a href="#generate-image">generate-image</a>
+  <a href="#paint">paint</a>
   <a href="#history-list">history list</a>
   <a href="#history-delete">history delete</a>
   <a href="#command-ref">Command Reference</a>
@@ -66,8 +67,9 @@
       <thead><tr><th>Capability</th><th>Commands</th><th><code>openai</code></th><th><code>claude</code></th></tr></thead>
       <tbody>
         <tr><td>Text chat</td><td><code>chat</code>, <code>translate</code>, <code>corpospeak</code></td><td>Yes</td><td>Yes</td></tr>
-        <tr><td>Image input</td><td><code>ocaaar</code></td><td>Yes</td><td>Yes</td></tr>
+        <tr><td>Image input</td><td><code>ocaaar</code>, <code>paint</code></td><td>Yes</td><td>Yes</td></tr>
         <tr><td>Image generation</td><td><code>generate-image</code></td><td>Yes</td><td>No</td></tr>
+        <tr><td>Tool calling</td><td><code>paint</code></td><td>Yes</td><td>Yes</td></tr>
         <tr><td><code>--reasoning-effort</code> values</td><td><code>chat</code></td><td><code>low</code>, <code>medium</code>, <code>high</code></td><td><code>low</code>, <code>medium</code>, <code>high</code>, <code>xhigh</code>, <code>max</code></td></tr>
       </tbody>
     </table>
@@ -346,6 +348,88 @@ flowchart LR
     </table>
   </section>
 
+  <!-- PAINT -->
+  <section id="paint">
+    <h2>paint</h2>
+    <p>
+      The model paints a 256&times;256 full-colour canvas through tools in an agentic loop while the
+      terminal redraws it live. The canvas starts white. Each model turn can call the tools below, and
+      every write that changes pixels is shown on screen as it happens. Works with <code>openai</code>
+      (uses the OpenAI Responses API) and <code>claude</code>. Uses the <code>OPENAI_API_KEY</code> or
+      <code>ANTHROPIC_API_KEY</code> environment variable. This command does not create a history session.
+    </p>
+
+    <p>The tools available to the model:</p>
+    <table>
+      <thead><tr><th>Tool</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>read_canvas</code></td><td>Returns the full canvas as a PNG image</td></tr>
+        <tr><td><code>read_region</code></td><td>Returns the exact hex colour values of a region (width and height up to 32)</td></tr>
+        <tr><td><code>set_pixels</code></td><td>Sets individual pixels from a list of <code>{x, y, color}</code> entries (up to 4096 per call)</td></tr>
+        <tr><td><code>fill_rect</code></td><td>Fills a rectangle with one colour</td></tr>
+        <tr><td><code>draw_line</code></td><td>Draws a line between two points (thickness 1&ndash;16)</td></tr>
+        <tr><td><code>fill_ellipse</code></td><td>Fills an ellipse given its centre and radii</td></tr>
+        <tr><td><code>finish</code></td><td>Ends the run with a summary</td></tr>
+      </tbody>
+    </table>
+    <p>
+      Colours are written as <code>#RRGGBB</code>. Coordinates start at the top-left corner, with x
+      increasing to the right and y increasing downwards. Invalid tool arguments are returned to the model
+      as an error result and the run continues.
+    </p>
+
+    <p>The run ends when one of these happens:</p>
+    <ul>
+      <li>The model calls <code>finish</code>. Any remaining tool calls in that response still run.</li>
+      <li>A model reply contains no tool calls.</li>
+      <li>The <code>--max-steps</code> limit is reached. The command prints <code>Step limit reached (N steps)</code>.</li>
+    </ul>
+    <p>
+      The output file is written when the run ends in any of these ways. If the provider returns an API
+      error, or you press Ctrl+C, the command exits with status 1 and writes nothing. Ctrl+C restores the
+      terminal and keeps the last frame on screen.
+    </p>
+
+    <p>
+      On an interactive terminal that supports truecolour, the display uses the alternate screen and
+      repaints only the cells that changed. When the run ends, the final image is printed to the normal
+      screen so it stays in your scrollback. When output is redirected, or the terminal does not support
+      truecolour, the command falls back to Spectre rendering. Redirected output prints one line per tool
+      call and the final image once.
+    </p>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk llm paint</span>
+      <span class="opt"> --prompt</span> <span class="val">"A pixelbadger"</span>
+    </div>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk llm paint</span>
+      <span class="opt"> --prompt</span> <span class="val">"A lighthouse at night"</span>
+      <span class="opt"> --provider</span> <span class="val">claude</span>
+      <span class="opt"> --max-steps</span> <span class="val">60</span>
+      <span class="opt"> --out-file</span> <span class="val">./lighthouse.png</span>
+    </div>
+
+    <table>
+      <thead><tr><th>Option</th><th>Required</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--prompt</code></td><td>Yes</td><td>&mdash;</td><td>What to paint</td></tr>
+        <tr><td><code>--provider</code></td><td>No</td><td><code>openai</code></td><td>LLM provider: <code>openai</code> or <code>claude</code></td></tr>
+        <tr><td><code>--model</code></td><td>No</td><td>Provider default (<code>gpt-5-nano</code> or <code>claude-sonnet-5-5</code>)</td><td>Model to use (must support tool calling and image input)</td></tr>
+        <tr><td><code>--max-steps</code></td><td>No</td><td><code>40</code></td><td>Maximum number of model turns (1&ndash;200)</td></tr>
+        <tr><td><code>--out-file</code></td><td>No</td><td>&mdash;</td><td>Write the final canvas to this PNG file</td></tr>
+        <tr><td><code>--overwrite</code></td><td>No</td><td>off</td><td>Replace <code>--out-file</code> if it already exists</td></tr>
+      </tbody>
+    </table>
+
+    <div class="warning-box">
+      If <code>--out-file</code> already exists and <code>--overwrite</code> is not given, the command stops
+      before the first model call, for example:
+      <code>Error: Output file already exists: &lt;path&gt;. Use --overwrite to replace it.</code>
+    </div>
+  </section>
+
   <!-- HISTORY LIST -->
   <section id="history-list">
     <h2>history list</h2>
@@ -435,6 +519,12 @@ flowchart LR
           <td><code>--prompt</code> <code>--out-file</code></td>
           <td><code>--provider</code> <code>--model</code> <code>--overwrite</code></td>
           <td>Image file written to <code>--out-file</code></td>
+        </tr>
+        <tr>
+          <td><code>llm paint</code></td>
+          <td><code>--prompt</code></td>
+          <td><code>--provider</code> <code>--model</code> <code>--max-steps</code> <code>--out-file</code> <code>--overwrite</code></td>
+          <td>Live canvas on the terminal; final image to the normal screen and to <code>--out-file</code> if given</td>
         </tr>
         <tr>
           <td><code>llm history list</code></td>

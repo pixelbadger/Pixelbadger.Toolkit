@@ -82,6 +82,7 @@ The project is .NET 10, and uses Microsoft's System.CommandLine library for buil
   - `pbtk llm translate --text "Hello" --target-language "French" --provider claude --model claude-haiku-5-5`
   - `pbtk llm ocaaar --image-path ./image.jpg`
   - `pbtk llm generate-image --prompt "A pirate ship at sunset" --out-file ./ship.png`
+  - `pbtk llm paint --prompt "A pixelbadger"`
   - `pbtk llm corpospeak --source "API performance is great" --audience "csuite"`
   - `pbtk llm corpospeak --source "New feature deployed" --audience "engineering" --user-messages "Hey team" "Let's ship this"`
   - `pbtk gpt train --source corpus.txt --out ./.gpt --steps 2000`
@@ -278,7 +279,7 @@ Available topics and actions:
 - **interpreters**: brainfuck, ook, bf-to-ook
 - **images**: display, steganography
 - **web**: serve-html
-- **llm**: chat, translate, ocaaar, corpospeak, generate-image, history (list, delete)
+- **llm**: chat, translate, ocaaar, corpospeak, generate-image, paint, history (list, delete)
 - **oauth**: token, profile (add, update, delete)
 - **crypto**: generate-key, encrypt, decrypt, add, subtract, multiply, encrypt-string, decrypt-string, replace, substring
 - **markov**: train, complete
