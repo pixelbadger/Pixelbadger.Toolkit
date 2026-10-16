@@ -52,7 +52,7 @@
       <span class="val"> ANTHROPIC_API_KEY=sk-ant-...</span>
     </div>
     <p>
-      When <code>--model</code> is omitted, each command uses the provider's default model: <code>gpt-5-nano</code>
+      When <code>--model</code> is omitted, each command uses the provider's default model: <code>gpt-6-luna</code>
       for <code>openai</code> (<code>gpt-image-1</code> for <code>generate-image</code>) and <code>claude-sonnet-5-5</code>
       for <code>claude</code>. Pass <code>--model</code> to override.
     </p>
@@ -159,7 +159,7 @@ flowchart LR
         <tr><td><code>--message</code></td><td>Yes</td><td>&mdash;</td><td>The user message to send</td></tr>
         <tr><td><code>--session-id</code></td><td>No</td><td>&mdash;</td><td>Session ID to continue a previous conversation</td></tr>
         <tr><td><code>--provider</code></td><td>No</td><td><code>openai</code></td><td>LLM provider: <code>openai</code> or <code>claude</code></td></tr>
-        <tr><td><code>--model</code></td><td>No</td><td>Provider default (<code>gpt-5-nano</code> or <code>claude-sonnet-5-5</code>)</td><td>Model to use</td></tr>
+        <tr><td><code>--model</code></td><td>No</td><td>Provider default (<code>gpt-6-luna</code> or <code>claude-sonnet-5-5</code>)</td><td>Model to use</td></tr>
         <tr><td><code>--reasoning-effort</code></td><td>No</td><td>&mdash;</td><td>Reasoning effort level. Values depend on the provider: <code>openai</code> accepts <code>low</code>, <code>medium</code>, <code>high</code>; <code>claude</code> accepts <code>low</code>, <code>medium</code>, <code>high</code>, <code>xhigh</code>, <code>max</code></td></tr>
       </tbody>
     </table>
@@ -204,7 +204,7 @@ flowchart LR
         <tr><td><code>--text</code></td><td>Yes</td><td>&mdash;</td><td>The text to translate</td></tr>
         <tr><td><code>--target-language</code></td><td>Yes</td><td>&mdash;</td><td>Target language (e.g. <code>Spanish</code>, <code>French</code>, <code>Japanese</code>)</td></tr>
         <tr><td><code>--provider</code></td><td>No</td><td><code>openai</code></td><td>LLM provider: <code>openai</code> or <code>claude</code></td></tr>
-        <tr><td><code>--model</code></td><td>No</td><td>Provider default (<code>gpt-5-nano</code> or <code>claude-sonnet-5-5</code>)</td><td>Model to use</td></tr>
+        <tr><td><code>--model</code></td><td>No</td><td>Provider default (<code>gpt-6-luna</code> or <code>claude-sonnet-5-5</code>)</td><td>Model to use</td></tr>
       </tbody>
     </table>
   </section>
@@ -244,7 +244,7 @@ flowchart LR
       <tbody>
         <tr><td><code>--image-path</code></td><td>Yes</td><td>&mdash;</td><td>Path to the image file to process</td></tr>
         <tr><td><code>--provider</code></td><td>No</td><td><code>openai</code></td><td>LLM provider: <code>openai</code> or <code>claude</code></td></tr>
-        <tr><td><code>--model</code></td><td>No</td><td>Provider default (<code>gpt-5-nano</code> or <code>claude-sonnet-5-5</code>)</td><td>Model to use (must support image input)</td></tr>
+        <tr><td><code>--model</code></td><td>No</td><td>Provider default (<code>gpt-6-luna</code> or <code>claude-sonnet-5-5</code>)</td><td>Model to use (must support image input)</td></tr>
       </tbody>
     </table>
   </section>
@@ -310,7 +310,7 @@ flowchart LR
         <tr><td><code>--audience</code></td><td>Yes</td><td>&mdash;</td><td>Target audience slug (see list above)</td></tr>
         <tr><td><code>--user-messages</code></td><td>No</td><td>&mdash;</td><td>Example messages to learn idiolect from (text or file paths, repeatable)</td></tr>
         <tr><td><code>--provider</code></td><td>No</td><td><code>openai</code></td><td>LLM provider: <code>openai</code> or <code>claude</code></td></tr>
-        <tr><td><code>--model</code></td><td>No</td><td>Provider default (<code>gpt-5-nano</code> or <code>claude-sonnet-5-5</code>)</td><td>Model to use</td></tr>
+        <tr><td><code>--model</code></td><td>No</td><td>Provider default (<code>gpt-6-luna</code> or <code>claude-sonnet-5-5</code>)</td><td>Model to use</td></tr>
       </tbody>
     </table>
   </section>
@@ -430,7 +430,7 @@ flowchart LR
       <tbody>
         <tr><td><code>--prompt</code></td><td>Yes</td><td>&mdash;</td><td>What to paint</td></tr>
         <tr><td><code>--provider</code></td><td>No</td><td><code>openai</code></td><td>LLM provider: <code>openai</code> or <code>claude</code></td></tr>
-        <tr><td><code>--model</code></td><td>No</td><td>Provider default (<code>gpt-5-nano</code> or <code>claude-sonnet-5-5</code>)</td><td>Model to use (must support tool calling and image input)</td></tr>
+        <tr><td><code>--model</code></td><td>No</td><td>Provider default (<code>gpt-6-luna</code> or <code>claude-sonnet-5-5</code>)</td><td>Model to use (must support tool calling and image input)</td></tr>
         <tr><td><code>--max-steps</code></td><td>No</td><td><code>40</code></td><td>Maximum number of model turns (1&ndash;200)</td></tr>
         <tr><td><code>--out-file</code></td><td>No</td><td>&mdash;</td><td>Write the final canvas to this PNG file</td></tr>
         <tr><td><code>--animation-out</code></td><td>No</td><td>&mdash;</td><td>Write an animated GIF of the painting to this file</td></tr>
