@@ -18,6 +18,7 @@ public static class LlmCommand
         command.Add(CreateOcaaarCommand());
         command.Add(CreateCorpospeakCommand());
         command.Add(CreateGenerateImageCommand());
+        command.Add(CreatePaintCommand());
         command.Add(CreateHistoryCommand());
 
         return command;
@@ -67,6 +68,7 @@ public static class LlmCommand
         services.AddTransient<OcaaarComponent>();
         services.AddTransient<CorpospeakComponent>();
         services.AddTransient<GenerateImageComponent>();
+        services.AddTransient<PaintComponent>();
 
         return services.BuildServiceProvider();
     }
@@ -280,6 +282,66 @@ public static class LlmCommand
                         .GenerateImageAsync(prompt, outFile, overwrite);
 
                     AnsiConsole.MarkupLine($"[green]Image written to {Markup.Escape(path)}[/]");
+                });
+        });
+
+        return command;
+    }
+
+    internal static Command CreatePaintCommand()
+    {
+        var command = new Command("paint", "Let an LLM paint a 256x256 canvas with tools while you watch it redraw live");
+
+        var promptOption = new Option<string>("--prompt") { Description = "What the LLM should paint", Required = true };
+        var maxStepsOption = new Option<int>("--max-steps")
+        {
+            Description = "Maximum number of model calls (1-200)",
+            DefaultValueFactory = _ => 40
+        };
+        maxStepsOption.Validators.Add(result =>
+        {
+            var value = result.GetValueOrDefault<int>();
+            if (value < PaintComponent.MinSteps || value > PaintComponent.MaxSteps)
+                result.AddError("--max-steps must be between 1 and 200.");
+        });
+        var outFileOption = new Option<string?>("--out-file") { Description = "Optional path to write the final canvas to as a PNG" }.WithImmutableDefault();
+        var overwriteOption = new Option<bool>("--overwrite") { Description = "Replace --out-file if it already exists" }.WithImmutableDefault();
+        var modelOption = CreateModelOption();
+        var providerOption = CreateProviderOption();
+
+        command.Add(promptOption);
+        command.Add(maxStepsOption);
+        command.Add(outFileOption);
+        command.Add(overwriteOption);
+        command.Add(modelOption);
+        command.Add(providerOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+        {
+            var prompt = parseResult.GetValue(promptOption)!;
+            var maxSteps = parseResult.GetValue(maxStepsOption);
+            var outFile = parseResult.GetValue(outFileOption);
+            var overwrite = parseResult.GetValue(overwriteOption);
+
+            return RunLlmActionAsync(
+                parseResult.GetValue(providerOption)!,
+                parseResult.GetValue(modelOption),
+                new LlmActionRequirements("paint", new HashSet<LlmCapability> { LlmCapability.TextChat, LlmCapability.ImageInput, LlmCapability.ToolCalling }),
+                async (services, _) =>
+                {
+                    PaintResult result;
+                    using (var renderer = PaintRendererFactory.Create(AnsiConsole.Console))
+                    {
+                        result = await services.GetRequiredService<PaintComponent>()
+                            .PaintAsync(prompt, maxSteps, outFile, overwrite, renderer, cancellationToken);
+                    }
+
+                    if (result.EndReason == PaintEndReason.StepLimit)
+                        AnsiConsole.MarkupLine(Markup.Escape($"Step limit reached ({result.Steps} steps)"));
+                    if (result.EndReason == PaintEndReason.Finished && !string.IsNullOrWhiteSpace(result.Summary))
+                        AnsiConsole.MarkupLine(Markup.Escape($"Finished: {result.Summary}"));
+                    if (result.OutFile is not null)
+                        AnsiConsole.MarkupLine($"[green]Image written to {Markup.Escape(result.OutFile)}[/]");
                 });
         });
 
