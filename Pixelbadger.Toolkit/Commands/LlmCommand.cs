@@ -258,8 +258,7 @@ public static class LlmCommand
         var modelOption = CreateModelOption();
         var providerOption = CreateProviderOption();
 
-        var animationOutOption = new Option<string?>("--animation-out") { Description = "Optional path to write an animated GIF of the painting" }.WithImmutableDefault();
-        var overwriteOption = new Option<bool>("--overwrite") { Description = "Replace --out-file or --animation-out if it already exists" }.WithImmutableDefault();
+        var overwriteOption = new Option<bool>("--overwrite") { Description = "Replace --out-file if it already exists" }.WithImmutableDefault();
 
         command.Add(promptOption);
         command.Add(outFileOption);
