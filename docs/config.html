@@ -68,13 +68,13 @@
     <h3>Override it for one action</h3>
     <p>
       A default set on an action wins over the default set on its topic, so <code>chat</code> uses
-      <code>gpt-5-nano</code> while the other <code>llm</code> actions keep <code>claude-sonnet-5-5</code>:
+      <code>gpt-6-luna</code> while the other <code>llm</code> actions keep <code>claude-sonnet-5-5</code>:
     </p>
     <div class="cmd-block">
       <span class="prompt">$ </span><span class="cmd">pbtk config llm chat</span>
-      <span class="opt"> --model</span> <span class="val">gpt-5-nano</span>
+      <span class="opt"> --model</span> <span class="val">gpt-6-luna</span>
     </div>
-    <pre style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:1rem;overflow-x:auto;font-size:0.85rem;line-height:1.6;color:#e2e8f0;">Set llm chat --model = gpt-5-nano</pre>
+    <pre style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:1rem;overflow-x:auto;font-size:0.85rem;line-height:1.6;color:#e2e8f0;">Set llm chat --model = gpt-6-luna</pre>
 
     <h3>Show the effective values</h3>
     <p>
@@ -83,7 +83,7 @@
     <div class="cmd-block">
       <span class="prompt">$ </span><span class="cmd">pbtk config llm chat</span>
     </div>
-    <pre style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:1rem;overflow-x:auto;font-size:0.85rem;line-height:1.6;color:#e2e8f0;">--model = gpt-5-nano (from: llm chat)</pre>
+    <pre style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:1rem;overflow-x:auto;font-size:0.85rem;line-height:1.6;color:#e2e8f0;">--model = gpt-6-luna (from: llm chat)</pre>
     <div class="cmd-block">
       <span class="prompt">$ </span><span class="cmd">pbtk config llm</span>
     </div>
@@ -126,7 +126,7 @@ Usage:
 Options:
   --message &lt;message&gt; (REQUIRED)         The message to send to the LLM
   --session-id &lt;session-id&gt;              Session ID to continue a previous conversation (omit to start a new session)
-  --model &lt;model&gt;                        The model to use (defaults to the provider's default model) [default: gpt-5-nano]
+  --model &lt;model&gt;                        The model to use (defaults to the provider's default model) [default: gpt-6-luna]
   --provider &lt;claude|openai&gt;             The LLM provider to use (supported: openai, claude) [default: openai]
   --reasoning-effort &lt;reasoning-effort&gt;  Reasoning effort level (supported values depend on --provider)
   -?, -h, --help                         Show help and usage information</pre>

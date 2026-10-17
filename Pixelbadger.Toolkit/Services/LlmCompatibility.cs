@@ -1,6 +1,6 @@
 namespace Pixelbadger.Toolkit.Services;
 
-public enum LlmCapability { TextChat, ImageInput, ImageGeneration }
+public enum LlmCapability { TextChat, ImageInput, ImageGeneration, ToolCalling }
 
 /// <summary>Registered as a singleton by each provider module. Plain data; no API key access.</summary>
 public sealed record LlmProviderCapabilities(
@@ -70,6 +70,7 @@ public class LlmCompatibilityValidator : ILlmCompatibilityValidator
         LlmCapability.TextChat => "text chat",
         LlmCapability.ImageInput => "image input",
         LlmCapability.ImageGeneration => "image generation",
+        LlmCapability.ToolCalling => "tool calling",
         _ => capability.ToString()
     };
 }

@@ -36,9 +36,10 @@ public class ClaudeProviderCompositionTests : IDisposable
 
         var capabilities = services.GetRequiredService<LlmProviderCapabilities>();
         capabilities.ProviderName.Should().Be("claude");
-        capabilities.Capabilities.Should().BeEquivalentTo(new[] { LlmCapability.TextChat, LlmCapability.ImageInput });
+        capabilities.Capabilities.Should().BeEquivalentTo(new[] { LlmCapability.TextChat, LlmCapability.ImageInput, LlmCapability.ToolCalling });
         capabilities.SupportedReasoningEfforts.Should().Equal("low", "medium", "high", "xhigh", "max");
         services.GetRequiredService<ILlmCompatibilityValidator>().Should().BeOfType<LlmCompatibilityValidator>();
+        services.GetRequiredService<IChatReasoningConfigurator>().Should().BeOfType<ClaudeChatReasoningConfigurator>();
     }
 
     [Fact]
@@ -168,5 +169,38 @@ public class ClaudeProviderCompositionTests : IDisposable
         var output = Normalise(stdout + stderr);
         output.Should().Contain("Invalid reasoning effort 'xhigh' for provider 'openai'. Supported values: low, medium, high");
         output.Should().NotContain("API_KEY");
+    }
+
+    [Fact]
+    public void BuildLlmServices_ShouldThrowOnChatClientResolve_WhenAnthropicKeyMissing()
+    {
+        ClearKeys();
+        using var services = LlmCommand.BuildLlmServices("claude", null);
+
+        var act = () => services.GetRequiredService<Microsoft.Extensions.AI.IChatClient>();
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("ANTHROPIC_API_KEY environment variable is not set.");
+    }
+
+    [Fact]
+    public void BuildLlmServices_ShouldThrowOnChatClientResolve_WhenAnthropicKeyEmpty()
+    {
+        ClearKeys();
+        Environment.SetEnvironmentVariable("ANTHROPIC_API_KEY", "");
+        using var services = LlmCommand.BuildLlmServices("claude", null);
+
+        var act = () => services.GetRequiredService<Microsoft.Extensions.AI.IChatClient>();
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("ANTHROPIC_API_KEY environment variable is not set.");
+    }
+
+    [Fact]
+    public void BuildLlmServices_ShouldResolveChatClient_WhenAnthropicKeySet()
+    {
+        ClearKeys();
+        Environment.SetEnvironmentVariable("ANTHROPIC_API_KEY", "test-key");
+        using var services = LlmCommand.BuildLlmServices("claude", null);
+
+        services.GetRequiredService<Microsoft.Extensions.AI.IChatClient>().Should().NotBeNull();
     }
 }

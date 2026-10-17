@@ -23,7 +23,7 @@ public class LlmCommandCompositionTests : IDisposable
 
         var capabilities = services.GetRequiredService<LlmProviderCapabilities>();
         capabilities.ProviderName.Should().Be("openai");
-        capabilities.Capabilities.Should().BeEquivalentTo(new[] { LlmCapability.TextChat, LlmCapability.ImageInput, LlmCapability.ImageGeneration });
+        capabilities.Capabilities.Should().BeEquivalentTo(new[] { LlmCapability.TextChat, LlmCapability.ImageInput, LlmCapability.ImageGeneration, LlmCapability.ToolCalling });
         capabilities.SupportedReasoningEfforts.Should().Equal("low", "medium", "high");
         services.GetRequiredService<ILlmCompatibilityValidator>().Should().BeOfType<LlmCompatibilityValidator>();
     }
@@ -146,5 +146,29 @@ public class LlmCommandCompositionTests : IDisposable
         var (exitCode, _, _) = await ToolkitProcess.RunAsync(null, "llm", "chat", "--message", "hi", "--provider", "bogus");
 
         exitCode.Should().NotBe(0);
+    }
+
+    [Fact]
+    public void BuildLlmServices_ShouldThrowOnChatClientResolve_WhenOpenAiKeyMissing()
+    {
+        Environment.SetEnvironmentVariable("OPENAI_API_KEY", null);
+        using var services = LlmCommand.BuildLlmServices("openai", null);
+
+        var act = () => services.GetRequiredService<Microsoft.Extensions.AI.IChatClient>();
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("OPENAI_API_KEY environment variable is not set.");
+    }
+
+    [Fact]
+    public void BuildLlmServices_ShouldResolveChatClient_WhenOpenAiKeySet()
+    {
+        Environment.SetEnvironmentVariable("OPENAI_API_KEY", "test-key");
+        using var services = LlmCommand.BuildLlmServices("openai", "custom-model");
+
+        var client = services.GetRequiredService<Microsoft.Extensions.AI.IChatClient>();
+
+        client.Should().NotBeNull();
+        services.GetRequiredService<PaintComponent>().Should().NotBeNull();
+        services.GetRequiredService<IChatReasoningConfigurator>().Should().BeOfType<OpenAiChatReasoningConfigurator>();
     }
 }

@@ -117,4 +117,15 @@ public class LlmCompatibilityValidatorTests
 
         result.Error.Should().Contain("'someprovider'");
     }
+
+    [Fact]
+    public void Validate_ShouldDescribeToolCalling_WhenMissing()
+    {
+        var validator = Create("p", LlmCapability.TextChat);
+
+        var result = validator.Validate(Require(null, LlmCapability.TextChat, LlmCapability.ToolCalling));
+
+        result.IsCompatible.Should().BeFalse();
+        result.Error.Should().Contain("tool calling");
+    }
 }
