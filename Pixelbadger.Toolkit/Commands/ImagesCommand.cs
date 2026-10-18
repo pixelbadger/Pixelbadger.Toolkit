@@ -33,8 +33,9 @@ public static class ImagesCommand
             catch (Exception ex)
             {
                 AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
-                Environment.Exit(1);
+                return 1;
             }
+            return 0;
         });
 
         return command;
@@ -69,15 +70,13 @@ public static class ImagesCommand
                     if (string.IsNullOrEmpty(message))
                     {
                         AnsiConsole.MarkupLine("[red]Error:[/] --message is required for encode mode");
-                        Environment.Exit(1);
-                        return;
+                        return 1;
                     }
 
                     if (string.IsNullOrEmpty(output))
                     {
                         AnsiConsole.MarkupLine("[red]Error:[/] --output is required for encode mode");
-                        Environment.Exit(1);
-                        return;
+                        return 1;
                     }
 
                     await steganography.EncodeMessageAsync(image, message, output);
@@ -91,14 +90,15 @@ public static class ImagesCommand
                 else
                 {
                     AnsiConsole.MarkupLine("[red]Error:[/] Mode must be 'encode' or 'decode'");
-                    Environment.Exit(1);
+                    return 1;
                 }
             }
             catch (Exception ex)
             {
                 AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
-                Environment.Exit(1);
+                return 1;
             }
+            return 0;
         });
 
         return command;

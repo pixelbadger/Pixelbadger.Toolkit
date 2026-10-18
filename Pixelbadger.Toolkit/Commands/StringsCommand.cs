@@ -43,8 +43,9 @@ public static class StringsCommand
             catch (Exception ex)
             {
                 AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
-                Environment.Exit(1);
+                return 1;
             }
+            return 0;
         });
 
         return command;
@@ -74,8 +75,9 @@ public static class StringsCommand
             catch (Exception ex)
             {
                 AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
-                Environment.Exit(1);
+                return 1;
             }
+            return 0;
         });
 
         return command;
@@ -105,8 +107,9 @@ public static class StringsCommand
             catch (Exception ex)
             {
                 AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
-                Environment.Exit(1);
+                return 1;
             }
+            return 0;
         });
 
         return command;
@@ -144,8 +147,9 @@ public static class StringsCommand
             catch (Exception ex)
             {
                 AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
-                Environment.Exit(1);
+                return 1;
             }
+            return 0;
         });
 
         return command;
@@ -171,15 +175,13 @@ public static class StringsCommand
                 if (inFile is null && inputString is null)
                 {
                     AnsiConsole.MarkupLine("[red]Error:[/] Either '--in-file' or '--string' must be provided.");
-                    Environment.Exit(1);
-                    return;
+                    return 1;
                 }
 
                 if (inFile is not null && inputString is not null)
                 {
                     AnsiConsole.MarkupLine("[red]Error:[/] Only one of '--in-file' or '--string' may be provided.");
-                    Environment.Exit(1);
-                    return;
+                    return 1;
                 }
 
                 var component = new StringReportComponent();
@@ -216,8 +218,9 @@ public static class StringsCommand
             catch (Exception ex)
             {
                 AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
-                Environment.Exit(1);
+                return 1;
             }
+            return 0;
         });
 
         return command;

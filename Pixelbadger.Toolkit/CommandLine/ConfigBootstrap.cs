@@ -16,12 +16,13 @@ public static class ConfigBootstrap
     }
 
     /// <summary>Parses args applying the invoked topic's configured defaults, then invokes. Returns the exit code.</summary>
-    public static async Task<int> InvokeAsync(RootCommand root, string[] args, IConfigStore store)
+    public static async Task<int> InvokeAsync(RootCommand root, string[] args, IConfigStore store,
+        InvocationConfiguration? configuration = null, CancellationToken cancellationToken = default)
     {
         ParseResult parse;
         try
         {
-            parse = ParseWithConfig(root, args, store, Console.Error);
+            parse = ParseWithConfig(root, args, store, ToolkitConsole.Error);
         }
         catch (ConfigStoreException ex)
         {
@@ -29,7 +30,7 @@ public static class ConfigBootstrap
             return 1;
         }
 
-        return await parse.InvokeAsync();
+        return await parse.InvokeAsync(configuration, cancellationToken);
     }
 
     internal static ParseResult ParseWithConfig(RootCommand root, string[] args, IConfigStore store, TextWriter warnings) =>
