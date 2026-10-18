@@ -84,6 +84,7 @@ Tools: interpreters_brainfuck, interpreters_ook, interpreters_bf-to-ook</pre>
         <tr><td><code>--profile</code></td><td>No</td><td>Profile to serve. Default: the <code>default</code> profile (the built-in one unless overridden)</td></tr>
         <tr><td><code>--host</code></td><td>No</td><td>Host to bind. Overrides the profile's host. Default <code>127.0.0.1</code></td></tr>
         <tr><td><code>--port</code></td><td>No</td><td>Port to bind. Overrides the profile's port. Default <code>5100</code></td></tr>
+        <tr><td><code>--allow-remote</code></td><td>No</td><td>Required to bind a non-loopback host. Without it the server refuses to start</td></tr>
       </tbody>
     </table>
 
@@ -361,12 +362,14 @@ exit code: 1</pre>
       <li><strong>Host and Origin checks on loopback.</strong> While bound to a loopback address, a request whose
         <code>Host</code> header is not <code>localhost</code>, <code>127.0.0.1</code> or <code>[::1]</code> gets
         <code>403 Forbidden</code>. So does a request with an <code>Origin</code> header that is not loopback.</li>
-      <li><strong>Warning on non-loopback binds.</strong> Binding another address prints a warning to stderr:</li>
+      <li><strong>Non-loopback binds need <code>--allow-remote</code>.</strong> Without the flag the server refuses to start on
+        another address. With it, a warning is printed to stderr:</li>
     </ul>
     <pre style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:1rem;overflow-x:auto;font-size:0.85rem;line-height:1.6;color:#e2e8f0;">Warning: binding to non-loopback address 0.0.0.0; the MCP server has no authentication.</pre>
     <div class="warning-box">
       Do not bind a non-loopback address on a network you do not trust. The Host and Origin checks apply only to loopback
-      binds, and the server has no authentication in any case.
+      binds, and the server has no authentication in any case. A tool that times out is cancelled cooperatively; a command
+      that ignores cancellation (such as <code>llm</code> or <code>gpt train</code>) can keep running and writing files.
     </div>
   </section>
 

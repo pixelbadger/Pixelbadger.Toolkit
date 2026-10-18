@@ -279,7 +279,7 @@ public class McpCommandTests : IDisposable
     [Fact]
     public async Task Serve_ShouldFailWithExitOne_WhenProfileIsUnknown()
     {
-        var (code, output, _) = await RunAsync("mcp", "serve", "--profile", "ghost");
+        var (code, _, output) = await RunAsync("mcp", "serve", "--profile", "ghost");
 
         code.Should().Be(1);
         output.Trim().Should().Be("Error: MCP profile 'ghost' not found.");
@@ -290,17 +290,17 @@ public class McpCommandTests : IDisposable
     {
         _profiles.Save(new McpProfile("stale", ["gone/away"], null, null));
 
-        var (code, output, err) = await RunAsync("mcp", "serve", "--profile", "stale");
+        var (code, _, err) = await RunAsync("mcp", "serve", "--profile", "stale");
 
         code.Should().Be(1);
-        err.Trim().Should().Be("Warning: skipping unresolved entry 'gone/away' in MCP profile 'stale'");
-        output.Trim().Should().Be("Error: MCP profile 'stale' exposes no tools.");
+        err.Should().Contain("Warning: skipping unresolved entry 'gone/away' in MCP profile 'stale'");
+        err.Should().Contain("Error: MCP profile 'stale' exposes no tools.");
     }
 
     [Fact]
     public async Task Serve_ShouldFail_WhenPortOverrideIsOutOfRange()
     {
-        var (code, output, _) = await RunAsync("mcp", "serve", "--port", "70000");
+        var (code, _, output) = await RunAsync("mcp", "serve", "--port", "70000");
 
         code.Should().Be(1);
         output.Trim().Should().Be("Error: Port must be between 1 and 65535.");
@@ -310,7 +310,7 @@ public class McpCommandTests : IDisposable
     public async Task Config_ShouldAcceptProfileDefaultAndRejectHost_WhenConfiguringServe()
     {
         var (okCode, _, _) = await RunAsync("config", "mcp", "serve", "--profile", "ghost");
-        var (code, output, _) = await RunAsync("mcp", "serve");
+        var (code, _, output) = await RunAsync("mcp", "serve");
         var (hostCode, _, hostErr) = await RunAsync("config", "mcp", "serve", "--host", "0.0.0.0");
 
         okCode.Should().Be(0);

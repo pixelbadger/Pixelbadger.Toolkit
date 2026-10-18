@@ -27,14 +27,16 @@ public static class McpCommand
         var profileOption = new Option<string?>("--profile") { Description = "Profile to serve (default: the 'default' profile)" };
         var hostOption = new Option<string?>("--host") { Description = "Host to bind (overrides the profile; default 127.0.0.1)" }.WithImmutableDefault();
         var portOption = new Option<int?>("--port") { Description = "Port to bind (overrides the profile; default 5100)" }.WithImmutableDefault();
+        var allowRemoteOption = new Option<bool>("--allow-remote") { Description = "Allow binding a non-loopback host (the server has no authentication)" }.WithImmutableDefault();
         command.Add(profileOption);
         command.Add(hostOption);
         command.Add(portOption);
+        command.Add(allowRemoteOption);
 
         command.SetAction((parseResult, ct) =>
         {
             var component = new McpServeComponent(profiles, tree, new McpServerHost(new McpToolExecutor(store)));
-            return component.RunAsync(parseResult.GetValue(profileOption), parseResult.GetValue(hostOption), parseResult.GetValue(portOption), ct);
+            return component.RunAsync(parseResult.GetValue(profileOption), parseResult.GetValue(hostOption), parseResult.GetValue(portOption), ct, parseResult.GetValue(allowRemoteOption));
         });
         return command;
     }

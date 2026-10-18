@@ -59,6 +59,8 @@ public sealed class McpToolExecutor : IMcpToolExecutor
         }
 
         cancellationToken.ThrowIfCancellationRequested();
+        // Cancellation is cooperative: a command that ignores its token (e.g. llm, gpt train) keeps running
+        // in the background after the timeout and may still write its output files.
         linked.Cancel();
         var seconds = _timeout.TotalSeconds.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
         return new McpToolResult($"Tool {tool.Name} timed out after {seconds} s.", true, 1);

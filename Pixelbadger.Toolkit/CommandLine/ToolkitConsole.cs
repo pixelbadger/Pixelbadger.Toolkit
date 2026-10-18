@@ -44,6 +44,7 @@ public static class ToolkitConsole
             Interactive = InteractionSupport.No,
             Out = new AnsiConsoleOutput(writer)
         });
+        console.Profile.Capabilities.Ansi = false;
         console.Profile.Width = 4096;
         return console;
     }

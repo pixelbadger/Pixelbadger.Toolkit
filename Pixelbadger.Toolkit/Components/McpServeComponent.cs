@@ -1,7 +1,6 @@
 using System.CommandLine;
 using Pixelbadger.Toolkit.CommandLine;
 using Pixelbadger.Toolkit.Services;
-using Spectre.Console;
 
 namespace Pixelbadger.Toolkit.Components;
 
@@ -10,7 +9,7 @@ public sealed class McpServeComponent(IMcpProfileStore store, Func<RootCommand> 
     public const string DefaultHost = "127.0.0.1";
     public const int DefaultPort = 5100;
 
-    public async Task<int> RunAsync(string? profileName, string? host, int? port, CancellationToken cancellationToken)
+    public async Task<int> RunAsync(string? profileName, string? host, int? port, CancellationToken cancellationToken, bool allowRemote = false)
     {
         McpProfile? profile;
         try
@@ -49,7 +48,11 @@ public sealed class McpServeComponent(IMcpProfileStore store, Func<RootCommand> 
         }
 
         if (!McpHostRules.IsLoopback(effectiveHost))
+        {
+            if (!allowRemote)
+                return Fail($"Refusing to bind non-loopback address {effectiveHost}: the MCP server has no authentication and exposes file-reading and file-writing commands. Pass --allow-remote to proceed.");
             ToolkitConsole.Error.WriteLine($"Warning: binding to non-loopback address {effectiveHost}; the MCP server has no authentication.");
+        }
 
         ToolkitConsole.InstallRouting();
         var settings = new McpServerSettings(profile.Name, effectiveHost, effectivePort, tools);
@@ -74,7 +77,7 @@ public sealed class McpServeComponent(IMcpProfileStore store, Func<RootCommand> 
 
     private static int Fail(string message)
     {
-        AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(message)}");
+        ToolkitConsole.Error.WriteLine($"Error: {message}");
         return 1;
     }
 }

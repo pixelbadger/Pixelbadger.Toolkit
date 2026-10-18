@@ -54,7 +54,7 @@ public class McpServeComponentTests : IDisposable
         _host.Setup(h => h.RunAsync(It.IsAny<McpServerSettings>(), It.IsAny<Action>(), It.IsAny<CancellationToken>()))
             .Callback<McpServerSettings, Action, CancellationToken>((s, _, _) => settings = s).Returns(Task.CompletedTask);
 
-        await Component().RunAsync("p", flagHost, flagPort, CancellationToken.None);
+        await Component().RunAsync("p", flagHost, flagPort, CancellationToken.None, allowRemote: true);
 
         settings!.Host.Should().Be(expectedHost);
         settings.Port.Should().Be(expectedPort);
@@ -81,6 +81,23 @@ public class McpServeComponentTests : IDisposable
     }
 
     [Theory]
+    [InlineData("0.0.0.0")]
+    [InlineData("192.168.1.5")]
+    public async Task RunAsync_ShouldFail_WhenHostIsNotLoopbackAndAllowRemoteNotSet(string host)
+    {
+        var output = new StringWriter();
+        var error = new StringWriter();
+        ToolkitConsole.InstallRouting();
+        int code;
+        using (ToolkitConsole.Capture(ToolkitConsole.CreateCaptureConsole(output), output, error))
+            code = await Component().RunAsync(null, host, 5111, CancellationToken.None);
+
+        code.Should().Be(1);
+        error.ToString().Should().Contain("--allow-remote");
+        _host.Verify(h => h.RunAsync(It.IsAny<McpServerSettings>(), It.IsAny<Action>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Theory]
     [InlineData("0.0.0.0", true)]
     [InlineData("192.168.1.5", true)]
     [InlineData("example.com", true)]
@@ -96,7 +113,7 @@ public class McpServeComponentTests : IDisposable
         ToolkitConsole.InstallRouting();
 
         using (ToolkitConsole.Capture(ToolkitConsole.CreateCaptureConsole(output), output, error))
-            await Component().RunAsync(null, host, 5111, CancellationToken.None);
+            await Component().RunAsync(null, host, 5111, CancellationToken.None, allowRemote: true);
 
         if (warns)
             error.ToString().Trim().Should().Be($"Warning: binding to non-loopback address {host}; the MCP server has no authentication.");
@@ -118,7 +135,7 @@ public class McpServeComponentTests : IDisposable
             code = await Component().RunAsync(null, null, null, CancellationToken.None);
 
         code.Should().Be(1);
-        output.ToString().Should().Contain("Error: Failed to bind to address");
+        error.ToString().Should().Contain("Error: Failed to bind to address");
     }
 
     [Fact]
