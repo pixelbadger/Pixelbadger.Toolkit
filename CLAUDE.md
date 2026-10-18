@@ -243,7 +243,9 @@ The project follows a topic-based command architecture with a component-per-comm
 
 - New topics must be added in `ToolkitCommandTree.Create` before the config topic, so they are exposed to `mcp` and `config`.
 - Mark commands that can't run headless or never return with `.ExcludeFromMcp()` (namespace `Pixelbadger.Toolkit.CommandLine`).
-- Actions must return exit codes and never call `Environment.Exit`. They must write output through `AnsiConsole` or `ToolkitConsole.Out/Error`, never `Console.*` directly, so the MCP server can capture it per call.
+- Actions must return exit codes and never call `Environment.Exit`.
+- Actions must write output through `AnsiConsole` or `ToolkitConsole.Out/Error`, and read stdin through `ToolkitConsole.OpenStandardInput()`, never `Console.*` directly, so the MCP server can capture it per call. Commands excluded from MCP, such as demoscene, are the exception.
+- Long-running loops should observe the action's `CancellationToken`, so the MCP per-call timeout can stop them.
 
 ## Component-Per-Command Pattern
 
