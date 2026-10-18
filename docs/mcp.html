@@ -303,9 +303,26 @@ Built-in default profile restored.</pre>
     <pre style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:1rem;overflow-x:auto;font-size:0.85rem;line-height:1.6;color:#e2e8f0;">Error: Brainfuck program file not found: /nonexistent/x.bf
 exit code: 1</pre>
     <p>
-      An argument the schema does not allow, such as an unknown property, returns an error result with only the message,
-      for example <code>Unknown argument 'nope' for tool interpreters_brainfuck.</code>, and no <code>exit code</code> line.
+      An argument the schema does not allow, such as an unknown property or an unsupported type, returns an error result
+      like any other error. For example, an unknown property returns:
     </p>
+    <pre style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:1rem;overflow-x:auto;font-size:0.85rem;line-height:1.6;color:#e2e8f0;">Unknown argument 'nope' for tool interpreters_brainfuck.
+exit code: 1</pre>
+
+    <h3>Call behaviour</h3>
+    <p>These rules apply to every tool call, and differ from the command line in the first two cases:</p>
+    <ul>
+      <li><strong>Values starting with <code>@</code> are literal.</strong> System.CommandLine response-file expansion is
+        disabled for tool calls, so an argument value such as <code>@notes.txt</code> is passed through as that text. The
+        command line is unchanged: there, <code>@file</code> still expands a response file.</li>
+      <li><strong>Stdin is empty.</strong> Inside a tool call, a <code>-</code> "read stdin" file argument reads nothing.</li>
+      <li><strong>Timeouts stop the interpreters.</strong> The Brainfuck and Ook interpreters stop when the call times out;
+        the 300 second timeout cancels them.</li>
+      <li><strong>Argument errors end with an exit code line.</strong> An unknown argument or an unsupported type produces an
+        error result that ends with <code>exit code: 1</code>, like every other error result.</li>
+      <li><strong>Every call is logged.</strong> Every call, including an unknown tool and a call the client cancelled, writes
+        one <code>tool &lt;name&gt; exit &lt;code&gt; &lt;ms&gt;ms</code> line to the server's stderr.</li>
+    </ul>
 
     <h3>Concurrency and timeout</h3>
     <p>
