@@ -304,7 +304,7 @@ Built-in default profile restored.</pre>
 exit code: 1</pre>
     <p>
       An argument the schema does not allow, such as an unknown property or an unsupported type, returns an error result
-      like any other error. For example, an unknown property returns:
+      like a failing command. For example, an unknown property returns:
     </p>
     <pre style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:1rem;overflow-x:auto;font-size:0.85rem;line-height:1.6;color:#e2e8f0;">Unknown argument 'nope' for tool interpreters_brainfuck.
 exit code: 1</pre>
@@ -319,7 +319,7 @@ exit code: 1</pre>
       <li><strong>Timeouts stop the interpreters.</strong> The Brainfuck and Ook interpreters stop when the call times out;
         the 300 second timeout cancels them.</li>
       <li><strong>Argument errors end with an exit code line.</strong> An unknown argument or an unsupported type produces an
-        error result that ends with <code>exit code: 1</code>, like every other error result.</li>
+        error result that ends with <code>exit code: 1</code>, like the error result of a command that fails. A call to a tool name the profile does not contain is different: its whole text is <code>Unknown tool '&lt;name&gt;'.</code>, with no exit code line, because no command runs.</li>
       <li><strong>Every call is logged.</strong> Every call, including an unknown tool and a call the client cancelled, writes
         one <code>tool &lt;name&gt; exit &lt;code&gt; &lt;ms&gt;ms</code> line to the server's stderr.</li>
     </ul>
