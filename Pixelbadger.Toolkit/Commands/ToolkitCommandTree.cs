@@ -23,6 +23,7 @@ public static class ToolkitCommandTree
         root.Add(MarkovCommand.Create());
         root.Add(DemosceneCommand.Create());
         root.Add(GptCommand.Create());
+        root.Add(McpCommand.Create(store));
         // Further topics are registered above this line, before the config topic.
 
         // The config topic mirrors the finished tree, so it must be added last.

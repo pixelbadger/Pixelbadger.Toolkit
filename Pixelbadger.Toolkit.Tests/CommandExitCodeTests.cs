@@ -55,15 +55,14 @@ public class CommandExitCodeTests : IDisposable
         ["markov train --source {m}.txt"],
         ["gpt complete --model {d}/nomodel --prompt x"],
         ["web serve-html --file {m}.html"],
-        ["oauth profile delete --name no-such-profile-{g}"],
-        ["llm history delete --session-id 987654321"],
+        ["llm generate-image --provider claude --prompt x --out-file {d}/o.png"],
     ];
 
     [Theory]
     [MemberData(nameof(ErrorCases))]
     public async Task Invoke_ShouldReturnOneAndPrintError_WhenCommandFails(string template)
     {
-        var line = template.Replace("{m}", Missing("missing")).Replace("{d}", _dir).Replace("{g}", Guid.NewGuid().ToString("N"));
+        var line = template.Replace("{m}", Missing("missing")).Replace("{d}", _dir);
 
         var (code, output, error) = await RunAsync(line.Split(' '));
 
