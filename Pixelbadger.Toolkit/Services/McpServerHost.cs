@@ -80,39 +80,9 @@ public sealed class McpServerHost(IMcpToolExecutor executor, TextWriter? callLog
             .AddMcpServer(o => o.ServerInfo = new Implementation { Name = "pbtk", Version = version })
             .WithHttpTransport(o => o.Stateless = true)
             .WithListToolsHandler((_, _) => ValueTask.FromResult(new ListToolsResult { Tools = listed }))
-            .WithCallToolHandler(async (request, ct) =>
-            {
-                var name = request.Params?.Name ?? string.Empty;
-                if (!tools.TryGetValue(name, out var tool))
-                    return ErrorResult($"Unknown tool '{name}'.");
-
-                var watch = Stopwatch.StartNew();
-                McpToolResult result;
-                try
-                {
-                    var args = request.Params?.Arguments is { } a
-                        ? (IReadOnlyDictionary<string, System.Text.Json.JsonElement>)a
-                        : null;
-                    result = await executor.ExecuteAsync(tool, args, ct).ConfigureAwait(false);
-                }
-                catch (OperationCanceledException) when (ct.IsCancellationRequested)
-                {
-                    throw;
-                }
-                catch (Exception ex)
-                {
-                    result = new McpToolResult($"{ex.Message}\nexit code: 1", true, 1);
-                }
-                watch.Stop();
-                lock (_callLog)
-                    _callLog.WriteLine($"tool {name} exit {result.ExitCode} {(long)watch.Elapsed.TotalMilliseconds}ms");
-
-                return new CallToolResult
-                {
-                    IsError = result.IsError,
-                    Content = [new TextContentBlock { Text = result.Text }]
-                };
-            });
+            .WithCallToolHandler((request, ct) => new ValueTask<CallToolResult>(HandleCallAsync(
+                tools, request.Params?.Name ?? string.Empty,
+                request.Params?.Arguments is { } a ? (IReadOnlyDictionary<string, System.Text.Json.JsonElement>)a : null, ct)));
 
         var app = builder.Build();
         app.Urls.Add($"http://{McpHostRules.UrlHost(settings.Host)}:{settings.Port}");
@@ -142,9 +112,40 @@ public sealed class McpServerHost(IMcpToolExecutor executor, TextWriter? callLog
         return app;
     }
 
-    private static CallToolResult ErrorResult(string text) => new()
+    internal async Task<CallToolResult> HandleCallAsync(IReadOnlyDictionary<string, McpToolDefinition> tools, string name,
+        IReadOnlyDictionary<string, System.Text.Json.JsonElement>? args, CancellationToken ct)
     {
-        IsError = true,
-        Content = [new TextContentBlock { Text = text }]
-    };
+        var watch = Stopwatch.StartNew();
+        McpToolResult result;
+        try
+        {
+            if (!tools.TryGetValue(name, out var tool))
+                result = new McpToolResult($"Unknown tool '{name}'.", true, 1);
+            else
+                result = await executor.ExecuteAsync(tool, args, ct).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            LogCall(name, 1, watch);
+            throw;
+        }
+        catch (Exception ex)
+        {
+            result = new McpToolResult($"{ex.Message}\nexit code: 1", true, 1);
+        }
+
+        LogCall(name, result.ExitCode, watch);
+        return new CallToolResult
+        {
+            IsError = result.IsError,
+            Content = [new TextContentBlock { Text = result.Text }]
+        };
+    }
+
+    private void LogCall(string name, int exitCode, Stopwatch watch)
+    {
+        watch.Stop();
+        lock (_callLog)
+            _callLog.WriteLine($"tool {name} exit {exitCode} {(long)watch.Elapsed.TotalMilliseconds}ms");
+    }
 }

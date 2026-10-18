@@ -97,7 +97,7 @@ public class McpToolExecutorTests : IDisposable
     {
         var result = await Executor().ExecuteAsync(Tool("interpreters/brainfuck"), Args("""{"file":"x","nope":1}"""));
 
-        result.Should().Be(new McpToolResult("Unknown argument 'nope' for tool interpreters_brainfuck.", true, 1));
+        result.Should().Be(new McpToolResult("Unknown argument 'nope' for tool interpreters_brainfuck.\nexit code: 1", true, 1));
     }
 
     [Fact]
@@ -128,26 +128,87 @@ public class McpToolExecutorTests : IDisposable
                 var ch = (char)('A' + i);
                 var file = Program(new string('+', ch) + ".");
                 var r = await executor.ExecuteAsync(brainfuck, Args($$"""{"file":{{JsonSerializer.Serialize(file)}}}"""));
-                return (r, Expected: ch.ToString(), Exact: true);
+                return (r, Expected: ch.ToString());
             }
             else
             {
                 // distance between "a" and "a" + i 'b's is exactly i
                 var r = await executor.ExecuteAsync(lev,
                     Args($$"""{"string1":"a","string2":"a{{new string('b', i)}}"}"""));
-                return (r, Expected: i.ToString(), Exact: false);
+                return (r, Expected: $"Levenshtein distance: {i}\n");
             }
         }).ToArray();
 
         var results = await Task.WhenAll(calls);
 
-        foreach (var (r, expected, exact) in results)
+        foreach (var (r, expected) in results)
         {
             r.IsError.Should().BeFalse(r.Text);
-            if (exact) r.Text.Should().Be(expected); else r.Text.Should().Contain(expected);
+            r.Text.Should().Be(expected);
         }
         // Each distance result names only its own distance.
-        results.Where(x => !x.Exact).Select(x => x.r.Text).Distinct().Should().HaveCount(10);
+        results.Where((_, i) => i % 2 == 1).Select(x => x.r.Text).Distinct().Should().HaveCount(10);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ShouldPassAtPrefixedValueLiterally_WhenArgumentLooksLikeResponseFile()
+    {
+        var secretFile = Path.Combine(_dir, "secret.rsp");
+        File.WriteAllText(secretFile, "DISTINCTIVE-SECRET-TEXT");
+        var literal = "@" + secretFile;
+
+        var result = await Executor().ExecuteAsync(Tool("strings/levenshtein-distance"),
+            Args($$"""{"string1":{{JsonSerializer.Serialize(literal)}},"string2":"abc"}"""));
+
+        var expected = await new Pixelbadger.Toolkit.Components.LevenshteinCalculator().CalculateDistanceAsync(literal, "abc");
+        result.IsError.Should().BeFalse(result.Text);
+        result.Text.Should().NotContain("DISTINCTIVE-SECRET-TEXT");
+        result.Text.Should().Be($"Levenshtein distance: {expected}\n");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ShouldCompletePromptlyWithoutReadingStdin_WhenFileArgumentIsDash()
+    {
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+
+        var result = await Executor(TimeSpan.FromSeconds(30)).ExecuteAsync(Tool("crypto/encrypt-string"),
+            Args($$"""{"string-file":"-","public-key-file":{{JsonSerializer.Serialize(Path.Combine(_dir, "missing.json"))}},"out-file":{{JsonSerializer.Serialize(Path.Combine(_dir, "out.json"))}}}"""));
+
+        watch.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(10));
+        result.IsError.Should().BeTrue();
+        result.Text.Should().Contain("missing.json").And.EndWith("exit code: 1");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ShouldStopRunawayProgram_WhenTimeoutElapses()
+    {
+        var executor = Executor(TimeSpan.FromMilliseconds(200));
+        Task? run = null;
+        executor.OnRunStarted = t => run = t;
+
+        var result = await executor.ExecuteAsync(Tool("interpreters/brainfuck"),
+            Args($$"""{"file":{{JsonSerializer.Serialize(Program("+[]"))}}}"""));
+
+        result.Should().Be(new McpToolResult("Tool interpreters_brainfuck timed out after 0.2 s.", true, 1));
+        run.Should().NotBeNull();
+        (await Task.WhenAny(run!, Task.Delay(2000))).Should().BeSameAs(run, "the cancelled interpreter stops spinning");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ShouldReturnMessageOnlyWithoutStackTrace_WhenActionThrows()
+    {
+        RootCommand Factory()
+        {
+            var boom = new Command("boom", "Throws");
+            boom.SetAction((_, _) => throw new InvalidOperationException("boom"));
+            return new RootCommand { boom };
+        }
+        var tool = McpToolCatalogue.Describe(Factory().Subcommands.Single());
+
+        var result = await Executor(factory: Factory).ExecuteAsync(tool, null);
+
+        result.Should().Be(new McpToolResult("stderr:\nboom\nexit code: 1", true, 1));
+        result.Text.Should().NotContain(" at ");
     }
 
     [Fact]
@@ -193,18 +254,22 @@ public class McpToolExecutorTests : IDisposable
     [Fact]
     public async Task ExecuteAsync_ShouldThrowCancellation_WhenCallerCancels()
     {
+        var started = new TaskCompletionSource();
         RootCommand Factory()
         {
             var slow = new Command("slow", "Never finishes");
-            slow.SetAction(async (_, ct) => { await Task.Delay(Timeout.Infinite, ct); return 0; });
+            slow.SetAction(async (_, ct) => { started.TrySetResult(); await Task.Delay(Timeout.Infinite, ct); return 0; });
             return new RootCommand { slow };
         }
         var tool = McpToolCatalogue.Describe(Factory().Subcommands.Single());
-        using var cts = new CancellationTokenSource(100);
+        using var cts = new CancellationTokenSource();
 
         var act = () => Executor(factory: Factory).ExecuteAsync(tool, null, cts.Token);
+        var pending = act();
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        cts.Cancel();
 
-        await act.Should().ThrowAsync<OperationCanceledException>();
+        await ((Func<Task>)(() => pending)).Should().ThrowAsync<OperationCanceledException>();
     }
 
     [Theory]

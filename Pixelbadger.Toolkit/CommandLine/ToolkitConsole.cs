@@ -19,6 +19,9 @@ public static class ToolkitConsole
 
     public static TextWriter Error => Current.Value?.Error ?? Console.Error;
 
+    /// <summary>Empty stream when the current flow is captured (never the host process's stdin); else the real stdin.</summary>
+    public static Stream OpenStandardInput() => Current.Value is not null ? Stream.Null : Console.OpenStandardInput();
+
     /// <summary>Captures output for the current async flow; dispose to restore the previous values.</summary>
     public static IDisposable Capture(IAnsiConsole console, TextWriter output, TextWriter error)
     {

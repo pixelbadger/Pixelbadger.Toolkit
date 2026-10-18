@@ -19,6 +19,24 @@ public class ToolkitConsoleTests : IDisposable
     }
 
     [Fact]
+    public void OpenStandardInput_ShouldBeEmpty_WhenCaptured()
+    {
+        var o = new StringWriter();
+        using (ToolkitConsole.Capture(ToolkitConsole.CreateCaptureConsole(o), o, new StringWriter()))
+        {
+            using var reader = new StreamReader(ToolkitConsole.OpenStandardInput());
+            reader.ReadToEnd().Should().BeEmpty();
+        }
+    }
+
+    [Fact]
+    public void OpenStandardInput_ShouldNotBeNullStream_WhenNothingCaptured()
+    {
+        using var stream = ToolkitConsole.OpenStandardInput();
+        stream.Should().NotBeSameAs(Stream.Null);
+    }
+
+    [Fact]
     public void Capture_ShouldRouteOutErrorAndAnsiConsole_WhenInstalled()
     {
         ToolkitConsole.InstallRouting();

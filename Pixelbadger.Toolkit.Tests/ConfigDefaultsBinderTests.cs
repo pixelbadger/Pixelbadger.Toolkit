@@ -6,6 +6,7 @@ using Pixelbadger.Toolkit.Services;
 
 namespace Pixelbadger.Toolkit.Tests;
 
+[Collection("AnsiConsole")]
 public class ConfigDefaultsBinderTests
 {
     private readonly DemoTree _demo = new();
@@ -14,6 +15,35 @@ public class ConfigDefaultsBinderTests
 
     private ParseResult Parse(params string[] args) =>
         ConfigBootstrap.ParseWithConfig(_demo.Root, args, _store, _warnings);
+
+    [Fact]
+    public void ParseWithConfig_ShouldExpandResponseFiles_WhenNoParserConfigurationGiven()
+    {
+        var rsp = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".rsp");
+        File.WriteAllText(rsp, "--name fromfile");
+        try
+        {
+            var result = Parse("demo", "run", "@" + rsp);
+            result.Errors.Should().BeEmpty();
+            result.GetValue(_demo.RunName).Should().Be("fromfile");
+        }
+        finally { File.Delete(rsp); }
+    }
+
+    [Fact]
+    public void ParseWithConfig_ShouldKeepAtValueLiteral_WhenResponseFilesDisabled()
+    {
+        var rsp = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".rsp");
+        File.WriteAllText(rsp, "--name fromfile");
+        try
+        {
+            var result = ConfigBootstrap.ParseWithConfig(_demo.Root, ["demo", "run", "--name", "@" + rsp], _store, _warnings,
+                new ParserConfiguration { ResponseFileTokenReplacer = null });
+            result.Errors.Should().BeEmpty();
+            result.GetValue(_demo.RunName).Should().Be("@" + rsp);
+        }
+        finally { File.Delete(rsp); }
+    }
 
     [Fact]
     public void ParseWithConfig_ShouldUseBuiltInDefault_WhenNothingConfigured()

@@ -4,18 +4,18 @@ public class BrainfuckInterpreter
 {
     private const int MemorySize = 30000;
     
-    public async Task<string> ExecuteAsync(string filePath)
+    public async Task<string> ExecuteAsync(string filePath, CancellationToken cancellationToken = default)
     {
         if (!File.Exists(filePath))
         {
             throw new FileNotFoundException($"Brainfuck program file not found: {filePath}");
         }
 
-        var program = await File.ReadAllTextAsync(filePath);
-        return Execute(program);
+        var program = await File.ReadAllTextAsync(filePath, cancellationToken);
+        return Execute(program, cancellationToken);
     }
 
-    public string Execute(string program)
+    public string Execute(string program, CancellationToken cancellationToken = default)
     {
         var memory = new byte[MemorySize];
         var dataPointer = 0;
@@ -24,8 +24,13 @@ public class BrainfuckInterpreter
         var input = new StringReader("");
         var loopStack = new Stack<int>();
 
+        var executed = 0;
+
         while (instructionPointer < program.Length)
         {
+            if ((++executed & 4095) == 0)
+                cancellationToken.ThrowIfCancellationRequested();
+
             var command = program[instructionPointer];
             
             switch (command)

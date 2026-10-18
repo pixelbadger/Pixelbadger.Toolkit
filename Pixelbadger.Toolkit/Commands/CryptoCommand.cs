@@ -466,7 +466,7 @@ public static class CryptoCommand
         string text;
         if (path == "-")
         {
-            using var reader = new StreamReader(Console.OpenStandardInput(), new UTF8Encoding(false), detectEncodingFromByteOrderMarks: true);
+            using var reader = new StreamReader(ToolkitConsole.OpenStandardInput(), new UTF8Encoding(false), detectEncodingFromByteOrderMarks: true);
             text = await reader.ReadToEndAsync(cancellationToken);
         }
         else

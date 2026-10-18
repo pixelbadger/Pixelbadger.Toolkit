@@ -31,7 +31,7 @@ public static class InterpretersCommand
             {
                 var file = parseResult.GetValue(fileOption)!;
                 var interpreter = new BrainfuckInterpreter();
-                var result = await interpreter.ExecuteAsync(file);
+                var result = await interpreter.ExecuteAsync(file, cancellationToken);
                 AnsiConsole.Write(new Text(result));
             }
             catch (Exception ex)
@@ -59,7 +59,7 @@ public static class InterpretersCommand
             {
                 var file = parseResult.GetValue(fileOption)!;
                 var interpreter = new OokInterpreter();
-                var result = await interpreter.ExecuteAsync(file);
+                var result = await interpreter.ExecuteAsync(file, cancellationToken);
                 AnsiConsole.Write(new Text(result));
             }
             catch (Exception ex)

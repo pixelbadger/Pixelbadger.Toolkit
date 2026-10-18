@@ -10,11 +10,12 @@ internal static class ConfigDefaultsBinder
     // Per-root undo actions for the factories installed by the previous ParseWithConfig call.
     private static readonly ConditionalWeakTable<RootCommand, List<Action>> Installed = new();
 
-    public static ParseResult ParseWithConfig(RootCommand root, string[] args, IConfigStore store, TextWriter warnings)
+    public static ParseResult ParseWithConfig(RootCommand root, string[] args, IConfigStore store, TextWriter warnings,
+        ParserConfiguration? parserConfiguration = null)
     {
         Reset(root);
 
-        var first = root.Parse(args);
+        var first = root.Parse(args, parserConfiguration);
         var topic = FindTopic(root, first.CommandResult.Command);
         if (topic is null || topic.Name == ConfigTree.ConfigTopicName)
             return first;
@@ -83,7 +84,7 @@ internal static class ConfigDefaultsBinder
         foreach (var install in installs)
             install();
 
-        return root.Parse(args);
+        return root.Parse(args, parserConfiguration);
     }
 
     private static void Install(RootCommand root, Option option, Action set)

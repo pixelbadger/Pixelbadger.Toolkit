@@ -37,23 +37,35 @@ public sealed class McpToolExecutor : IMcpToolExecutor
         ArgumentNullException.ThrowIfNull(tool);
 
         var mapping = McpArgumentMapper.Map(tool, arguments);
-        if (mapping.Error is not null) return new McpToolResult(mapping.Error, true, 1);
+        if (mapping.Error is not null) return Format(mapping.Error, string.Empty, 1);
         var tokens = mapping.Tokens!.ToArray();
 
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var token = linked.Token;
 
         var run = Task.Run(() => RunAsync(tokens, token), CancellationToken.None);
-        var delay = Task.Delay(_timeout, cancellationToken);
+        OnRunStarted?.Invoke(run);
+
+        using var delayCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var delay = Task.Delay(_timeout, delayCts.Token);
 
         var finished = await Task.WhenAny(run, delay).ConfigureAwait(false);
-        if (finished == run) return await run.ConfigureAwait(false);
+        if (finished == run)
+        {
+            delayCts.Cancel();
+            // A caller cancel that races the run's own cancellation result must surface as cancellation.
+            cancellationToken.ThrowIfCancellationRequested();
+            return await run.ConfigureAwait(false);
+        }
 
         cancellationToken.ThrowIfCancellationRequested();
         linked.Cancel();
         var seconds = _timeout.TotalSeconds.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
         return new McpToolResult($"Tool {tool.Name} timed out after {seconds} s.", true, 1);
     }
+
+    /// <summary>Test hook: receives the background run task of each call.</summary>
+    internal Action<Task>? OnRunStarted { get; set; }
 
     private async Task<McpToolResult> RunAsync(string[] tokens, CancellationToken cancellationToken)
     {
@@ -67,7 +79,13 @@ public sealed class McpToolExecutor : IMcpToolExecutor
             {
                 var root = _treeFactory();
                 exitCode = await ConfigBootstrap.InvokeAsync(root, tokens, _store,
-                    new InvocationConfiguration { Output = stdout, Error = stderr }, cancellationToken).ConfigureAwait(false);
+                    new InvocationConfiguration
+                    {
+                        Output = stdout,
+                        Error = stderr,
+                        EnableDefaultExceptionHandler = false,
+                        ProcessTerminationTimeout = null
+                    }, cancellationToken, new ParserConfiguration { ResponseFileTokenReplacer = null }).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
