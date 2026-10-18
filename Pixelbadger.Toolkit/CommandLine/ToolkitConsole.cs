@@ -42,6 +42,8 @@ public static class ToolkitConsole
             Ansi = AnsiSupport.No,
             ColorSystem = ColorSystemSupport.NoColors,
             Interactive = InteractionSupport.No,
+            // Default enrichers (GitHub Actions, Azure DevOps, ...) force Ansi on from CI env vars after settings apply.
+            Enrichment = new ProfileEnrichment { UseDefaultEnrichers = false },
             Out = new AnsiConsoleOutput(writer)
         });
         console.Profile.Capabilities.Ansi = false;

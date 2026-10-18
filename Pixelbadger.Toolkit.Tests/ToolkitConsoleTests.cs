@@ -12,6 +12,27 @@ public class ToolkitConsoleTests : IDisposable
     public void Dispose() => AnsiConsole.Console = _originalConsole;
 
     [Fact]
+    public void CreateCaptureConsole_ShouldEmitPlainText_WhenCiEnvironmentVariablesAreSet()
+    {
+        var names = new[] { "GITHUB_ACTIONS", "TF_BUILD", "CI" };
+        var values = new[] { "true", "True", "true" };
+        var previous = names.Select(Environment.GetEnvironmentVariable).ToArray();
+        try
+        {
+            for (var i = 0; i < names.Length; i++) Environment.SetEnvironmentVariable(names[i], values[i]);
+            var o = new StringWriter();
+            var console = ToolkitConsole.CreateCaptureConsole(o);
+            console.MarkupLine("[bold]x[/] y");
+            o.ToString().Should().Be("x y" + Environment.NewLine);
+            o.ToString().Should().NotContain("\u001b");
+        }
+        finally
+        {
+            for (var i = 0; i < names.Length; i++) Environment.SetEnvironmentVariable(names[i], previous[i]);
+        }
+    }
+
+    [Fact]
     public void OutAndError_ShouldFallBackToProcessConsole_WhenNothingCaptured()
     {
         ToolkitConsole.Out.Should().BeSameAs(Console.Out);
