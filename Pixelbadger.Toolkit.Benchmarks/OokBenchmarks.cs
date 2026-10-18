@@ -8,6 +8,7 @@ public class OokBenchmarks
 {
     private OokBrainfuckTranslator _translator = null!;
     private OokInterpreter _interpreter = null!;
+    private CancellationTokenSource _cts = null!;
 
     // 72 increments + output (~150 chars of BF)
     private const string ShortBrainfuck =
@@ -27,6 +28,13 @@ public class OokBenchmarks
         _interpreter = new OokInterpreter();
         _shortOok = _translator.TranslateBrainfuckToOok(ShortBrainfuck);
         _helloWorldOok = _translator.TranslateBrainfuckToOok(HelloWorldBrainfuck);
+        _cts = new CancellationTokenSource();
+    }
+
+    [GlobalCleanup]
+    public void Cleanup()
+    {
+        _cts.Dispose();
     }
 
     [Benchmark]
@@ -52,4 +60,9 @@ public class OokBenchmarks
     [Benchmark]
     public string ExecuteOok_HelloWorld() =>
         _interpreter.Execute(_helloWorldOok);
+
+    // These measure the cancellation check added for the MCP per-call timeout (checked every 4096 instructions)
+    [Benchmark]
+    public string ExecuteOok_HelloWorld_WithCancellationToken() =>
+        _interpreter.Execute(_helloWorldOok, _cts.Token);
 }

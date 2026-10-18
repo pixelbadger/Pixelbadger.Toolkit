@@ -7,6 +7,7 @@ namespace Pixelbadger.Toolkit.Benchmarks;
 public class BrainfuckBenchmarks
 {
     private BrainfuckInterpreter _interpreter = null!;
+    private CancellationTokenSource _cts = null!;
 
     // 72 increment instructions then a single output — tests raw increment throughput
     private const string TinyProgram =
@@ -24,6 +25,13 @@ public class BrainfuckBenchmarks
     public void Setup()
     {
         _interpreter = new BrainfuckInterpreter();
+        _cts = new CancellationTokenSource();
+    }
+
+    [GlobalCleanup]
+    public void Cleanup()
+    {
+        _cts.Dispose();
     }
 
     [Benchmark]
@@ -37,4 +45,13 @@ public class BrainfuckBenchmarks
     [Benchmark]
     public string Execute_MultiplyIntensive() =>
         _interpreter.Execute(MultiplyIntensiveProgram);
+
+    // These measure the cancellation check added for the MCP per-call timeout (checked every 4096 instructions)
+    [Benchmark]
+    public string Execute_MultiplyIntensive_WithCancellationToken() =>
+        _interpreter.Execute(MultiplyIntensiveProgram, _cts.Token);
+
+    [Benchmark]
+    public string Execute_HelloWorld_WithCancellationToken() =>
+        _interpreter.Execute(HelloWorldProgram, _cts.Token);
 }
