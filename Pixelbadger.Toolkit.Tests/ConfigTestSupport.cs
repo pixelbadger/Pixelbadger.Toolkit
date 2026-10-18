@@ -6,13 +6,22 @@ using Spectre.Console;
 namespace Pixelbadger.Toolkit.Tests;
 
 /// <summary>In-memory IConfigStore that records which topics were accessed.</summary>
-internal sealed class InMemoryConfigStore : IConfigStore
+internal sealed class InMemoryConfigStore : IConfigStore, IDisposable
 {
+    private readonly string _directory = Path.Combine(Path.GetTempPath(), "pbtk-memory-" + Guid.NewGuid().ToString("N"));
+
     public Dictionary<string, List<ConfigEntry>> Tables { get; } = new();
     public List<string> TopicsAccessed { get; } = new();
     public Exception? FailWith { get; set; }
 
-    public string DatabasePath => "memory";
+    /// <summary>A unique absolute path that is never created by read paths; <see cref="Dispose"/> removes it if a write created it.</summary>
+    public string DatabasePath => Path.Combine(_directory, "config.db");
+
+    public void Dispose()
+    {
+        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+        if (Directory.Exists(_directory)) Directory.Delete(_directory, true);
+    }
 
     public ITopicConfig ForTopic(string topic)
     {

@@ -138,7 +138,7 @@ public static class LlmCommand
                         .ChatAsync(message, sessionId, compatibility.NormalisedReasoningEffort);
 
                     AnsiConsole.WriteLine(result.Response);
-                    Console.Error.WriteLine($"Session: {result.SessionId}");
+                    ToolkitConsole.Error.WriteLine($"Session: {result.SessionId}");
                 });
         });
 
@@ -381,8 +381,9 @@ public static class LlmCommand
             catch (Exception ex)
             {
                 AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
-                Environment.Exit(1);
+                return 1;
             }
+            return 0;
         });
 
         return command;
@@ -410,8 +411,9 @@ public static class LlmCommand
             catch (Exception ex)
             {
                 AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
-                Environment.Exit(1);
+                return 1;
             }
+            return 0;
         });
 
         return command;

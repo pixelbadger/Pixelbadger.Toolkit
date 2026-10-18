@@ -1,6 +1,7 @@
 using System.CommandLine;
 using System.Text;
 using System.Text.Json;
+using Pixelbadger.Toolkit.CommandLine;
 using Pixelbadger.Toolkit.Components;
 using Pixelbadger.Toolkit.Models;
 using Spectre.Console;
@@ -59,8 +60,9 @@ public static class CryptoCommand
             catch (Exception ex)
             {
                 AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
-                Environment.Exit(1);
+                return 1;
             }
+            return 0;
         });
 
         return command;
@@ -100,8 +102,9 @@ public static class CryptoCommand
             catch (Exception ex)
             {
                 AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
-                Environment.Exit(1);
+                return 1;
             }
+            return 0;
         });
 
         return command;
@@ -134,12 +137,13 @@ public static class CryptoCommand
 
                 var component = new HomomorphicEncryptionComponent();
                 var plaintext = component.Decrypt(encrypted, keyPair);
-                Console.Out.WriteLine(plaintext.ToString());
+                ToolkitConsole.Out.WriteLine(plaintext.ToString());
             }
             catch (Exception ex)
             {
-                ReportDecryptionError(ex);
+                return ReportDecryptionError(ex);
             }
+            return 0;
         });
 
         return command;
@@ -183,8 +187,9 @@ public static class CryptoCommand
             catch (Exception ex)
             {
                 AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
-                Environment.Exit(1);
+                return 1;
             }
+            return 0;
         });
 
         return command;
@@ -228,8 +233,9 @@ public static class CryptoCommand
             catch (Exception ex)
             {
                 AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
-                Environment.Exit(1);
+                return 1;
             }
+            return 0;
         });
 
         return command;
@@ -269,8 +275,9 @@ public static class CryptoCommand
             catch (Exception ex)
             {
                 AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
-                Environment.Exit(1);
+                return 1;
             }
+            return 0;
         });
 
         return command;
@@ -309,8 +316,9 @@ public static class CryptoCommand
             catch (Exception ex)
             {
                 AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
-                Environment.Exit(1);
+                return 1;
             }
+            return 0;
         });
 
         return command;
@@ -342,12 +350,13 @@ public static class CryptoCommand
                     ?? throw new InvalidOperationException("Failed to deserialize private key.");
 
                 var component = new HomomorphicEncryptionComponent();
-                Console.Out.WriteLine(component.DecryptString(encrypted, keyPair));
+                ToolkitConsole.Out.WriteLine(component.DecryptString(encrypted, keyPair));
             }
             catch (Exception ex)
             {
-                ReportDecryptionError(ex);
+                return ReportDecryptionError(ex);
             }
+            return 0;
         });
 
         return command;
@@ -389,8 +398,9 @@ public static class CryptoCommand
             catch (Exception ex)
             {
                 AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
-                Environment.Exit(1);
+                return 1;
             }
+            return 0;
         });
 
         return command;
@@ -432,8 +442,9 @@ public static class CryptoCommand
             catch (Exception ex)
             {
                 AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
-                Environment.Exit(1);
+                return 1;
             }
+            return 0;
         });
 
         return command;
@@ -443,11 +454,11 @@ public static class CryptoCommand
 
     // File access problems keep their specific message; every other failure (bad JSON, wrong key, ...)
     // is reported with one fixed message so nothing about the failure mode leaks.
-    private static void ReportDecryptionError(Exception ex)
+    private static int ReportDecryptionError(Exception ex)
     {
         var message = ex is IOException or UnauthorizedAccessException ? ex.Message : GenericDecryptionError;
         AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(message)}");
-        Environment.Exit(1);
+        return 1;
     }
 
     private static async Task<string> ReadTextInputAsync(string path, CancellationToken cancellationToken)
@@ -455,7 +466,7 @@ public static class CryptoCommand
         string text;
         if (path == "-")
         {
-            using var reader = new StreamReader(Console.OpenStandardInput(), new UTF8Encoding(false), detectEncodingFromByteOrderMarks: true);
+            using var reader = new StreamReader(ToolkitConsole.OpenStandardInput(), new UTF8Encoding(false), detectEncodingFromByteOrderMarks: true);
             text = await reader.ReadToEndAsync(cancellationToken);
         }
         else

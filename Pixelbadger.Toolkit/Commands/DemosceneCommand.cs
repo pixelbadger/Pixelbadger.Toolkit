@@ -1,4 +1,5 @@
 using System.CommandLine;
+using Pixelbadger.Toolkit.CommandLine;
 using Pixelbadger.Toolkit.Components;
 
 namespace Pixelbadger.Toolkit.Commands;
@@ -9,7 +10,7 @@ public static class DemosceneCommand
 
     public static Command Create()
     {
-        var command = new Command("demoscene", "Classic Amiga and IBM PC demoscene effects rendered in the terminal using half-block ANSI characters");
+        var command = new Command("demoscene", "Classic Amiga and IBM PC demoscene effects rendered in the terminal using half-block ANSI characters").ExcludeFromMcp();
 
         command.Add(CreateEffectCommand("kefrens", "Kefrens-style sine wave colour bars scrolling across the screen", () => new KefrensBarsComponent()));
         command.Add(CreateEffectCommand("boing", "Classic Amiga Boing Ball — a red-and-white checkered ball bouncing on a grey grid", () => new BoingBallComponent()));

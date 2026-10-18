@@ -1,4 +1,5 @@
 using System.CommandLine;
+using Pixelbadger.Toolkit.CommandLine;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -20,7 +21,7 @@ public static class WebCommand
 
     private static Command CreateServeHtmlCommand()
     {
-        var command = new Command("serve-html", "Serves a static HTML file via HTTP server");
+        var command = new Command("serve-html", "Serves a static HTML file via HTTP server").ExcludeFromMcp();
 
         var fileOption = new Option<string>("--file") { Description = "Path to the HTML file to serve", Required = true };
         var portOption = new Option<int>("--port") { Description = "Port to bind the server to", DefaultValueFactory = _ => 8080 };
@@ -38,8 +39,7 @@ public static class WebCommand
                 if (!File.Exists(file))
                 {
                     AnsiConsole.MarkupLine($"[red]Error:[/] File '{Markup.Escape(file)}' not found");
-                    Environment.Exit(1);
-                    return;
+                    return 1;
                 }
 
                 var builder = WebApplication.CreateBuilder();
@@ -76,8 +76,9 @@ public static class WebCommand
             catch (Exception ex)
             {
                 AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
-                Environment.Exit(1);
+                return 1;
             }
+            return 0;
         });
 
         return command;

@@ -31,14 +31,15 @@ public static class InterpretersCommand
             {
                 var file = parseResult.GetValue(fileOption)!;
                 var interpreter = new BrainfuckInterpreter();
-                var result = await interpreter.ExecuteAsync(file);
+                var result = await interpreter.ExecuteAsync(file, cancellationToken);
                 AnsiConsole.Write(new Text(result));
             }
             catch (Exception ex)
             {
                 AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
-                Environment.Exit(1);
+                return 1;
             }
+            return 0;
         });
 
         return command;
@@ -58,14 +59,15 @@ public static class InterpretersCommand
             {
                 var file = parseResult.GetValue(fileOption)!;
                 var interpreter = new OokInterpreter();
-                var result = await interpreter.ExecuteAsync(file);
+                var result = await interpreter.ExecuteAsync(file, cancellationToken);
                 AnsiConsole.Write(new Text(result));
             }
             catch (Exception ex)
             {
                 AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
-                Environment.Exit(1);
+                return 1;
             }
+            return 0;
         });
 
         return command;
@@ -94,8 +96,9 @@ public static class InterpretersCommand
             catch (Exception ex)
             {
                 AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
-                Environment.Exit(1);
+                return 1;
             }
+            return 0;
         });
 
         return command;

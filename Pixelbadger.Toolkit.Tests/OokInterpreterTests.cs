@@ -164,4 +164,30 @@ public class OokInterpreterTests : IDisposable
         // Assert
         result.Should().NotBeNull();
     }
+
+    [Fact]
+    public async Task Execute_ShouldThrowOperationCanceled_WhenTokenCancelledDuringInfiniteLoop()
+    {
+        using var cts = new CancellationTokenSource(100);
+        var program = new OokBrainfuckTranslator().TranslateBrainfuckToOok("+[]");
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+
+        var act = () => Task.Run(() => new OokInterpreter().Execute(program, cts.Token));
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        watch.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(2));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ShouldThrowOperationCanceled_WhenTokenAlreadyCancelled()
+    {
+        var file = Path.Combine(_testDirectory, "loop.txt");
+        await File.WriteAllTextAsync(file, new OokBrainfuckTranslator().TranslateBrainfuckToOok("+[]"));
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        var act = () => new OokInterpreter().ExecuteAsync(file, cts.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
 }

@@ -94,6 +94,11 @@ The project is .NET 10, and uses Microsoft's System.CommandLine library for buil
   - `pbtk gpt train --source corpus.txt --out ./.gpt --loss-graph ./loss.html`
   - `pbtk gpt train --source corpus.txt --out ./.gpt --validation-split 0.1 --eval-interval 50`
   - `pbtk gpt complete --model ./.gpt --prompt "ROMEO:" --max-tokens 200`
+  - `pbtk mcp serve`
+  - `pbtk mcp serve --profile text-tools --port 5200`
+  - `pbtk mcp save --name text-tools --include strings interpreters/brainfuck --port 5200`
+  - `pbtk mcp list`
+  - `pbtk mcp delete --name text-tools`
   - `pbtk config llm --model claude-sonnet-5-5`
   - `pbtk config llm chat --model gpt-6-luna`
   - `pbtk config llm chat`
@@ -223,16 +228,24 @@ public async Task ComponentMethod_ShouldReturnExpectedResult_WhenValidInputProvi
 
 The project follows a topic-based command architecture with a component-per-command pattern:
 
-- **Program.cs**: Entry point that registers all topic commands with the root command
+- **Program.cs**: Entry point that builds the command tree via `ToolkitCommandTree.Create` (which registers every topic) and invokes it
 - **Commands/**: Contains topic command definitions, each topic has a static `Create()` method that registers sub-actions
 - **Components/**: Contains the core business logic implementations that commands delegate to
 
 ### Per-user config
 
-- `ConfigBootstrap.AddConfigTopic` in `Program.cs` must stay after all topic registrations, because the `config` tree is built from the finished command tree.
+- `ConfigBootstrap.AddConfigTopic` in `ToolkitCommandTree.Create` must stay after all topic registrations, because the `config` tree is built from the finished command tree.
 - Every non-required option is configurable automatically. No per-option wiring is needed.
 - To exclude an option, mark it with `.WithImmutableDefault()` (namespace `Pixelbadger.Toolkit.CommandLine`). Use this for secrets and destructive or session-identifying flags.
 - The option key `unset` is reserved for the `config` command's `--unset` option.
+
+### MCP server
+
+- New topics must be added in `ToolkitCommandTree.Create` before the config topic, so they are exposed to `mcp` and `config`.
+- Mark commands that can't run headless or never return with `.ExcludeFromMcp()` (namespace `Pixelbadger.Toolkit.CommandLine`).
+- Actions must return exit codes and never call `Environment.Exit`.
+- Actions must write output through `AnsiConsole` or `ToolkitConsole.Out/Error`, and read stdin through `ToolkitConsole.OpenStandardInput()`, never `Console.*` directly, so the MCP server can capture it per call. Commands excluded from MCP, such as demoscene, are the exception.
+- Long-running loops should observe the action's `CancellationToken`, so the MCP per-call timeout can stop them.
 
 ## Component-Per-Command Pattern
 
@@ -274,7 +287,7 @@ Each topic command follows the pattern:
 4. Set up handlers that delegate to dedicated component classes (one per action)
 5. Handle errors and provide user feedback
 
-Topic commands are registered in Program.cs by calling their static `Create()` methods and adding them to the root command.
+Topic commands are registered in `ToolkitCommandTree.Create` by calling their static `Create()` methods and adding them to the root command.
 
 Available topics and actions:
 - **strings**: reverse, levenshtein-distance, abjadify, flesch-reading-ease, report
@@ -287,6 +300,7 @@ Available topics and actions:
 - **markov**: train, complete
 - **demoscene**: showcase
 - **gpt**: train, complete
+- **mcp**: serve, save, delete, list
 - **config**: mirrors every topic/group/action; sets, shows (bare) and unsets (--unset) per-user option defaults
 
 ## Dependencies
@@ -301,6 +315,7 @@ Available topics and actions:
 - Microsoft.Extensions.AI (for AI abstractions)
 - Microsoft.Extensions.AI.OpenAI (for OpenAI integration)
 - Dapper (config store data access)
+- ModelContextProtocol.AspNetCore (MCP server over stateless HTTP)
 
 ## Environment Variables
 

@@ -208,7 +208,10 @@ low, medium, high</pre>
       <li><strong>Immutable options.</strong> These are marked as never persisted, because they are secrets, destructive
         or identify a session. They are <code>llm chat --session-id</code>, <code>llm generate-image --overwrite</code>,
         <code>gpt train --resume</code> and <code>oauth profile add --client-secret</code>
-        (also <code>oauth profile update --client-secret</code>).</li>
+        (also <code>oauth profile update --client-secret</code>). The <code>mcp</code> topic adds
+        <code>mcp serve --host</code>, <code>mcp serve --port</code>, <code>mcp serve --allow-remote</code>, and every option of <code>mcp save</code>
+        (<code>--name</code>, <code>--include</code>, <code>--host</code>, <code>--port</code>) and
+        <code>mcp delete</code> (<code>--name</code>). <code>mcp serve --profile</code>, by contrast, is configurable.</li>
       <li><strong>The config topic itself.</strong> <code>pbtk config config</code> is not a valid command.</li>
     </ul>
     <div class="info-box">

@@ -16,7 +16,7 @@ public static class ConfigCommand
     internal static Command Create(RootCommand root, IConfigStore store)
     {
         var tree = ConfigTree.Build(root);
-        var command = new Command(ConfigTree.ConfigTopicName, "Show or set per-user default values for command options");
+        var command = new Command(ConfigTree.ConfigTopicName, "Show or set per-user default values for command options").ExcludeFromMcp();
 
         foreach (var topic in tree.Topics)
             command.Add(CreateNode(root, store, topic));

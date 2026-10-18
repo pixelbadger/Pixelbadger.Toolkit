@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pixelbadger Toolkit — MCP</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header>
+  <h1>MCP <span class="badge">mcp</span></h1>
+  <div class="subtitle">Serve a profile of toolkit commands as MCP tools over stateless HTTP, executed in-process</div>
+  <div class="meta">Pixelbadger Toolkit &mdash; <code>pbtk mcp</code> &mdash; <a href="index.html" style="color:#60a5fa">&#8592; all topics</a></div>
+</header>
+
+<nav>
+  <a href="#overview">Overview</a>
+  <a href="#serve">serve</a>
+  <a href="#save">save</a>
+  <a href="#delete">delete</a>
+  <a href="#list">list</a>
+  <a href="#profiles">Profiles</a>
+  <a href="#tools">Tools</a>
+  <a href="#security">Security</a>
+  <a href="#connecting">Connecting a client</a>
+  <a href="#command-ref">Command Reference</a>
+</nav>
+
+<div class="content">
+
+  <!-- OVERVIEW -->
+  <section id="overview">
+    <h2>Overview</h2>
+    <p>
+      The <code>mcp</code> topic serves a profile of toolkit commands as MCP tools over stateless HTTP. Each command in
+      the profile becomes one tool. A tool call runs the command in the server process and returns its output as the
+      tool result. A profile is a named list of topics, groups or actions, saved per user.
+    </p>
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk mcp</span>
+      <span class="val"> &lt;action&gt;</span>
+      <span class="opt"> [options]</span>
+    </div>
+    <p>
+      The server binds <code>127.0.0.1</code> by default and has <strong>no authentication</strong>. See
+      <a href="#security">Security</a> before binding any other address.
+    </p>
+    <div class="info-box">
+      Profiles are read when <code>serve</code> starts. Changing a profile does not affect a server that is already running.
+    </div>
+  </section>
+
+  <!-- SERVE -->
+  <section id="serve">
+    <h2>serve</h2>
+    <p>
+      Serves a profile at <code>/mcp</code>. Without <code>--profile</code> it serves the <code>default</code> profile,
+      which is the whole <code>interpreters</code> topic unless you save a profile named <code>default</code>. The server
+      prints its URL and tool list at startup, then runs until it is stopped.
+    </p>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk mcp serve</span>
+    </div>
+    <pre style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:1rem;overflow-x:auto;font-size:0.85rem;line-height:1.6;color:#e2e8f0;">Serving MCP profile 'default' on http://127.0.0.1:5100/mcp
+Tools: interpreters_brainfuck, interpreters_ook, interpreters_bf-to-ook</pre>
+
+    <p>To serve a saved profile on another port:</p>
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk mcp serve</span>
+      <span class="opt"> --profile</span> <span class="val">text-tools</span>
+      <span class="opt"> --port</span> <span class="val">5200</span>
+    </div>
+
+    <p>
+      Each tool call writes one line to stderr when it finishes, in the form <code>tool &lt;name&gt; exit &lt;code&gt; &lt;ms&gt;ms</code>:
+    </p>
+    <pre style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:1rem;overflow-x:auto;font-size:0.85rem;line-height:1.6;color:#e2e8f0;">tool interpreters_brainfuck exit 0 60ms</pre>
+
+    <table>
+      <thead><tr><th>Option</th><th>Required</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--profile</code></td><td>No</td><td>Profile to serve. Default: the <code>default</code> profile (the built-in one unless overridden)</td></tr>
+        <tr><td><code>--host</code></td><td>No</td><td>Host to bind. Overrides the profile's host. Default <code>127.0.0.1</code></td></tr>
+        <tr><td><code>--port</code></td><td>No</td><td>Port to bind. Overrides the profile's port. Default <code>5100</code></td></tr>
+        <tr><td><code>--allow-remote</code></td><td>No</td><td>Required to bind a non-loopback host. Without it the server refuses to start</td></tr>
+      </tbody>
+    </table>
+
+    <div class="info-box">
+      Precedence for the bind address is: the <code>--host</code> or <code>--port</code> flag, then the value saved in the
+      profile, then <code>127.0.0.1</code> and <code>5100</code>. See <a href="#profiles">Profiles</a>.
+    </div>
+
+    <div class="warning-box">
+      <strong>Errors.</strong> An unknown profile prints <code>Error: MCP profile 'nope' not found.</code> A profile that
+      exposes no tools prints <code>Error: MCP profile '&lt;name&gt;' exposes no tools.</code> Both exit with status 1.
+    </div>
+  </section>
+
+  <!-- SAVE -->
+  <section id="save">
+    <h2>save</h2>
+    <p>
+      Saves a named profile. The profile name must match <code>^[a-z0-9-]+$</code>. Saving a name that already exists
+      overwrites it without a prompt. Each <code>--include</code> entry is either a topic (<code>strings</code>) or an
+      action path (<code>interpreters/brainfuck</code>). The command rejects an entry that does not exist or cannot be
+      exposed, and exits with status 1.
+    </p>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk mcp save</span>
+      <span class="opt"> --name</span> <span class="val">text-tools</span>
+      <span class="opt"> --include</span> <span class="val">strings</span> <span class="val">interpreters/brainfuck</span>
+      <span class="opt"> --port</span> <span class="val">5200</span>
+    </div>
+    <pre style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:1rem;overflow-x:auto;font-size:0.85rem;line-height:1.6;color:#e2e8f0;">Saved MCP profile 'text-tools' (6 tools)</pre>
+
+    <table>
+      <thead><tr><th>Option</th><th>Required</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--name</code></td><td>Yes</td><td>Profile name (lowercase letters, digits and hyphens)</td></tr>
+        <tr><td><code>--include</code></td><td>Yes</td><td>Entries to expose: <code>topic</code> or <code>topic/action[/sub]</code>. Repeatable, and also accepts several values after one flag</td></tr>
+        <tr><td><code>--host</code></td><td>No</td><td>Host to bind when serving this profile</td></tr>
+        <tr><td><code>--port</code></td><td>No</td><td>Port to bind when serving this profile</td></tr>
+      </tbody>
+    </table>
+
+    <div class="warning-box">
+      <strong>Non-exposable entries are rejected.</strong> <code>mcp</code>, <code>config</code>, <code>web serve-html</code>,
+      <code>demoscene</code>, <code>oauth token</code>, <code>oauth profile add</code> and <code>oauth profile update</code>
+      cannot be saved. For example, <code>pbtk mcp save --name x --include config</code> prints
+      <code>Error: Unknown or non-exposable entry 'config'.</code> and exits with status 1. Names that do not match
+      the pattern print <code>Error: Invalid profile name '&lt;name&gt;'. Profile names must match ^[a-z0-9-]+$.</code>
+    </div>
+  </section>
+
+  <!-- DELETE -->
+  <section id="delete">
+    <h2>delete</h2>
+    <p>
+      Deletes a saved profile. Deleting a profile that does not exist exits with status 1. Deleting the profile named
+      <code>default</code> restores the built-in default. See <a href="#profiles">Profiles</a>.
+    </p>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk mcp delete</span>
+      <span class="opt"> --name</span> <span class="val">text-tools</span>
+    </div>
+    <pre style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:1rem;overflow-x:auto;font-size:0.85rem;line-height:1.6;color:#e2e8f0;">Deleted MCP profile 'text-tools'</pre>
+
+    <table>
+      <thead><tr><th>Option</th><th>Required</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--name</code></td><td>Yes</td><td>Profile name</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- LIST -->
+  <section id="list">
+    <h2>list</h2>
+    <p>
+      Lists the built-in <code>default</code> profile, unless a profile named <code>default</code> is saved, and every saved
+      profile in name order. Each profile shows its entries, host and port. An entry that no longer resolves is marked
+      <code>(unresolved)</code>.
+    </p>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk mcp list</span>
+    </div>
+    <pre style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:1rem;overflow-x:auto;font-size:0.85rem;line-height:1.6;color:#e2e8f0;">default (built-in)
+  include: interpreters
+  host: (default)
+  port: (default)
+
+text-tools
+  include: strings, interpreters/brainfuck
+  host: (default)
+  port: 5200</pre>
+  </section>
+
+  <!-- PROFILES -->
+  <section id="profiles">
+    <h2>Profiles</h2>
+    <p>
+      Profiles are stored in the same per-user <code>config.db</code> as <a href="config.html">config</a>, in a table named
+      <code>mcp_profiles</code>.
+    </p>
+
+    <h3>Entry syntax</h3>
+    <p>
+      An entry is <code>topic</code> or <code>topic/action[/sub]</code>. It resolves to every command at or below that
+      node that can be exposed as a tool. For example, <code>strings</code> exposes all five <code>strings</code> actions,
+      and <code>interpreters/brainfuck</code> exposes one tool.
+    </p>
+
+    <h3>The built-in default</h3>
+    <p>
+      With no saved <code>default</code> profile, the built-in profile is <code>interpreters</code>, which exposes
+      <code>interpreters_brainfuck</code>, <code>interpreters_ook</code> and <code>interpreters_bf-to-ook</code>.
+    </p>
+
+    <h3>Overriding the default</h3>
+    <p>Saving a profile named <code>default</code> replaces the built-in one:</p>
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk mcp save</span>
+      <span class="opt"> --name</span> <span class="val">default</span>
+      <span class="opt"> --include</span> <span class="val">strings</span>
+    </div>
+    <pre style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:1rem;overflow-x:auto;font-size:0.85rem;line-height:1.6;color:#e2e8f0;">Saved MCP profile 'default' (5 tools)</pre>
+
+    <h3>Restoring the default</h3>
+    <p>Deleting the <code>default</code> profile brings back the built-in one:</p>
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk mcp delete</span>
+      <span class="opt"> --name</span> <span class="val">default</span>
+    </div>
+    <pre style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:1rem;overflow-x:auto;font-size:0.85rem;line-height:1.6;color:#e2e8f0;">Deleted MCP profile 'default'
+Built-in default profile restored.</pre>
+
+    <h3>Overwriting a profile</h3>
+    <p>
+      <code>save</code> always overwrites. Saving <code>text-tools</code> again replaces its entries, host and port
+      with the new values. Nothing is merged.
+    </p>
+
+    <h3>Stale entries</h3>
+    <p>
+      If an entry in a saved profile no longer resolves, for example after a command is renamed, <code>serve</code> prints
+      a warning to stderr and skips the entry. The other entries are still served. If no entry resolves, the server does
+      not start:
+    </p>
+    <pre style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:1rem;overflow-x:auto;font-size:0.85rem;line-height:1.6;color:#e2e8f0;">Warning: skipping unresolved entry 'strings/nope' in MCP profile 'text-tools'</pre>
+
+    <h3>Host and port</h3>
+    <p>
+      The address the server binds is chosen in this order: the <code>--host</code> or <code>--port</code> flag of
+      <code>serve</code>, then the host or port saved in the profile, then <code>127.0.0.1</code> and <code>5100</code>.
+      The endpoint path is always <code>/mcp</code>.
+    </p>
+    <div class="info-box">
+      <code>pbtk mcp save --name text-tools --include strings --port 5200</code> followed by
+      <code>pbtk mcp serve --profile text-tools</code> binds <code>5200</code>. Adding <code>--port 5201</code> to the
+      <code>serve</code> command binds <code>5201</code> instead.
+    </div>
+  </section>
+
+  <!-- TOOLS -->
+  <section id="tools">
+    <h2>Tools</h2>
+
+    <h3>Naming</h3>
+    <p>
+      A tool's name is the action path joined with <code>_</code>. Its description is the command's description. For example:
+    </p>
+    <ul>
+      <li><code>interpreters brainfuck</code> becomes <code>interpreters_brainfuck</code></li>
+      <li><code>interpreters bf-to-ook</code> becomes <code>interpreters_bf-to-ook</code></li>
+      <li><code>strings levenshtein-distance</code> becomes <code>strings_levenshtein-distance</code></li>
+    </ul>
+
+    <h3>Input schema</h3>
+    <p>
+      Each property is one option, named by the option name without its leading dashes. For example,
+      <code>--in-file</code> becomes the property <code>in-file</code>. The JSON type follows the option's type:
+    </p>
+    <table>
+      <thead><tr><th>Option type</th><th>JSON schema type</th></tr></thead>
+      <tbody>
+        <tr><td>string</td><td><code>string</code></td></tr>
+        <tr><td>int, long</td><td><code>integer</code></td></tr>
+        <tr><td>double, float, decimal</td><td><code>number</code></td></tr>
+        <tr><td>bool</td><td><code>boolean</code></td></tr>
+        <tr><td>array or collection</td><td><code>array</code> of <code>string</code></td></tr>
+        <tr><td>enum</td><td><code>string</code> with the enum's names as allowed values</td></tr>
+      </tbody>
+    </table>
+    <p>
+      A required option is listed in <code>required</code>. Any property that is not in the schema is an error. For example,
+      <code>interpreters_brainfuck</code> takes one required string property, <code>file</code>:
+    </p>
+    <pre style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:1rem;overflow-x:auto;font-size:0.85rem;line-height:1.6;color:#e2e8f0;">{ "name": "interpreters_brainfuck", "arguments": { "file": "hello.bf" } }</pre>
+    <p>
+      Arguments are turned back into CLI tokens, so <code>interpreters_brainfuck</code> with <code>file</code> set to
+      <code>hello.bf</code> runs <code>interpreters brainfuck --file hello.bf</code>. A boolean is passed explicitly as
+      <code>--flag true</code> or <code>--flag false</code>.
+    </p>
+
+    <h3>Results</h3>
+    <p>
+      A tool result is a single text block, built in this order:
+    </p>
+    <ol>
+      <li>The command's stdout.</li>
+      <li>A <code>stderr:</code> section with the command's stderr, if there is any.</li>
+      <li>An <code>exit code: N</code> line, if the exit code is not 0.</li>
+    </ol>
+    <p>
+      If the command produced no output at all, the text is <code>(no output)</code>. The result has
+      <code>isError</code> set when the exit code is not 0. For example, a missing input file returns:
+    </p>
+    <pre style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:1rem;overflow-x:auto;font-size:0.85rem;line-height:1.6;color:#e2e8f0;">Error: Brainfuck program file not found: /nonexistent/x.bf
+exit code: 1</pre>
+    <p>
+      An argument the schema does not allow, such as an unknown property or an unsupported type, returns an error result
+      like a failing command. For example, an unknown property returns:
+    </p>
+    <pre style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:1rem;overflow-x:auto;font-size:0.85rem;line-height:1.6;color:#e2e8f0;">Unknown argument 'nope' for tool interpreters_brainfuck.
+exit code: 1</pre>
+
+    <h3>Call behaviour</h3>
+    <p>These rules apply to every tool call, and differ from the command line in the first two cases:</p>
+    <ul>
+      <li><strong>Values starting with <code>@</code> are literal.</strong> System.CommandLine response-file expansion is
+        disabled for tool calls, so an argument value such as <code>@notes.txt</code> is passed through as that text. The
+        command line is unchanged: there, <code>@file</code> still expands a response file.</li>
+      <li><strong>Stdin is empty.</strong> Inside a tool call, a <code>-</code> "read stdin" file argument reads nothing.</li>
+      <li><strong>Timeouts stop the interpreters.</strong> The Brainfuck and Ook interpreters stop when the call times out;
+        the 300 second timeout cancels them.</li>
+      <li><strong>Argument errors end with an exit code line.</strong> An unknown argument or an unsupported type produces an
+        error result that ends with <code>exit code: 1</code>, like the error result of a command that fails. A call to a tool name the profile does not contain is different: its whole text is <code>Unknown tool '&lt;name&gt;'.</code>, with no exit code line, because no command runs.</li>
+      <li><strong>Every call is logged.</strong> Every call, including an unknown tool and a call the client cancelled, writes
+        one <code>tool &lt;name&gt; exit &lt;code&gt; &lt;ms&gt;ms</code> line to the server's stderr.</li>
+    </ul>
+
+    <h3>Concurrency and timeout</h3>
+    <p>
+      Tool calls run concurrently. Each call uses its own command tree and captures its own output. A call that runs
+      longer than 300 seconds is cancelled and returns an error result, <code>Tool &lt;name&gt; timed out after 300 s.</code>
+    </p>
+
+    <h3>Your config defaults</h3>
+    <p>
+      Tool calls use the same config path as the command line. Defaults set with <a href="config.html">config</a> apply
+      to them, and a value given in the arguments overrides the default.
+    </p>
+
+    <h3>Never exposed</h3>
+    <p>These commands are never exposed as tools, and <code>mcp save</code> rejects them:</p>
+    <ul>
+      <li><code>mcp</code> (all of it)</li>
+      <li><code>config</code> (all of it)</li>
+      <li><code>web serve-html</code></li>
+      <li><code>demoscene</code> (all of it)</li>
+      <li><code>oauth token</code>, <code>oauth profile add</code> and <code>oauth profile update</code></li>
+    </ul>
+    <div class="info-box">
+      <code>oauth profile delete</code> and the other <code>oauth</code> actions are not in this list, so they can be exposed.
+    </div>
+  </section>
+
+  <!-- SECURITY -->
+  <section id="security">
+    <h2>Security</h2>
+    <ul>
+      <li><strong>Loopback by default.</strong> The server binds <code>127.0.0.1</code>. Pass <code>--host</code> or save
+        a host in a profile to bind somewhere else.</li>
+      <li><strong>No authentication.</strong> Anyone who can reach the port can call every exposed tool. The tools read and
+        write files as the user who runs the server.</li>
+      <li><strong>Host and Origin checks on loopback.</strong> While bound to a loopback address, a request whose
+        <code>Host</code> header is not <code>localhost</code>, <code>127.0.0.1</code> or <code>[::1]</code> gets
+        <code>403 Forbidden</code>. So does a request with an <code>Origin</code> header that is not loopback.</li>
+      <li><strong>Non-loopback binds need <code>--allow-remote</code>.</strong> Without the flag the server refuses to start on
+        another address. With it, a warning is printed to stderr:</li>
+    </ul>
+    <pre style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:1rem;overflow-x:auto;font-size:0.85rem;line-height:1.6;color:#e2e8f0;">Warning: binding to non-loopback address 0.0.0.0; the MCP server has no authentication.</pre>
+    <div class="warning-box">
+      Do not bind a non-loopback address on a network you do not trust. The Host and Origin checks apply only to loopback
+      binds, and the server has no authentication in any case. A tool that times out is cancelled cooperatively; a command
+      that ignores cancellation (such as <code>llm</code> or <code>gpt train</code>) can keep running and writing files.
+    </div>
+  </section>
+
+  <!-- CONNECTING -->
+  <section id="connecting">
+    <h2>Connecting a client</h2>
+    <p>
+      Start a server, then add it to Claude Code as an HTTP MCP server. Use the port of the profile you serve:
+    </p>
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk mcp serve</span>
+    </div>
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">claude mcp add --transport http pbtk http://127.0.0.1:5100/mcp</span>
+    </div>
+    <div class="info-box">
+      <code>pbtk config mcp serve --profile &lt;name&gt;</code> sets the profile that <code>serve</code> uses when you do not
+      pass <code>--profile</code>. <code>--host</code> and <code>--port</code> cannot be configured, and neither can the
+      options of <code>save</code> and <code>delete</code>.
+    </div>
+  </section>
+
+  <!-- COMMAND REFERENCE -->
+  <section id="command-ref">
+    <h2>Command Reference</h2>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Command</th>
+          <th>Required options</th>
+          <th>Optional options</th>
+          <th>Output</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>mcp serve</code></td>
+          <td>&mdash;</td>
+          <td><code>--profile</code> <code>--host</code> <code>--port</code></td>
+          <td>Startup URL and tool list on stdout, one stderr line per tool call</td>
+        </tr>
+        <tr>
+          <td><code>mcp save</code></td>
+          <td><code>--name</code> <code>--include</code></td>
+          <td><code>--host</code> <code>--port</code></td>
+          <td><code>Saved MCP profile '&lt;name&gt;' (N tools)</code></td>
+        </tr>
+        <tr>
+          <td><code>mcp delete</code></td>
+          <td><code>--name</code></td>
+          <td>&mdash;</td>
+          <td><code>Deleted MCP profile '&lt;name&gt;'</code></td>
+        </tr>
+        <tr>
+          <td><code>mcp list</code></td>
+          <td>&mdash;</td>
+          <td>&mdash;</td>
+          <td>Each profile with its entries, host and port</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+</div>
+
+<footer>
+  Pixelbadger Toolkit &mdash; MCP Documentation
+</footer>
+
+</body>
+</html>

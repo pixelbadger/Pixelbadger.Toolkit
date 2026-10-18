@@ -20,7 +20,7 @@ public static class OAuthCommand
 
     private static Command CreateTokenCommand()
     {
-        var command = new Command("token", "Acquire an OAuth access token using Resource Owner Password Credentials");
+        var command = new Command("token", "Acquire an OAuth access token using Resource Owner Password Credentials").ExcludeFromMcp();
 
         var profileOption = new Option<string>("--profile") { Description = "Name of the OAuth profile to use", Required = true };
 
@@ -44,8 +44,9 @@ public static class OAuthCommand
             catch (Exception ex)
             {
                 AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
-                Environment.Exit(1);
+                return 1;
             }
+            return 0;
         });
 
         return command;
@@ -64,7 +65,7 @@ public static class OAuthCommand
 
     private static Command CreateProfileAddCommand()
     {
-        var command = new Command("add", "Add a new OAuth profile");
+        var command = new Command("add", "Add a new OAuth profile").ExcludeFromMcp();
 
         var nameOption = new Option<string>("--name") { Description = "Profile name", Required = true };
         var authorityOption = new Option<string>("--authority") { Description = "OAuth authority URI (e.g. https://login.microsoftonline.com/tenant)", Required = true };
@@ -100,8 +101,9 @@ public static class OAuthCommand
             catch (Exception ex)
             {
                 AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
-                Environment.Exit(1);
+                return 1;
             }
+            return 0;
         });
 
         return command;
@@ -109,7 +111,7 @@ public static class OAuthCommand
 
     private static Command CreateProfileUpdateCommand()
     {
-        var command = new Command("update", "Update an existing OAuth profile");
+        var command = new Command("update", "Update an existing OAuth profile").ExcludeFromMcp();
 
         var nameOption = new Option<string>("--name") { Description = "Profile name to update", Required = true };
         var authorityOption = new Option<string?>("--authority") { Description = "New OAuth authority URI" };
@@ -142,8 +144,9 @@ public static class OAuthCommand
             catch (Exception ex)
             {
                 AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
-                Environment.Exit(1);
+                return 1;
             }
+            return 0;
         });
 
         return command;
@@ -171,8 +174,9 @@ public static class OAuthCommand
             catch (Exception ex)
             {
                 AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
-                Environment.Exit(1);
+                return 1;
             }
+            return 0;
         });
 
         return command;

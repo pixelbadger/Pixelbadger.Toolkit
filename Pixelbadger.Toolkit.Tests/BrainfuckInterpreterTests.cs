@@ -208,4 +208,30 @@ public class BrainfuckInterpreterTests : IDisposable
         // Assert
         result.Should().Be("");
     }
+
+    [Fact]
+    public async Task Execute_ShouldThrowOperationCanceled_WhenTokenCancelledDuringInfiniteLoop()
+    {
+        using var cts = new CancellationTokenSource(100);
+        var program = "+[]";
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+
+        var act = () => Task.Run(() => new BrainfuckInterpreter().Execute(program, cts.Token));
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        watch.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(2));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ShouldThrowOperationCanceled_WhenTokenAlreadyCancelled()
+    {
+        var file = Path.Combine(_testDirectory, "loop.txt");
+        await File.WriteAllTextAsync(file, "+[]");
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        var act = () => new BrainfuckInterpreter().ExecuteAsync(file, cts.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
 }
