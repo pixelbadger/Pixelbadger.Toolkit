@@ -109,6 +109,26 @@ jobs:
             "AbjadifyComponent"
             "ImageSteganography"
             "HomomorphicEncryptionComponent"
+            "StringReverser"
+            "StringReportComponent"
+            "FleschReadingEaseComponent"
+            "OokBrainfuckTranslator"
+            "ImageDisplayComponent"
+            "PixelBuffer"
+            "PlasmaComponent"
+            "FireComponent"
+            "CopperBarsComponent"
+            "KefrensBarsComponent"
+            "BoingBallComponent"
+            "MarkovTrainComponent"
+            "MarkovCompleteComponent"
+            "Tensor"
+            "GptModel"
+            "AdamW"
+            "BpeTokenizer"
+            "CharTokenizer"
+            "GptTrainComponent"
+            "GptCompleteComponent"
           )
 
           CHANGED_BASENAMES=$(git diff origin/master...HEAD --name-only | xargs -I{} basename {} .cs)
@@ -176,6 +196,15 @@ jobs:
           echo "SixLaborsLicenseFile=$RUNNER_TEMP/sixlabors.lic" >> "$GITHUB_ENV"
       - name: Build
         run: dotnet build --no-restore --configuration Release
+      - name: Validate benchmark results
+        run: dotnet run --no-build --configuration Release --project Pixelbadger.Toolkit.Benchmarks -- validate
+      - name: Check benchmark report is up to date
+        run: |
+          dotnet run --no-build --configuration Release --project Pixelbadger.Toolkit.Benchmarks -- report --out "$RUNNER_TEMP/benchmark-report.html"
+          if ! diff -q "$RUNNER_TEMP/benchmark-report.html" docs/benchmark-report.html; then
+            echo "::error::docs/benchmark-report.html is stale. Regenerate it with: dotnet run -c Release --project Pixelbadger.Toolkit.Benchmarks -- report"
+            exit 1
+          fi
       - name: Test
         run: dotnet test --no-build --configuration Release --verbosity normal
       - name: Pack (validation only)

@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "slug": "linux-x64-intel-xeon-2-80ghz-4c-16gb",
+  "fingerprint": {
+    "os": "linux",
+    "osDescription": "Ubuntu 24.04.5 LTS",
+    "arch": "x64",
+    "cpu": "intel-xeon-2-80ghz",
+    "physicalCores": 4,
+    "logicalCores": 4,
+    "memoryGb": 16,
+    "hypervisor": null
+  }
+}
