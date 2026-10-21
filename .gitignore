@@ -492,3 +492,4 @@ test-assets/
 
 # Six Labors (ImageSharp) license file. Never commit it; CI supplies it from a secret.
 sixlabors.lic
+benchmarks/results/**/*.tmp

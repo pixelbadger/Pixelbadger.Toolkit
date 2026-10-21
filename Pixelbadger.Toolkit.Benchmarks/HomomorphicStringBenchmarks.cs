@@ -5,6 +5,7 @@ using Pixelbadger.Toolkit.Models;
 namespace Pixelbadger.Toolkit.Benchmarks;
 
 [MemoryDiagnoser]
+[BenchmarkCategory("slow")]
 public class HomomorphicStringBenchmarks
 {
     private HomomorphicEncryptionComponent _component = null!;
@@ -27,7 +28,6 @@ public class HomomorphicStringBenchmarks
         _encryptedB = _component.Encrypt(7, _publicKey);
     }
 
-    [Params("hello", "hello, world!")]
     public string ShortPlaintext { get; set; } = "hello";
 
     public string LongPlaintext => "The quick brown fox jumps over the lazy dog. Pack my box!";
@@ -91,4 +91,12 @@ public class HomomorphicStringBenchmarks
     [Benchmark]
     public EncryptedNumber MultiplyEncrypted_ByZero() =>
         _component.MultiplyEncrypted(_encryptedA, 0);
+
+    [Benchmark]
+    public EncryptedNumber MultiplyEncrypted_ByScalar() =>
+        _component.MultiplyEncrypted(_encryptedA, 7);
+
+    [Benchmark]
+    public PaillierKeyPair GenerateKey() =>
+        _component.GenerateKey();
 }

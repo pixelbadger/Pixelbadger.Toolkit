@@ -33,6 +33,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Pixelbadger.Toolkit\Pixelbadger.Toolkit.csproj" />
+    <ProjectReference Include="..\Pixelbadger.Toolkit.Benchmarks\Pixelbadger.Toolkit.Benchmarks.csproj" />
   </ItemGroup>
 
   <ItemGroup>

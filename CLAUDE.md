@@ -43,6 +43,7 @@ The project is .NET 10, and uses Microsoft's System.CommandLine library for buil
 - Test-only changes (adding/modifying test files)
 - GitHub Actions workflow changes (`.github/` folder)
 - Repository configuration files (.gitignore, .editorconfig, etc.)
+- Benchmark results and the generated report (`benchmarks/results/`, `docs/benchmark-report.html`) and the Benchmarks project
 
 **Note**: README.md changes DO require version bumps as README files are published with NuGet packages.
 
@@ -64,6 +65,7 @@ The project is .NET 10, and uses Microsoft's System.CommandLine library for buil
 - **Test**: `dotnet test`
 - **Package**: `dotnet pack`
 - **Publish to NuGet**: `dotnet nuget push bin/Release/Pixelbadger.Toolkit.*.nupkg --source https://api.nuget.org/v3/index.json --api-key $NUGET_API_KEY`
+- **Benchmarks**: `dotnet run -c Release --project Pixelbadger.Toolkit.Benchmarks -- run` (standard tier, MediumRun) and `-- run --slow` (Paillier, ShortRun) record results under `benchmarks/results/<device>/<version>/`; `-- report` regenerates `docs/benchmark-report.html`. Follow `.claude/skills/update-benchmarks/SKILL.md` when capturing.
 - **Install as global tool**: `dotnet tool install --global --add-source ./bin/Release Pixelbadger.Toolkit`
 - **Run (from source)**: `dotnet run -- [topic] [action] [options]`
 - **Run (global tool)**: `pbtk [topic] [action] [options]`
