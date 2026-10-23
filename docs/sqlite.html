@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pixelbadger Toolkit — SQLite</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header>
+  <h1>SQLite <span class="badge">sqlite</span></h1>
+  <div class="subtitle">Interactive SQLite tools — browse the schema, run SQL and save or discard changes in a terminal UI</div>
+  <div class="meta">Pixelbadger Toolkit &mdash; <code>pbtk sqlite</code> &mdash; <a href="index.html" style="color:#60a5fa">&#8592; all topics</a></div>
+</header>
+
+<nav>
+  <a href="#tui">tui</a>
+  <a href="#command-ref">Command Reference</a>
+</nav>
+
+<div class="content">
+
+  <!-- TUI -->
+  <section id="tui">
+    <h2>tui</h2>
+    <p>
+      Opens an interactive terminal UI over an existing SQLite database file. The left panel shows a
+      tree of the database's tables and views, which expands to show their columns. The right side has
+      a multi-line query editor on top and a results pane below it. Press <kbd>F5</kbd> or <kbd>Ctrl+E</kbd>
+      to run the editor contents as one batch.
+    </p>
+    <p>
+      The UI runs on the alternate screen and needs an interactive terminal with at least 80&times;24
+      characters. It redraws to the current console size whenever the window is resized. Press
+      <kbd>Ctrl+Q</kbd> or <kbd>Ctrl+C</kbd> to quit.
+    </p>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk sqlite tui</span>
+      <span class="opt"> --db</span> <span class="val">./app.db</span>
+    </div>
+
+    <h3>Layout</h3>
+    <pre style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:1rem;overflow-x:auto;font-size:0.85rem;line-height:1.6;color:#e2e8f0;">+------------------------------+-----------------------------------------+
+| Tables                       | Query                                   |
+|                              |                                         |
+| app.db                       |  SELECT id, name                        |
+|  &#9662; users                     |  FROM users                             |
+|      id INTEGER PK NOT NULL  |  WHERE id &gt; 10_                         |
+|      name TEXT NOT NULL      |                                         |
+|    orders                    +-----------------------------------------+
+|    v_active_users (view)     | Results                                 |
+|                              | 3 row(s) (2 ms)                         |
+|                              | id | name                               |
+|                              | 11 | Ada                                |
+|                              | 12 | NULL                               |
+|                              | 13 | &lt;blob 24 bytes&gt;                     |
++------------------------------+-----------------------------------------+
+| app.db  READ-ONLY  ● UNSAVED CHANGES   F5 run  Ctrl+S save  F8 discard |
++---------------------------------------------------------------------------+</pre>
+
+    <table>
+      <thead><tr><th>Region</th><th>Contents</th></tr></thead>
+      <tbody>
+        <tr><td>Tables (left, 32 columns wide)</td><td>Tree with the database file name as root, then tables (names not starting with <code>sqlite_</code>) and views (suffixed <code>(view)</code>), each sorted by name. Expanding a node lists its columns as <code>name TYPE</code> with <code>PK</code> and <code>NOT NULL</code> markers.</td></tr>
+        <tr><td>Query (top right, about 40% of the height)</td><td>Multi-line SQL editor. Long lines scroll horizontally to keep the cursor visible; lines are not wrapped.</td></tr>
+        <tr><td>Results (bottom right)</td><td>A message line followed by a table of the last result set.</td></tr>
+        <tr><td>Status line (bottom row)</td><td>Database file name, <code>READ-ONLY</code> when the file is not writable, transaction state (<code>● UNSAVED CHANGES</code> or <code>saved</code>), and key hints. Confirmation prompts replace this line.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Key bindings</h3>
+    <table>
+      <thead><tr><th>Area</th><th>Key</th><th>Action</th></tr></thead>
+      <tbody>
+        <tr><td>Global</td><td><kbd>Tab</kbd> / <kbd>Shift+Tab</kbd></td><td>Move focus forward / backward: Tree, Editor, Results</td></tr>
+        <tr><td>Global</td><td><kbd>F5</kbd> or <kbd>Ctrl+E</kbd></td><td>Execute the editor contents</td></tr>
+        <tr><td>Global</td><td><kbd>Ctrl+S</kbd></td><td>Save (commit) unsaved changes</td></tr>
+        <tr><td>Global</td><td><kbd>F8</kbd></td><td>Discard unsaved changes (asks <code>Discard unsaved changes? (y/n)</code>)</td></tr>
+        <tr><td>Global</td><td><kbd>Ctrl+Q</kbd> or <kbd>Ctrl+C</kbd></td><td>Quit. <kbd>Ctrl+C</kbd> is read as a key, not as an interrupt signal.</td></tr>
+        <tr><td>Tree</td><td><kbd>Up</kbd> / <kbd>Down</kbd></td><td>Select the previous / next node</td></tr>
+        <tr><td>Tree</td><td><kbd>Right</kbd> or <kbd>Enter</kbd></td><td>Expand the selected node</td></tr>
+        <tr><td>Tree</td><td><kbd>Left</kbd></td><td>Collapse the selected node; on a column, move to its parent</td></tr>
+        <tr><td>Editor</td><td>Printable characters, including paste</td><td>Insert text</td></tr>
+        <tr><td>Editor</td><td><kbd>Enter</kbd></td><td>Insert a newline</td></tr>
+        <tr><td>Editor</td><td><kbd>Backspace</kbd> / <kbd>Delete</kbd></td><td>Delete a character; at a line edge, join the lines</td></tr>
+        <tr><td>Editor</td><td>Arrows, <kbd>Home</kbd>, <kbd>End</kbd></td><td>Move the cursor</td></tr>
+        <tr><td>Editor</td><td><kbd>PgUp</kbd> / <kbd>PgDn</kbd></td><td>Move by the visible height of the editor</td></tr>
+        <tr><td>Results</td><td><kbd>Up</kbd> / <kbd>Down</kbd>, <kbd>PgUp</kbd> / <kbd>PgDn</kbd></td><td>Scroll rows</td></tr>
+        <tr><td>Results</td><td><kbd>Left</kbd> / <kbd>Right</kbd></td><td>Scroll columns</td></tr>
+        <tr><td>Results</td><td><kbd>Home</kbd></td><td>Go to the first row</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Running SQL</h3>
+    <p>
+      Execute runs the whole editor text as one batch. Empty or whitespace-only text shows
+      <code>Nothing to execute</code>. If a statement fails, the error is shown in red in the results pane
+      and the whole batch has no effect.
+    </p>
+    <p>
+      The results pane shows the last statement that returns columns, with up to <strong>1000 rows</strong>.
+      The message line then reads <code>N row(s) (T ms)</code>, or <code>Showing first 1000 rows (more available) (T ms)</code>
+      when the cap applies. If no statement returns columns, the message line reports
+      <code>N row(s) affected (T ms)</code> instead.
+    </p>
+    <p>
+      <code>NULL</code> values appear as dim <code>NULL</code>. BLOB values appear as
+      <code>&lt;blob N bytes&gt;</code>. Other values are truncated to 40 characters with <code>…</code>.
+    </p>
+
+    <div class="info-box">
+      <strong>Save and the write lock:</strong> the first batch that changes data opens a transaction and
+      holds SQLite's write lock until you save or discard. While the lock is held, other processes that
+      try to write get <code>database is locked</code>. Other processes can still read, and they see the
+      data as it was before your changes. <kbd>Ctrl+S</kbd> commits the transaction, and <kbd>F8</kbd>
+      rolls it back. The status line shows <code>● UNSAVED CHANGES</code> while there are changes waiting to
+      be saved.
+    </div>
+
+    <div class="info-box">
+      <strong>Transaction statements are refused:</strong> the TUI manages transactions itself. If a batch
+      contains <code>BEGIN</code>, <code>COMMIT</code>, <code>END</code>, <code>ROLLBACK</code>,
+      <code>SAVEPOINT</code> or <code>RELEASE</code>, the whole batch is refused without running and the
+      message reads <code>Transactions are managed by the TUI: Ctrl+S saves, F8 discards</code>.
+    </div>
+
+    <h3>Saving, discarding and quitting</h3>
+    <table>
+      <thead><tr><th>Action</th><th>Result</th></tr></thead>
+      <tbody>
+        <tr><td><kbd>Ctrl+S</kbd> with unsaved changes</td><td>Commits the transaction, shows <code>Changes saved</code> and clears the unsaved state. If the commit fails (for example, the database is busy), the error is shown and the changes stay unsaved so you can retry.</td></tr>
+        <tr><td><kbd>Ctrl+S</kbd> with no unsaved changes</td><td>Shows <code>No changes to save</code>.</td></tr>
+        <tr><td><kbd>F8</kbd> and <kbd>y</kbd></td><td>Rolls back the transaction and shows <code>Changes discarded</code>.</td></tr>
+        <tr><td><kbd>F8</kbd> with no unsaved changes</td><td>Shows <code>No changes to discard</code>.</td></tr>
+        <tr><td><kbd>Ctrl+Q</kbd> with no unsaved changes</td><td>Exits immediately.</td></tr>
+        <tr><td><kbd>Ctrl+Q</kbd> with unsaved changes</td><td>Shows the prompt <code>Unsaved changes: [S]ave, [D]iscard, [C]ancel</code>. <kbd>S</kbd> commits and exits (if the commit fails, you stay in the TUI with the error shown). <kbd>D</kbd> rolls back and exits. <kbd>C</kbd> or <kbd>Esc</kbd> returns to the TUI.</td></tr>
+      </tbody>
+    </table>
+
+    <div class="warning-box">
+      <strong>Killing the process loses unsaved changes:</strong> if the process is terminated while there are
+      unsaved changes, nothing from that transaction is persisted. SQLite rolls back the journal. Closing
+      the session also rolls back any unsaved changes.
+    </div>
+
+    <h3>Options</h3>
+    <table>
+      <thead><tr><th>Option</th><th>Required</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--db</code></td><td>Yes</td><td>&mdash;</td><td>Path to an existing SQLite database file</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Opening a database</h3>
+    <p>
+      The database is opened for reading and writing when the file is writable. If it is not writable, the
+      database opens <strong>read-only</strong>: the status line shows <code>READ-ONLY</code>, and any
+      mutating statement fails with the SQLite error in the results pane.
+    </p>
+
+    <div class="warning-box">
+      <strong>Error exits:</strong> the command exits with code <code>1</code>, prints an error line and does
+      not draw the TUI in these cases:
+      <ul style="margin-top:0.5rem">
+        <li>The file does not exist: <code>Error: Database file '&lt;path&gt;' not found</code>. The command never creates a file.</li>
+        <li>The file is not a SQLite database: <code>Error: '&lt;path&gt;' is not a valid SQLite database: &lt;sqlite message&gt;</code></li>
+        <li>Input or output is redirected (no interactive terminal): <code>Error: sqlite tui requires an interactive terminal</code></li>
+      </ul>
+    </div>
+
+    <div class="info-box">
+      <strong>Not available over MCP:</strong> <code>sqlite</code> is an interactive command and is not exposed
+      through <code>pbtk mcp</code>.
+    </div>
+  </section>
+
+  <!-- COMMAND REFERENCE -->
+  <section id="command-ref">
+    <h2>Command Reference</h2>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Command</th>
+          <th>Required options</th>
+          <th>Optional options</th>
+          <th>Output</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>sqlite tui</code></td>
+          <td><code>--db</code></td>
+          <td>None</td>
+          <td>Interactive TUI on the alternate screen; exit 0 on quit, exit 1 on error</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+</div>
+
+<footer>
+  Pixelbadger Toolkit &mdash; SQLite Documentation
+</footer>
+
+</body>
+</html>

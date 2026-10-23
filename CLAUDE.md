@@ -73,6 +73,7 @@ The project is .NET 10, and uses Microsoft's System.CommandLine library for buil
   - `pbtk strings reverse --in-file hello.txt --out-file hello-reversed.txt`
   - `pbtk strings levenshtein-distance --string1 "hello" --string2 "world"`
   - `pbtk images display --file ./ship.png`
+  - `pbtk sqlite tui --db ./app.db`
   - `pbtk interpreters brainfuck --file hello.bf`
   - `pbtk interpreters ook --file hello.ook`
   - `pbtk interpreters bf-to-ook --source hello.bf --output hello.ook`
@@ -296,6 +297,7 @@ Available topics and actions:
 - **interpreters**: brainfuck, ook, bf-to-ook
 - **images**: display, steganography
 - **web**: serve-html
+- **sqlite**: tui
 - **llm**: chat, translate, ocaaar, corpospeak, generate-image, paint, history (list, delete)
 - **oauth**: token, profile (add, update, delete)
 - **crypto**: generate-key, encrypt, decrypt, add, subtract, multiply, encrypt-string, decrypt-string, replace, substring
