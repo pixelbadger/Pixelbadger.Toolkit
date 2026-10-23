@@ -60,6 +60,8 @@ public class McpEntryResolverTests
     [InlineData("demoscene/showcase")]
     [InlineData("web")]
     [InlineData("web/serve-html")]
+    [InlineData("sqlite")]
+    [InlineData("sqlite/tui")]
     [InlineData("oauth/token")]
     [InlineData("oauth/profile/add")]
     [InlineData("oauth/profile/update")]

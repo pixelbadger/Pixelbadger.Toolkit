@@ -77,6 +77,7 @@ public class McpSaveComponentTests : IDisposable
     [InlineData("config")]
     [InlineData("demoscene")]
     [InlineData("web/serve-html")]
+    [InlineData("sqlite")]
     [InlineData("oauth/token")]
     [InlineData("mcp")]
     [InlineData("nosuch")]
