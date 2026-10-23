@@ -42,23 +42,33 @@
     </div>
 
     <h3>Layout</h3>
-    <pre style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:1rem;overflow-x:auto;font-size:0.85rem;line-height:1.6;color:#e2e8f0;">+------------------------------+-----------------------------------------+
-| Tables                       | Query                                   |
-|                              |                                         |
-| app.db                       |  SELECT id, name                        |
-|  &#9662; users                     |  FROM users                             |
-|      id INTEGER PK NOT NULL  |  WHERE id &gt; 10_                         |
-|      name TEXT NOT NULL      |                                         |
-|    orders                    +-----------------------------------------+
-|    v_active_users (view)     | Results                                 |
-|                              | 3 row(s) (2 ms)                         |
-|                              | id | name                               |
-|                              | 11 | Ada                                |
-|                              | 12 | NULL                               |
-|                              | 13 | &lt;blob 24 bytes&gt;                     |
-+------------------------------+-----------------------------------------+
-| app.db  READ-ONLY  ● UNSAVED CHANGES   F5 run  Ctrl+S save  F8 discard |
-+---------------------------------------------------------------------------+</pre>
+    <pre style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:1rem;overflow-x:auto;font-size:0.85rem;line-height:1.6;color:#e2e8f0;">╭─Tables───────────────────────╮╭─Query────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ app.db                       ││ SELECT id, name, email, avatar FROM users ORDER BY id                                                    │
+│ ├── ▸ big                    ││                                                                                                          │
+│ ├── ▸ orders                 ││                                                                                                          │
+│ ├── ▸ users                  ││                                                                                                          │
+│ └── ▸ v_named (view)         ││                                                                                                          │
+│                              ││                                                                                                          │
+│                              ││                                                                                                          │
+│                              ││                                                                                                          │
+│                              ││                                                                                                          │
+│                              ││                                                                                                          │
+│                              ││                                                                                                          │
+│                              ││                                                                                                          │
+│                              ││                                                                                                          │
+│                              ││                                                                                                          │
+│                              │╰──────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+│                              │╭─Results──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                              ││ 3 rows (6 ms)                                                                                            │
+│                              ││ ╭────┬──────────────┬──────────────────────────────────────────┬─────────────────╮                       │
+│                              ││ │ id │ name         │ email                                    │ avatar          │                       │
+│                              ││ ├────┼──────────────┼──────────────────────────────────────────┼─────────────────┤                       │
+│                              ││ │ 1  │ Ada Lovelace │ ada@example.com                          │ NULL            │                       │
+│                              ││ │ 2  │ Grace Hopper │ NULL                                     │ &lt;blob 24 bytes&gt; │                       │
+│                              ││ │ 3  │ Alan Turing  │ alan.turing.with.a.very.long.address@ex… │ NULL            │                       │
+│                              ││ ╰────┴──────────────┴──────────────────────────────────────────┴─────────────────╯                       │
+app.db │ saved │ Tab focus · F5 run · Ctrl+S save · F8 discard · Ctrl+Q quit</pre>
+    <p>Captured from a 140×40 terminal after running a query; the focused panel's border is highlighted.</p>
 
     <table>
       <thead><tr><th>Region</th><th>Contents</th></tr></thead>
