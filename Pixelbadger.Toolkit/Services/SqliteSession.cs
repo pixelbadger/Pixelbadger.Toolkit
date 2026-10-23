@@ -174,6 +174,7 @@ public sealed class SqliteSession : ISqliteSession
             if (Handle.AutoCommit)
                 Exec("BEGIN");
             Exec("SAVEPOINT pbtk_batch");
+            var changesBefore = raw.sqlite3_total_changes(Handle.Raw);
 
             using (var cmd = CreateCommand(sql))
             using (var reader = cmd.ExecuteReader())
@@ -204,8 +205,10 @@ public sealed class SqliteSession : ISqliteSession
                     while (reader.Read()) { }
                 } while (reader.NextResult());
 
-                affected = Math.Max(0, reader.RecordsAffected);
             }
+
+            // total_changes is unaffected by DDL/PRAGMA, unlike the per-statement count behind RecordsAffected.
+            affected = Math.Max(0, raw.sqlite3_total_changes(Handle.Raw) - changesBefore);
 
             Exec("RELEASE pbtk_batch");
         }
@@ -239,6 +242,9 @@ public sealed class SqliteSession : ISqliteSession
         }
         catch (SqliteException ex)
         {
+            // SQLite may already have ended the transaction (e.g. auto-rollback); nothing is left to save or discard.
+            if (Handle.AutoCommit)
+                _dirty = false;
             return new SessionActionResult(false, ex.Message);
         }
     }
@@ -255,6 +261,9 @@ public sealed class SqliteSession : ISqliteSession
         }
         catch (SqliteException ex)
         {
+            // SQLite may already have ended the transaction (e.g. auto-rollback); nothing is left to save or discard.
+            if (Handle.AutoCommit)
+                _dirty = false;
             return new SessionActionResult(false, ex.Message);
         }
     }
@@ -394,6 +403,12 @@ public sealed class SqliteSession : ISqliteSession
             }
             else if (c == ';')
             {
+                if (IsOpenTrigger(current.ToString()))
+                {
+                    current.Append(c);
+                    i++;
+                    continue;
+                }
                 yield return current.ToString();
                 current.Clear();
                 i++;
@@ -405,6 +420,58 @@ public sealed class SqliteSession : ISqliteSession
             }
         }
         yield return current.ToString();
+    }
+
+    // True while text is a CREATE [TEMP|TEMPORARY] TRIGGER whose BEGIN ... END body has not closed yet.
+    private static bool IsOpenTrigger(string text)
+    {
+        var words = new List<string>();
+        var i = 0;
+        while (i < text.Length)
+        {
+            var c = text[i];
+            if (c is '\'' or '"' or '`' or '[')
+            {
+                var close = c == '[' ? ']' : c;
+                i++;
+                while (i < text.Length && text[i] != close) i++;
+                i++;
+            }
+            else if (char.IsLetterOrDigit(c) || c == '_')
+            {
+                var start = i;
+                while (i < text.Length && (char.IsLetterOrDigit(text[i]) || text[i] == '_')) i++;
+                words.Add(text[start..i]);
+            }
+            else
+                i++;
+        }
+
+        bool Is(int index, string word) => index < words.Count && words[index].Equals(word, StringComparison.OrdinalIgnoreCase);
+        if (!Is(0, "CREATE"))
+            return false;
+        var next = Is(1, "TEMP") || Is(1, "TEMPORARY") ? 2 : 1;
+        if (!Is(next, "TRIGGER"))
+            return false;
+
+        var begun = false;
+        var caseDepth = 0;
+        for (var w = next + 1; w < words.Count; w++)
+        {
+            if (!begun)
+            {
+                begun = Is(w, "BEGIN");
+            }
+            else if (Is(w, "CASE"))
+                caseDepth++;
+            else if (Is(w, "END"))
+            {
+                if (caseDepth == 0)
+                    return false;
+                caseDepth--;
+            }
+        }
+        return begun;
     }
 
     // First keyword of a statement after leading whitespace and comments; null when there is none.
