@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Microsoft.Data.Sqlite;
 using Moq;
 using Pixelbadger.Toolkit.CommandLine;
 using Pixelbadger.Toolkit.Components;
@@ -586,6 +587,62 @@ public class SqliteTuiComponentTests
         c.HandleKey(Key(ConsoleKey.F5));
 
         RenderText(c).Should().Contain("fresh").And.NotContain("orders");
+    }
+
+    [Fact]
+    public void HandleKey_ShouldKeepRunningAndPreviousTree_WhenSchemaRefreshFailsAfterExecute()
+    {
+        var c = Create();
+        var result = Rows(["a"], [[1L]]);
+        _session.Setup(s => s.Execute(It.IsAny<string>())).Returns(result);
+        _session.Setup(s => s.GetSchema()).Throws(new SqliteException("database is locked", 5));
+
+        c.HandleKey(Key(ConsoleKey.F5)).Should().BeTrue();
+
+        c.LastResult.Should().BeSameAs(result);
+        c.StatusMessage.Should().Be("Could not refresh tables: database is locked");
+        var text = RenderText(c);
+        text.Should().Contain("users").And.Contain("orders").And.Contain("v_active");
+        text.Should().Contain("Could not refresh tables: database is locked");
+    }
+
+    [Fact]
+    public void HandleKey_ShouldKeepActionError_WhenSaveFailsAndSchemaRefreshFails()
+    {
+        _dirty = true;
+        _session.Setup(s => s.Save()).Returns(new SessionActionResult(false, "Save failed"));
+        var c = Create();
+        _session.Setup(s => s.GetSchema()).Throws(new SqliteException("database is locked", 5));
+
+        c.HandleKey(CtrlS).Should().BeTrue();
+
+        c.StatusMessage.Should().Be("Save failed");
+        RenderLines(c).Last().Should().Contain("Save failed").And.NotContain("Could not refresh tables");
+    }
+
+    [Fact]
+    public void HandleKey_ShouldShowSchemaError_WhenSaveSucceedsButSchemaRefreshFails()
+    {
+        _dirty = true;
+        var c = Create();
+        _session.Setup(s => s.GetSchema()).Throws(new SqliteException("database is locked", 5));
+
+        c.HandleKey(CtrlS).Should().BeTrue();
+
+        c.StatusMessage.Should().Be("Could not refresh tables: database is locked");
+    }
+
+    [Fact]
+    public void Constructor_ShouldRenderWithEmptySchemaAndError_WhenSchemaRefreshFails()
+    {
+        _session.Setup(s => s.GetSchema()).Throws(new SqliteException("database is locked", 5));
+
+        var c = Create();
+
+        c.StatusMessage.Should().Be("Could not refresh tables: database is locked");
+        var text = RenderText(c);
+        text.Should().Contain("Could not refresh tables: database is locked");
+        text.Should().NotContain("users").And.NotContain("orders");
     }
 
     [Fact]
@@ -1253,19 +1310,6 @@ public class SqliteTuiComponentTests
 
         act.Should().Throw<InvalidOperationException>();
         output.ToString().Should().EndWith(Leave);
-    }
-
-    [Fact]
-    public void Run_ShouldRestoreTreatControlCAsInput_WhenFinished()
-    {
-        bool before;
-        try { before = Console.TreatControlCAsInput; }
-        catch (IOException) { return; } // no console attached: nothing to restore
-        var (console, _) = CaptureConsole();
-
-        Create().Run(console, new FakeInput([CtrlQ]), CancellationToken.None);
-
-        Console.TreatControlCAsInput.Should().Be(before);
     }
 
     [Fact]

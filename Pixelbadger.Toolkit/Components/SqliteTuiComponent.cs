@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using Microsoft.Data.Sqlite;
 using Pixelbadger.Toolkit.Services;
 using Spectre.Console;
 using Spectre.Console.Rendering;
@@ -236,7 +237,19 @@ public sealed class SqliteTuiComponent
             : null;
         int previousIndex = _selected;
 
-        _schema = _session.GetSchema();
+        IReadOnlyList<SchemaObject> schema;
+        try
+        {
+            schema = _session.GetSchema();
+        }
+        catch (SqliteException ex)
+        {
+            // A transient failure (e.g. another process holds a lock) must not end the TUI: keep the previous tree.
+            ShowSchemaRefreshFailure(ex);
+            return;
+        }
+
+        _schema = schema;
         _expanded.IntersectWith(_schema.Select(ObjectKey));
         _rows = BuildRows();
 
@@ -256,6 +269,14 @@ public sealed class SqliteTuiComponent
             }
         }
         _selected = found >= 0 ? found : Math.Clamp(previousIndex, 0, Math.Max(0, _rows.Count - 1));
+    }
+
+    // The action's own error wins; the schema error only replaces an empty or success status line.
+    private void ShowSchemaRefreshFailure(SqliteException ex)
+    {
+        if (StatusMessage is not null && _statusIsError) return;
+        StatusMessage = $"Could not refresh tables: {ex.Message}";
+        _statusIsError = true;
     }
 
     private int IndexOfObject(SchemaObject o)

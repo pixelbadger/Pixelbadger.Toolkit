@@ -558,6 +558,95 @@ public class SqliteSessionTests : IDisposable
         session.HasUnsavedChanges.Should().BeFalse();
     }
 
+    // ---- Regressions: RowsAffected, CREATE TRIGGER, failed COMMIT/ROLLBACK ----
+
+    [Fact]
+    public void Execute_ShouldCountOnlyDml_WhenDdlFollowsDmlInBatch()
+    {
+        var session = Open();
+        session.Execute("INSERT INTO items VALUES (3,'c'),(4,'d')");
+
+        var result = session.Execute("INSERT INTO items SELECT id + 10, name FROM items; CREATE TABLE z(y)");
+
+        result.Outcome.Should().Be(QueryOutcome.RowsAffected);
+        result.RowsAffected.Should().Be(4);
+    }
+
+    [Fact]
+    public void Execute_ShouldReportZeroAffected_WhenCreateTableFollowsEarlierDml()
+    {
+        var session = Open();
+        session.Execute("INSERT INTO items VALUES (3,'c')");
+
+        var result = session.Execute("CREATE TABLE zz(a)");
+
+        result.Outcome.Should().Be(QueryOutcome.RowsAffected);
+        result.RowsAffected.Should().Be(0);
+    }
+
+    [Fact]
+    public void Execute_ShouldReportZeroAffected_WhenPragmaFollowsEarlierDml()
+    {
+        var session = Open();
+        session.Execute("INSERT INTO items VALUES (3,'c')");
+
+        var result = session.Execute("PRAGMA user_version=3");
+
+        result.Outcome.Should().Be(QueryOutcome.RowsAffected);
+        result.RowsAffected.Should().Be(0);
+    }
+
+    [Fact]
+    public void Execute_ShouldSumAffected_WhenBatchIsPureMultiStatementDml()
+    {
+        var session = Open();
+
+        var result = session.Execute("INSERT INTO items VALUES (3,'c'),(4,'d'); UPDATE items SET name='x' WHERE id <= 2; DELETE FROM items WHERE id = 4");
+
+        result.RowsAffected.Should().Be(5);
+    }
+
+    [Fact]
+    public void Execute_ShouldCreateWorkingTrigger_WhenTriggerDependsOnTablesCreatedInSameBatch()
+    {
+        var session = Open();
+
+        var result = session.Execute("create table q(a); create table u(x); create trigger tr after insert on q begin insert into u values(1); end;");
+
+        result.Outcome.Should().Be(QueryOutcome.RowsAffected);
+        session.HasUnsavedChanges.Should().BeTrue();
+        session.Execute("insert into q values(5)").Outcome.Should().Be(QueryOutcome.RowsAffected);
+        session.Execute("select count(*) from u").Rows[0][0].Should().Be(1L);
+    }
+
+    [Fact]
+    public void Execute_ShouldNotEndTriggerEarly_WhenBodyContainsCaseExpression()
+    {
+        var session = Open();
+
+        var result = session.Execute(
+            "create table q(a); create table u(x); " +
+            "create trigger tr after insert on q begin insert into u values(case when new.a > 1 then 'big' else 'small' end); end;");
+
+        result.Outcome.Should().Be(QueryOutcome.RowsAffected);
+        session.Execute("insert into q values(5)");
+        session.Execute("select x from u").Rows[0][0].Should().Be("big");
+    }
+
+    [Theory]
+    [InlineData("create table q2(a); BEGIN;")]
+    [InlineData("create table q3(a); END;")]
+    public void Execute_ShouldRefuse_WhenTransactionControlFollowsDependentDdl(string sql)
+    {
+        var session = Open();
+
+        var result = session.Execute(sql);
+
+        result.Outcome.Should().Be(QueryOutcome.Refused);
+        result.Message.Should().Be(RefusedMessage);
+        session.HasUnsavedChanges.Should().BeFalse();
+    }
+
     // ---- Dispose ----
 
     [Fact]
