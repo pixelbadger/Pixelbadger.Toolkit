@@ -440,6 +440,104 @@ public class SqliteTuiComponentTests
         RenderLines(c, 80, 24).Should().HaveCount(24);
     }
 
+    [Fact]
+    public void Render_ShouldShowFullRefusalAcrossTwoLines_WhenMessageExceedsPaneWidth()
+    {
+        const string message = "VACUUM, ATTACH, DETACH, PRAGMA journal_mode and PRAGMA foreign_keys cannot run inside the TUI's transaction";
+        _session.Setup(s => s.Execute(It.IsAny<string>())).Returns(Other(QueryOutcome.Refused, message: message));
+        var c = Create();
+        c.HandleKey(Key(ConsoleKey.F5));
+
+        var text = RenderText(c, 140, 40);
+
+        text.Should().NotContain("…");
+        text.Should().Contain("VACUUM, ATTACH, DETACH, PRAGMA journal_mode and PRAGMA foreign_keys cannot run inside the TUI's");
+        text.Should().Contain("│ transaction ");
+        RenderLines(c, 140, 40).Should().HaveCount(40);
+    }
+
+    [Fact]
+    public void Render_ShouldWrapErrorInRed_WhenErrorIsLongAt80x24()
+    {
+        const string message = "SQLite Error 1: 'no such column: definitely_missing_column_name in the select list of this statement'.";
+        _session.Setup(s => s.Execute(It.IsAny<string>())).Returns(Other(QueryOutcome.Error, message: message));
+        var c = Create();
+        c.HandleKey(Key(ConsoleKey.F5));
+
+        var text = RenderText(c, 80, 24);
+
+        foreach (var word in message.Split(' ')) text.Should().Contain(word);
+        text.Should().NotContain("…");
+        text.Split('\n').Count(l => l.Contains("SQLite") || l.Contains("statement") || l.Contains("select list")).Should().BeGreaterThan(1);
+        RenderLines(c, 80, 24).Should().HaveCount(24);
+
+        var ansi = new StringWriter();
+        var console = AnsiConsole.Create(new AnsiConsoleSettings
+        {
+            Ansi = AnsiSupport.Yes,
+            ColorSystem = ColorSystemSupport.Standard,
+            Out = new AnsiConsoleOutput(ansi)
+        });
+        console.Profile.Width = 80;
+        console.Write(c.Render(80, 24));
+        ansi.ToString().Should().Contain("\u001b[91mlist of this statement");
+    }
+
+    [Fact]
+    public void Render_ShouldKeepLineBreak_WhenMessageContainsNewline()
+    {
+        _session.Setup(s => s.Execute(It.IsAny<string>()))
+            .Returns(Other(QueryOutcome.Error, message: "first part\nsecond part"));
+        var c = Create();
+        c.HandleKey(Key(ConsoleKey.F5));
+
+        var lines = RenderLines(c);
+
+        lines.Should().Contain(l => l.Contains("first part") && !l.Contains("second part"));
+        lines.Should().Contain(l => l.Contains("second part") && !l.Contains("first part"));
+    }
+
+    [Fact]
+    public void HandleKey_ShouldReachLastRowAndRenderHeader_WhenLongMessageAccompaniesResultSet()
+    {
+        var rows = Enumerable.Range(0, 50).Select(i => new object?[] { (long)i }).ToArray();
+        _session.Setup(s => s.Execute(It.IsAny<string>())).Returns(Rows(["idcol"], rows, truncated: true));
+        var c = Create();
+        c.HandleKey(Key(ConsoleKey.F5));
+        c.Focus.Should().Be(TuiFocus.Editor);
+        Run(c, Key(ConsoleKey.Tab, '\t'));
+        c.Focus.Should().Be(TuiFocus.Results);
+
+        var before = RenderLines(c, 80, 24);
+        var msgIdx = Array.FindIndex(before, l => l.Contains("Showing first"));
+        var headerIdx = Array.FindIndex(before, l => l.Contains("idcol"));
+        msgIdx.Should().BeGreaterThan(-1);
+        headerIdx.Should().BeGreaterThan(msgIdx);
+
+        for (int i = 0; i < 10; i++) c.HandleKey(Key(ConsoleKey.PageDown));
+        RenderText(c, 80, 24).Should().Contain(" 49 ");
+        RenderLines(c, 80, 24).Should().HaveCount(24);
+    }
+
+    [Fact]
+    public void Render_ShouldEndWithEllipsisAndKeepHeight_WhenMessageTallerThanPane()
+    {
+        var message = string.Join("\n", Enumerable.Range(0, 60).Select(i => $"line{i:D2}"));
+        _session.Setup(s => s.Execute(It.IsAny<string>())).Returns(Other(QueryOutcome.Error, message: message));
+        var c = Create();
+        c.HandleKey(Key(ConsoleKey.F5));
+
+        var lines = RenderLines(c, 80, 24);
+        var text = string.Join("\n", lines);
+
+        lines.Should().HaveCount(24);
+        text.Should().Contain("line00");
+        text.Should().NotContain("line59");
+        text.Should().Contain("…");
+        lines.Count(l => l.Contains("…")).Should().Be(1);
+        lines.Single(l => l.Contains("…")).Should().MatchRegex("line\\d\\d…");
+    }
+
     // ---------------------------------------------------------------- focus
 
     [Fact]

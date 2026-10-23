@@ -371,21 +371,23 @@ public sealed class SqliteTuiComponent
 
     // ---------------------------------------------------------------- rendering
 
-    private sealed record Layout(int BodyHeight, int QueryHeight, int ResultsHeight, int RightWidth)
+    private sealed record Layout(int BodyHeight, int QueryHeight, int ResultsHeight, int RightWidth, int MessageLines)
     {
         public int EditorRows => Math.Max(1, QueryHeight - 2);
         public int EditorColumns => Math.Max(1, RightWidth - 4);
-        public int ResultRows => Math.Max(1, ResultsHeight - 2 - 1 - 4);
+        public int ResultRows => Math.Max(1, ResultsHeight - 2 - 1 - 4 - Math.Max(0, MessageLines - 1));
         public int TreeRows => Math.Max(1, BodyHeight - 2 - 1);
     }
 
     private Layout GetLayout() => ComputeLayout(_width, _height);
 
-    private static Layout ComputeLayout(int width, int height)
+    private Layout ComputeLayout(int width, int height)
     {
         int body = Math.Max(1, height - 1);
         int query = Math.Max(6, (int)Math.Round(body * 0.4));
-        return new Layout(body, query, body - query, Math.Max(1, width - TreeWidth));
+        int rightWidth = Math.Max(1, width - TreeWidth);
+        int messageLines = WrapMessage(Math.Max(1, rightWidth - 4)).Lines.Count;
+        return new Layout(body, query, body - query, rightWidth, messageLines);
     }
 
     public IRenderable Render(int width, int height)
@@ -522,7 +524,19 @@ public sealed class SqliteTuiComponent
     {
         bool focused = Focus == TuiFocus.Results;
         int inner = layout.RightWidth - 4;
-        var items = new List<IRenderable> { new Markup(ResultMessage(inner)) { Overflow = Overflow.Crop } };
+        var items = new List<IRenderable>();
+        var (messageLines, color) = WrapMessage(inner);
+        int maxLines = Math.Max(1, layout.ResultsHeight - 2);
+        if (messageLines.Count > maxLines)
+        {
+            messageLines = messageLines.Take(maxLines).ToList();
+            messageLines[^1] = Clip(messageLines[^1] + "…", inner, keepEllipsis: true);
+        }
+        if (messageLines.Count > 0)
+        {
+            string text = string.Join("\n", messageLines.Select(Markup.Escape));
+            items.Add(new Markup(color is null ? text : $"[{color}]{text}[/]") { Overflow = Overflow.Crop });
+        }
 
         if (LastResult is { Outcome: QueryOutcome.ResultSet } result && result.Columns.Count > 0)
             items.Add(BuildTable(result, layout.ResultRows, inner));
@@ -530,25 +544,65 @@ public sealed class SqliteTuiComponent
         return MakePanel(new Rows(items), "Results", focused, layout.RightWidth, layout.ResultsHeight);
     }
 
-    private string ResultMessage(int width)
+    private (List<string> Lines, string? Color) WrapMessage(int width)
     {
-        if (LastResult is null) return string.Empty;
+        if (LastResult is null) return ([], null);
         var r = LastResult;
         long ms = (long)r.Elapsed.TotalMilliseconds;
+        string text;
+        string? color = null;
         switch (r.Outcome)
         {
             case QueryOutcome.ResultSet:
-                string text = r.Truncated
+                text = r.Truncated
                     ? $"Showing first {r.Rows.Count} rows (more available) ({ms} ms)"
                     : $"{r.Rows.Count} {(r.Rows.Count == 1 ? "row" : "rows")} ({ms} ms)";
-                return Markup.Escape(Clip(text, width));
+                break;
             case QueryOutcome.RowsAffected:
-                return Markup.Escape(Clip($"{r.RowsAffected} {(r.RowsAffected == 1 ? "row" : "rows")} affected ({ms} ms)", width));
+                text = $"{r.RowsAffected} {(r.RowsAffected == 1 ? "row" : "rows")} affected ({ms} ms)";
+                break;
             case QueryOutcome.Error:
-                return "[red]" + Markup.Escape(Clip(OneLine(r.Message ?? "Error"), width)) + "[/]";
+                text = r.Message ?? "Error";
+                color = "red";
+                break;
             default:
-                return "[yellow]" + Markup.Escape(Clip(OneLine(r.Message ?? string.Empty), width)) + "[/]";
+                text = r.Message ?? string.Empty;
+                color = "yellow";
+                break;
         }
+        return (WordWrap(text, width), color);
+    }
+
+    private static List<string> WordWrap(string text, int width)
+    {
+        width = Math.Max(1, width);
+        var lines = new List<string>();
+        foreach (var paragraph in text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n'))
+        {
+            var current = new StringBuilder();
+            foreach (var word in paragraph.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            {
+                string w = word;
+                if (current.Length > 0 && current.Length + 1 + w.Length <= width)
+                {
+                    current.Append(' ').Append(w);
+                    continue;
+                }
+                if (current.Length > 0)
+                {
+                    lines.Add(current.ToString());
+                    current.Clear();
+                }
+                while (w.Length > width)
+                {
+                    lines.Add(w[..width]);
+                    w = w[width..];
+                }
+                current.Append(w);
+            }
+            lines.Add(current.ToString());
+        }
+        return lines;
     }
 
     private IRenderable BuildTable(QueryResult result, int visibleRows, int available)
@@ -636,8 +690,9 @@ public sealed class SqliteTuiComponent
 
     private static string OneLine(string s) => s.Replace("\r\n", " ").Replace('\n', ' ').Replace('\r', ' ');
 
-    private static string Clip(string s, int width)
+    private static string Clip(string s, int width, bool keepEllipsis = false)
     {
+        if (keepEllipsis && s.EndsWith('…') && s.Length > width) return s[..(width - 1)] + "…";
         if (width <= 0) return string.Empty;
         if (s.Length <= width) return s;
         return width == 1 ? "…" : s[..(width - 1)] + "…";
