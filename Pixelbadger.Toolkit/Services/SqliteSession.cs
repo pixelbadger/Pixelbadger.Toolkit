@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Text;
 using Microsoft.Data.Sqlite;
 using SQLitePCL;
 
@@ -21,10 +20,8 @@ public sealed class SqliteSession : ISqliteSession
 
     private const string RefusedMessage = "Transactions are managed by the TUI: Ctrl+S saves, F8 discards";
 
-    private static readonly HashSet<string> TransactionKeywords = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "BEGIN", "COMMIT", "END", "ROLLBACK", "SAVEPOINT", "RELEASE"
-    };
+    private const string IncompatibleMessage =
+        "Refused: VACUUM, ATTACH, DETACH and PRAGMA journal_mode/foreign_keys changes cannot run inside the TUI's transaction";
 
     private readonly SqliteConnection _connection;
     private readonly int _timeoutSeconds;
@@ -157,11 +154,13 @@ public sealed class SqliteSession : ISqliteSession
     {
         var stopwatch = Stopwatch.StartNew();
 
-        var plan = Classify(sql);
+        var plan = SqliteStatementClassifier.Classify(RawHandle, sql);
         if (plan.Statements == 0)
             return Result(QueryOutcome.NothingToExecute, stopwatch, message: "Nothing to execute");
         if (plan.HasTransactionControl)
             return Result(QueryOutcome.Refused, stopwatch, message: RefusedMessage);
+        if (plan.HasTransactionIncompatible)
+            return Result(QueryOutcome.Refused, stopwatch, message: IncompatibleMessage);
 
         var columns = new List<string>();
         var rows = new List<IReadOnlyList<object?>>();
@@ -171,10 +170,10 @@ public sealed class SqliteSession : ISqliteSession
 
         try
         {
-            if (Handle.AutoCommit)
+            if (AutoCommit)
                 Exec("BEGIN");
             Exec("SAVEPOINT pbtk_batch");
-            var changesBefore = raw.sqlite3_total_changes(Handle.Raw);
+            var changesBefore = raw.sqlite3_total_changes(RawHandle);
 
             using (var cmd = CreateCommand(sql))
             using (var reader = cmd.ExecuteReader())
@@ -208,7 +207,7 @@ public sealed class SqliteSession : ISqliteSession
             }
 
             // total_changes is unaffected by DDL/PRAGMA, unlike the per-statement count behind RecordsAffected.
-            affected = Math.Max(0, raw.sqlite3_total_changes(Handle.Raw) - changesBefore);
+            affected = Math.Max(0, raw.sqlite3_total_changes(RawHandle) - changesBefore);
 
             Exec("RELEASE pbtk_batch");
         }
@@ -216,7 +215,7 @@ public sealed class SqliteSession : ISqliteSession
         {
             RollBackBatch();
             // An error such as SQLITE_FULL can roll the whole transaction back by itself.
-            if (Handle.AutoCommit)
+            if (AutoCommit)
                 _dirty = false;
             EndReadTransactionIfClean();
             return Result(QueryOutcome.Error, stopwatch, message: ex.Message);
@@ -243,7 +242,7 @@ public sealed class SqliteSession : ISqliteSession
         catch (SqliteException ex)
         {
             // SQLite may already have ended the transaction (e.g. auto-rollback); nothing is left to save or discard.
-            if (Handle.AutoCommit)
+            if (AutoCommit)
                 _dirty = false;
             return new SessionActionResult(false, ex.Message);
         }
@@ -262,7 +261,7 @@ public sealed class SqliteSession : ISqliteSession
         catch (SqliteException ex)
         {
             // SQLite may already have ended the transaction (e.g. auto-rollback); nothing is left to save or discard.
-            if (Handle.AutoCommit)
+            if (AutoCommit)
                 _dirty = false;
             return new SessionActionResult(false, ex.Message);
         }
@@ -282,224 +281,8 @@ public sealed class SqliteSession : ISqliteSession
         _connection.Dispose();
     }
 
-    private sealed record BatchPlan(int Statements, bool HasTransactionControl, bool HasWrite);
-
-    private sealed class HandleView(SqliteConnection connection)
-    {
-        public sqlite3 Raw => connection.Handle!;
-        public bool AutoCommit => raw.sqlite3_get_autocommit(Raw) != 0;
-    }
-
-    private HandleView Handle => new(_connection);
-
-    // Splits the batch with sqlite3_prepare_v2 so statements are classified exactly as SQLite parses them.
-    // A statement that cannot be prepared (typically it depends on an object created earlier in the
-    // same batch) switches to a lexical scan of the remaining text and counts as writing.
-    private BatchPlan Classify(string sql)
-    {
-        var raw_ = Handle.Raw;
-        var statements = 0;
-        var control = false;
-        var write = false;
-        var remaining = sql;
-
-        while (remaining.Length > 0)
-        {
-            sqlite3_stmt? stmt = null;
-            try
-            {
-                var rc = raw.sqlite3_prepare_v2(raw_, remaining, out stmt, out var tail);
-                if (rc != raw.SQLITE_OK)
-                {
-                    var (count, scanControl) = ScanLexically(remaining);
-                    if (count == 0)
-                        break;
-                    return new BatchPlan(statements + count, control || scanControl, true);
-                }
-
-                tail ??= "";
-                if (stmt is not null && !stmt.IsInvalid)
-                {
-                    statements++;
-                    var consumed = remaining[..(remaining.Length - tail.Length)];
-                    var keyword = FirstKeyword(consumed);
-                    if (keyword is not null && TransactionKeywords.Contains(keyword))
-                        control = true;
-                    if (raw.sqlite3_stmt_readonly(stmt) == 0)
-                        write = true;
-                }
-
-                if (tail.Length >= remaining.Length)
-                    break;
-                remaining = tail;
-            }
-            finally
-            {
-                if (stmt is not null && !stmt.IsInvalid)
-                    raw.sqlite3_finalize(stmt);
-            }
-        }
-
-        return new BatchPlan(statements, control, write);
-    }
-
-    private static (int Count, bool Control) ScanLexically(string text)
-    {
-        var count = 0;
-        var control = false;
-        foreach (var piece in SplitStatements(text))
-        {
-            var keyword = FirstKeyword(piece);
-            if (keyword is null)
-                continue;
-            count++;
-            if (TransactionKeywords.Contains(keyword))
-                control = true;
-        }
-        return (count, control);
-    }
-
-    // Splits on ';' outside '...', "...", [...], `...` and comments; comments stay out of the pieces.
-    private static IEnumerable<string> SplitStatements(string text)
-    {
-        var current = new StringBuilder();
-        var i = 0;
-        while (i < text.Length)
-        {
-            var c = text[i];
-            if (c == '-' && i + 1 < text.Length && text[i + 1] == '-')
-            {
-                while (i < text.Length && text[i] != '\n') i++;
-                current.Append(' ');
-            }
-            else if (c == '/' && i + 1 < text.Length && text[i + 1] == '*')
-            {
-                var end = text.IndexOf("*/", i + 2, StringComparison.Ordinal);
-                i = end < 0 ? text.Length : end + 2;
-                current.Append(' ');
-            }
-            else if (c is '\'' or '"' or '`' or '[')
-            {
-                var close = c == '[' ? ']' : c;
-                current.Append(c);
-                i++;
-                while (i < text.Length)
-                {
-                    current.Append(text[i]);
-                    if (text[i] == close)
-                    {
-                        // A doubled quote is an escaped quote, not the end.
-                        if (close != ']' && i + 1 < text.Length && text[i + 1] == close)
-                        {
-                            current.Append(text[i + 1]);
-                            i += 2;
-                            continue;
-                        }
-                        i++;
-                        break;
-                    }
-                    i++;
-                }
-            }
-            else if (c == ';')
-            {
-                if (IsOpenTrigger(current.ToString()))
-                {
-                    current.Append(c);
-                    i++;
-                    continue;
-                }
-                yield return current.ToString();
-                current.Clear();
-                i++;
-            }
-            else
-            {
-                current.Append(c);
-                i++;
-            }
-        }
-        yield return current.ToString();
-    }
-
-    // True while text is a CREATE [TEMP|TEMPORARY] TRIGGER whose BEGIN ... END body has not closed yet.
-    private static bool IsOpenTrigger(string text)
-    {
-        var words = new List<string>();
-        var i = 0;
-        while (i < text.Length)
-        {
-            var c = text[i];
-            if (c is '\'' or '"' or '`' or '[')
-            {
-                var close = c == '[' ? ']' : c;
-                i++;
-                while (i < text.Length && text[i] != close) i++;
-                i++;
-            }
-            else if (char.IsLetterOrDigit(c) || c == '_')
-            {
-                var start = i;
-                while (i < text.Length && (char.IsLetterOrDigit(text[i]) || text[i] == '_')) i++;
-                words.Add(text[start..i]);
-            }
-            else
-                i++;
-        }
-
-        bool Is(int index, string word) => index < words.Count && words[index].Equals(word, StringComparison.OrdinalIgnoreCase);
-        if (!Is(0, "CREATE"))
-            return false;
-        var next = Is(1, "TEMP") || Is(1, "TEMPORARY") ? 2 : 1;
-        if (!Is(next, "TRIGGER"))
-            return false;
-
-        var begun = false;
-        var caseDepth = 0;
-        for (var w = next + 1; w < words.Count; w++)
-        {
-            if (!begun)
-            {
-                begun = Is(w, "BEGIN");
-            }
-            else if (Is(w, "CASE"))
-                caseDepth++;
-            else if (Is(w, "END"))
-            {
-                if (caseDepth == 0)
-                    return false;
-                caseDepth--;
-            }
-        }
-        return begun;
-    }
-
-    // First keyword of a statement after leading whitespace and comments; null when there is none.
-    private static string? FirstKeyword(string text)
-    {
-        var i = 0;
-        while (i < text.Length)
-        {
-            if (char.IsWhiteSpace(text[i]) || text[i] == ';')
-                i++;
-            else if (text[i] == '-' && i + 1 < text.Length && text[i + 1] == '-')
-            {
-                while (i < text.Length && text[i] != '\n') i++;
-            }
-            else if (text[i] == '/' && i + 1 < text.Length && text[i + 1] == '*')
-            {
-                var end = text.IndexOf("*/", i + 2, StringComparison.Ordinal);
-                i = end < 0 ? text.Length : end + 2;
-            }
-            else
-                break;
-        }
-
-        var start = i;
-        while (i < text.Length && (char.IsLetter(text[i]) || text[i] == '_'))
-            i++;
-        return i > start ? text[start..i] : (start < text.Length ? text[start].ToString() : null);
-    }
+    private sqlite3 RawHandle => _connection.Handle!;
+    private bool AutoCommit => raw.sqlite3_get_autocommit(RawHandle) != 0;
 
     private void RollBackBatch()
     {
@@ -516,7 +299,7 @@ public sealed class SqliteSession : ISqliteSession
 
     private void EndReadTransactionIfClean()
     {
-        if (_dirty || Handle.AutoCommit)
+        if (_dirty || AutoCommit)
             return;
         try { Exec("COMMIT"); } catch (SqliteException) { /* nothing was written; the lock clears on dispose */ }
     }

@@ -134,8 +134,11 @@ public sealed class SqliteTuiComponent
         }
         else if (c == 'd')
         {
-            _session.Discard();
-            return false;
+            var result = _session.Discard();
+            if (result.Success) return false;
+            Prompt = TuiPrompt.None;
+            SetStatus(result);
+            ReloadSchema();
         }
         else if (c == 'c' || escape) Prompt = TuiPrompt.None;
         return true;

@@ -335,6 +335,34 @@ public class SqliteSessionTests : IDisposable
         session.Execute("SELECT count(*) FROM items").Rows[0][0].Should().Be(2L);
     }
 
+    [Theory]
+    [InlineData("VACUUM")]
+    [InlineData("PRAGMA journal_mode=WAL")]
+    [InlineData("PRAGMA foreign_keys = ON")]
+    [InlineData("PRAGMA main.foreign_keys(1)")]
+    [InlineData("ATTACH DATABASE ':memory:' AS other")]
+    [InlineData("DETACH DATABASE other")]
+    [InlineData("DELETE FROM items; VACUUM")]
+    public void Execute_ShouldRefuseAndExecuteNothing_WhenBatchContainsTransactionIncompatibleStatement(string sql)
+    {
+        var session = Open();
+
+        var result = session.Execute(sql);
+
+        result.Outcome.Should().Be(QueryOutcome.Refused);
+        result.Message.Should().StartWith("Refused: VACUUM, ATTACH, DETACH");
+        session.HasUnsavedChanges.Should().BeFalse();
+        session.Execute("SELECT count(*) FROM items").Rows[0][0].Should().Be(2L);
+    }
+
+    [Fact]
+    public void Execute_ShouldAllowPragmaRead_WhenNoValueAssigned()
+    {
+        var session = Open();
+
+        session.Execute("PRAGMA foreign_keys").Outcome.Should().Be(QueryOutcome.ResultSet);
+    }
+
     [Fact]
     public void Execute_ShouldRefuse_WhenTransactionControlFollowsUnpreparableStatement()
     {

@@ -857,6 +857,20 @@ public class SqliteTuiComponentTests
         _session.Verify(s => s.Save(), Times.Never);
     }
 
+    [Fact]
+    public void HandleKey_ShouldStayAndShowError_WhenDiscardChosenAndFails()
+    {
+        _dirty = true;
+        _session.Setup(s => s.Discard()).Returns(new SessionActionResult(false, "SQLite Error 5: 'database is locked'."));
+        var c = Create();
+        c.HandleKey(CtrlQ);
+
+        c.HandleKey(Chr('d')).Should().BeTrue();
+
+        c.Prompt.Should().Be(TuiPrompt.None);
+        c.StatusMessage.Should().Be("SQLite Error 5: 'database is locked'.");
+    }
+
     [Theory]
     [InlineData('c')]
     [InlineData('C')]

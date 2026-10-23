@@ -136,6 +136,13 @@ app.db │ saved │ Tab focus · F5 run · Ctrl+S save · F8 discard · Ctrl+Q 
       message reads <code>Transactions are managed by the TUI: Ctrl+S saves, F8 discards</code>.
     </div>
 
+    <div class="info-box">
+      <strong>Statements that cannot run in a transaction are refused:</strong> a batch containing
+      <code>VACUUM</code>, <code>ATTACH</code>, <code>DETACH</code>, or a <code>PRAGMA journal_mode</code> /
+      <code>PRAGMA foreign_keys</code> that assigns a value is refused without running, because SQLite
+      rejects or ignores them inside the TUI's transaction.
+    </div>
+
     <h3>Saving, discarding and quitting</h3>
     <table>
       <thead><tr><th>Action</th><th>Result</th></tr></thead>
