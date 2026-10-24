@@ -24,7 +24,7 @@ public class ToolkitCommandTreeTests
         var root = ToolkitCommandTree.Create(new InMemoryConfigStore());
 
         root.Subcommands.Select(c => c.Name).Should().Equal(
-            "strings", "interpreters", "images", "web", "llm", "oauth", "crypto", "markov", "demoscene", "gpt", "mcp", "config");
+            "strings", "interpreters", "images", "web", "sqlite", "llm", "oauth", "crypto", "markov", "demoscene", "gpt", "mcp", "config");
         root.Description.Should().Be("CLI toolkit exposing varied functionality organized by topic");
     }
 }

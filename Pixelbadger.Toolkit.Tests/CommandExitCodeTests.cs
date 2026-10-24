@@ -88,6 +88,8 @@ public class CommandExitCodeTests : IDisposable
         ["gpt complete --model {d}/nomodel --prompt x", "No GPT checkpoint found in '{d}/nomodel'. Run 'gpt train' first."],
         // web
         ["web serve-html --file {m}.html", "File '{m}.html' not found"],
+        // sqlite
+        ["sqlite tui --db {m}.db", "Database file '{m}.db' not found"],
         // llm
         ["llm generate-image --provider claude --prompt x --out-file {d}/o.png", "The 'generate-image' action requires image generation which is not supported by the 'claude' provider."],
     ];

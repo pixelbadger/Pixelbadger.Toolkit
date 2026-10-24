@@ -17,6 +17,7 @@ public static class ToolkitCommandTree
         root.Add(InterpretersCommand.Create());
         root.Add(ImagesCommand.Create());
         root.Add(WebCommand.Create());
+        root.Add(SqliteCommand.Create());
         root.Add(LlmCommand.Create());
         root.Add(OAuthCommand.Create());
         root.Add(CryptoCommand.Create());
