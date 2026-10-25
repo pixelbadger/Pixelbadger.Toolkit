@@ -24,6 +24,7 @@
   <a href="#corpospeak">corpospeak</a>
   <a href="#generate-image">generate-image</a>
   <a href="#paint">paint</a>
+  <a href="#if">if</a>
   <a href="#history-list">history list</a>
   <a href="#history-delete">history delete</a>
   <a href="#command-ref">Command Reference</a>
@@ -69,8 +70,8 @@
         <tr><td>Text chat</td><td><code>chat</code>, <code>translate</code>, <code>corpospeak</code></td><td>Yes</td><td>Yes</td></tr>
         <tr><td>Image input</td><td><code>ocaaar</code>, <code>paint</code></td><td>Yes</td><td>Yes</td></tr>
         <tr><td>Image generation</td><td><code>generate-image</code></td><td>Yes</td><td>No</td></tr>
-        <tr><td>Tool calling</td><td><code>paint</code></td><td>Yes</td><td>Yes</td></tr>
-        <tr><td><code>--reasoning-effort</code> values</td><td><code>chat</code>, <code>paint</code></td><td><code>low</code>, <code>medium</code>, <code>high</code></td><td><code>low</code>, <code>medium</code>, <code>high</code>, <code>xhigh</code>, <code>max</code></td></tr>
+        <tr><td>Tool calling</td><td><code>paint</code>, <code>if</code></td><td>Yes</td><td>Yes</td></tr>
+        <tr><td><code>--reasoning-effort</code> values</td><td><code>chat</code>, <code>paint</code>, <code>if</code></td><td><code>low</code>, <code>medium</code>, <code>high</code></td><td><code>low</code>, <code>medium</code>, <code>high</code>, <code>xhigh</code>, <code>max</code></td></tr>
       </tbody>
     </table>
   </section>
@@ -454,6 +455,151 @@ flowchart LR
     </div>
   </section>
 
+  <!-- IF -->
+  <section id="if">
+    <h2>if</h2>
+    <p>
+      An LLM plays a Z-machine interactive fiction game (for example <code>anchor.z8</code>) on its own while
+      you watch in a full-screen terminal UI styled like a classic Inform interpreter. The model acts through
+      tools. You can halt it at any time, play a move yourself, leave it a note, and resume. Game state is saved
+      to disk, so play continues across runs. Works with <code>openai</code> and <code>claude</code>, and the model
+      must support tool calling. Uses the <code>OPENAI_API_KEY</code> or <code>ANTHROPIC_API_KEY</code> environment
+      variable. A missing key or other API error halts the loop with the error shown in the UI, so you can still play
+      by hand. This command does not create a history session and is not available through MCP.
+    </p>
+
+    <div class="warning-box">
+      Prerequisite: the game runs through <code>dfrotz</code> (frotz's dumb terminal interpreter). Install it with
+      <code>apt install frotz</code> or <code>brew install frotz</code>, or pass its path with <code>--interpreter</code>.
+      Without <code>--interpreter</code>, <code>dfrotz</code> is looked up on <code>PATH</code> and then at
+      <code>/usr/games/dfrotz</code>. The game file is never bundled: supply your own story file.
+    </div>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk llm if</span>
+      <span class="opt"> --game</span> <span class="val">./anchor.z8</span>
+    </div>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk llm if</span>
+      <span class="opt"> --game</span> <span class="val">./anchor.z8</span>
+      <span class="opt"> --new</span>
+      <span class="opt"> --max-steps</span> <span class="val">50</span>
+      <span class="opt"> --instructions</span> <span class="val">"Play as the protagonist; think in gothic first person"</span>
+    </div>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk llm if</span>
+      <span class="opt"> --game</span> <span class="val">./anchor.z8</span>
+      <span class="opt"> --provider</span> <span class="val">claude</span>
+      <span class="opt"> --model</span> <span class="val">claude-sonnet-5-5</span>
+    </div>
+
+    <table>
+      <thead><tr><th>Option</th><th>Required</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--game</code></td><td>Yes</td><td>&mdash;</td><td>Path to a Z-machine story file (any extension; <code>dfrotz</code> decides whether it is valid)</td></tr>
+        <tr><td><code>--new</code></td><td>No</td><td>off</td><td>Archive the existing autosave, transcript and notes for this game, then start fresh. Named slots are kept</td></tr>
+        <tr><td><code>--max-steps</code></td><td>No</td><td><code>30</code></td><td>Model responses per run before the loop halts (1&ndash;500). Resuming grants another <code>--max-steps</code> steps</td></tr>
+        <tr><td><code>--instructions</code></td><td>No</td><td>&mdash;</td><td>Free text appended to the system prompt (persona, goal, play style)</td></tr>
+        <tr><td><code>--interpreter</code></td><td>No</td><td><code>dfrotz</code> on <code>PATH</code>, then <code>/usr/games/dfrotz</code></td><td>Path to the <code>dfrotz</code> executable</td></tr>
+        <tr><td><code>--provider</code></td><td>No</td><td><code>openai</code></td><td>LLM provider: <code>openai</code> or <code>claude</code></td></tr>
+        <tr><td><code>--model</code></td><td>No</td><td>Provider default (<code>gpt-6-luna</code> or <code>claude-sonnet-5-5</code>)</td><td>Model to use (must support tool calling)</td></tr>
+        <tr><td><code>--reasoning-effort</code></td><td>No</td><td>&mdash;</td><td>Reasoning effort level. Values depend on the provider: <code>openai</code> accepts <code>low</code>, <code>medium</code>, <code>high</code>; <code>claude</code> accepts <code>low</code>, <code>medium</code>, <code>high</code>, <code>xhigh</code>, <code>max</code></td></tr>
+      </tbody>
+    </table>
+    <p>
+      Startup checks run before the screen opens, in this order. Each prints <code>Error: &lt;message&gt;</code> and
+      exits with status 1: provider and reasoning-effort compatibility, <code>Game file not found: &lt;path&gt;</code>,
+      <code>dfrotz not found</code>, <code>llm if requires an interactive terminal</code>, and
+      <code>Another llm if run is using this game's saves.</code>, and <code>Error: The interpreter did not save the new game.</code>
+      when dfrotz fails to save a new game's opening position. The terminal must be at least 60&times;16;
+      a smaller one shows <code>Terminal too small</code>. Quitting normally exits with status 0.
+    </p>
+
+    <h3>Keys</h3>
+    <p>
+      The loop starts running immediately, unless the previous run ended with a <code>finish</code>, in which case
+      it starts halted so you can read the summary.
+    </p>
+    <table>
+      <thead><tr><th>Key</th><th>Mode</th><th>Action</th></tr></thead>
+      <tbody>
+        <tr><td><code>Esc</code></td><td>Running</td><td>Halt. An in-flight model request is cancelled and its response discarded. A running <code>dfrotz</code> turn completes</td></tr>
+        <tr><td>Typing</td><td>Halted</td><td>Edits the input line</td></tr>
+        <tr><td><code>Enter</code> with text</td><td>Halted</td><td>Submits the line. A plain line is a game command that runs immediately and is recorded as a human move</td></tr>
+        <tr><td><code>!text</code> then <code>Enter</code></td><td>Halted</td><td>Leaves a note for the model, shown in its next prompt</td></tr>
+        <tr><td><code>/save &lt;name&gt;</code></td><td>Halted</td><td>Copies the current autosave to a named slot</td></tr>
+        <tr><td><code>/restore &lt;name&gt;</code></td><td>Halted</td><td>Restores a named slot, then runs <code>look</code> and shows the result</td></tr>
+        <tr><td><code>/slots</code></td><td>Halted</td><td>Lists the named slots</td></tr>
+        <tr><td><code>/quit</code></td><td>Halted</td><td>Quits</td></tr>
+        <tr><td><code>Enter</code> on an empty line</td><td>Halted</td><td>Resumes the loop. The step budget resets to <code>--max-steps</code> if it was used up</td></tr>
+        <tr><td><code>PgUp</code> / <code>PgDn</code></td><td>Any</td><td>Scroll the transcript</td></tr>
+        <tr><td><code>End</code></td><td>Any</td><td>Jump back to the newest output</td></tr>
+        <tr><td><code>Ctrl+C</code></td><td>Any</td><td>Quits. The terminal is restored and the lock released</td></tr>
+      </tbody>
+    </table>
+    <p>
+      An unknown <code>/</code> command prints <code>Unknown command. Try /save, /restore, /slots, /quit.</code>
+      In-game <code>save</code>, <code>restore</code>, <code>quit</code>, <code>q</code>, <code>restart</code>,
+      <code>script</code> and <code>unscript</code>, and commands starting with <code>\</code>, are rejected for you and the
+      model without running the interpreter. The meta-verb check applies at the start of every chained clause, after
+      <code>.</code>, <code>,</code>, <code>;</code>, <code>!</code>, <code>?</code> or the word <code>then</code>, so
+      <code>look. quit</code> and <code>n then save</code> are rejected too. Commands are a single line of 1&ndash;200 characters.
+    </p>
+
+    <h3>The model's tools</h3>
+    <table>
+      <thead><tr><th>Tool</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>send_command</code></td><td>Runs one game command with an in-character <code>thought</code> (shown in the UI and recorded). Returns the game's reply</td></tr>
+        <tr><td><code>save_slot</code></td><td>Saves the current position to a named slot</td></tr>
+        <tr><td><code>restore_slot</code></td><td>Restores a named slot and returns the <code>look</code> output</td></tr>
+        <tr><td><code>list_slots</code></td><td>Lists the named slots</td></tr>
+        <tr><td><code>update_notes</code></td><td>Replaces the model's persistent notes (map, clues, goals; up to 8,000 characters)</td></tr>
+        <tr><td><code>finish</code></td><td>Stops the loop with a summary (game won or over, or the model is stuck)</td></tr>
+      </tbody>
+    </table>
+    <p>
+      Each model step is stateless: the prompt is rebuilt from the saved notes, the last 40 transcript events, any
+      notes or moves you made since the model's last step, and the latest game output. Invalid tool arguments are
+      returned to the model as an error result and the loop continues. Results that do not appear in the transcript
+      (<code>list_slots</code> answers and tool errors such as a rejected command) are passed to the model's next step
+      only, in memory, so they do not survive a restart.
+    </p>
+
+    <h3>Halting</h3>
+    <ul>
+      <li>You press <code>Esc</code> while it is running.</li>
+      <li>The model calls <code>finish</code>. Any remaining tool calls in that response still run. The summary is shown and recorded.</li>
+      <li>The <code>--max-steps</code> limit is reached. The UI shows <code>Step limit reached</code>.</li>
+      <li>A model or API error occurs. The error is shown and recorded, and resuming retries. There is no automatic retry.</li>
+    </ul>
+    <p>
+      A halted loop never exits the program. Resume it with <code>Enter</code> on an empty line, or quit. A model reply
+      with no tool calls is recorded as a thought, and counts as a step.
+    </p>
+
+    <h3>Save files and retention</h3>
+    <p>
+      Each game has its own folder, <code>~/.pbtk/if/&lt;game-file-name&gt;-&lt;first 8 hex of the file's SHA-256&gt;/</code>.
+      Every game turn runs in a separate <code>dfrotz</code> process (10 second limit) that loads the autosave, runs the
+      command and saves again. The autosave is replaced only when that save succeeds. If the game ends, you die, or the
+      interpreter times out, the autosave is left unchanged and the next turn resumes from before the last command.
+    </p>
+    <table>
+      <thead><tr><th>Path</th><th>Contents and retention</th></tr></thead>
+      <tbody>
+        <tr><td><code>autosave.qzl</code></td><td>Current position, updated after every successful turn</td></tr>
+        <tr><td><code>transcript.jsonl</code></td><td>One JSON event per line (<code>ts</code>, <code>actor</code>, <code>kind</code>, <code>text</code>, <code>output</code>). The model's memory on resume. Kept until <code>--new</code> archives it</td></tr>
+        <tr><td><code>notes.md</code></td><td>The model's own notes. Kept until <code>--new</code> archives it</td></tr>
+        <tr><td><code>slots/&lt;name&gt;.qzl</code></td><td>Named slots (names <code>A-Z a-z 0-9 _ -</code>, 1&ndash;32 characters, at most 20). Overwriting an existing name is allowed. Kept until you delete the files</td></tr>
+        <tr><td><code>archive/&lt;yyyyMMdd-HHmmss&gt;/</code></td><td>Previous autosave, transcript and notes, created by <code>--new</code>. The 5 most recent are kept and older ones are deleted</td></tr>
+        <tr><td><code>run.lock</code></td><td>Held for the length of a run. A second concurrent run for the same game fails with <code>Another llm if run is using this game's saves.</code></td></tr>
+      </tbody>
+    </table>
+  </section>
+
   <!-- HISTORY LIST -->
   <section id="history-list">
     <h2>history list</h2>
@@ -549,6 +695,12 @@ flowchart LR
           <td><code>--prompt</code></td>
           <td><code>--provider</code> <code>--model</code> <code>--max-steps</code> <code>--out-file</code> <code>--animation-out</code> <code>--overwrite</code> <code>--reasoning-effort</code></td>
           <td>Live canvas on the terminal; final image to the normal screen, to <code>--out-file</code> if given, and an animated GIF to <code>--animation-out</code> if given</td>
+        </tr>
+        <tr>
+          <td><code>llm if</code></td>
+          <td><code>--game</code></td>
+          <td><code>--provider</code> <code>--model</code> <code>--new</code> <code>--max-steps</code> <code>--instructions</code> <code>--interpreter</code> <code>--reasoning-effort</code></td>
+          <td>Full-screen interactive TUI; game state saved under <code>~/.pbtk/if/</code>. Not available through MCP</td>
         </tr>
         <tr>
           <td><code>llm history list</code></td>

@@ -88,6 +88,8 @@ The project is .NET 10, and uses Microsoft's System.CommandLine library for buil
   - `pbtk llm paint --prompt "A pixelbadger"`
   - `pbtk llm paint --prompt "A pixelbadger" --animation-out ./badger.gif`
   - `pbtk llm paint --prompt "A pixelbadger" --model gpt-6.1-sol --reasoning-effort high`
+  - `pbtk llm if --game ./anchor.z8`
+  - `pbtk llm if --game ./anchor.z8 --new --max-steps 50 --instructions "Play as the protagonist; think in gothic first person"`
   - `pbtk llm corpospeak --source "API performance is great" --audience "csuite"`
   - `pbtk llm corpospeak --source "New feature deployed" --audience "engineering" --user-messages "Hey team" "Let's ship this"`
   - `pbtk gpt train --source corpus.txt --out ./.gpt --steps 2000`
@@ -298,7 +300,7 @@ Available topics and actions:
 - **images**: display, steganography
 - **web**: serve-html
 - **sqlite**: tui
-- **llm**: chat, translate, ocaaar, corpospeak, generate-image, paint, history (list, delete)
+- **llm**: chat, translate, ocaaar, corpospeak, generate-image, paint, if, history (list, delete)
 - **oauth**: token, profile (add, update, delete)
 - **crypto**: generate-key, encrypt, decrypt, add, subtract, multiply, encrypt-string, decrypt-string, replace, substring
 - **markov**: train, complete
