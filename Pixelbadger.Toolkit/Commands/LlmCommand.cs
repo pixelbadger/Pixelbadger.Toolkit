@@ -1,5 +1,6 @@
 using System.CommandLine;
 using Pixelbadger.Toolkit.CommandLine;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Pixelbadger.Toolkit.Components;
 using Pixelbadger.Toolkit.Services;
@@ -19,6 +20,7 @@ public static class LlmCommand
         command.Add(CreateCorpospeakCommand());
         command.Add(CreateGenerateImageCommand());
         command.Add(CreatePaintCommand());
+        command.Add(CreateIfCommand());
         command.Add(CreateHistoryCommand());
 
         return command;
@@ -349,6 +351,106 @@ public static class LlmCommand
                         AnsiConsole.MarkupLine($"[green]Image written to {Markup.Escape(result.OutFile)}[/]");
                     if (result.AnimationOut is not null)
                         AnsiConsole.MarkupLine($"[green]Animation written to {Markup.Escape(result.AnimationOut)}[/]");
+                });
+        });
+
+        return command;
+    }
+
+    internal static Command CreateIfCommand() =>
+        CreateIfCommand(() => !Console.IsInputRedirected && !Console.IsOutputRedirected);
+
+    /// <summary>Builds the <c>if</c> action with an injectable interactivity check so the non-terminal path is testable.</summary>
+    internal static Command CreateIfCommand(Func<bool> isInteractive)
+    {
+        ArgumentNullException.ThrowIfNull(isInteractive);
+
+        var command = new Command("if", "Let an LLM play a Z-machine interactive fiction game through dfrotz in an Inform-style TUI").ExcludeFromMcp();
+
+        var gameOption = new Option<string>("--game") { Description = "Path to a Z-machine story file (any extension; validity is decided by dfrotz)", Required = true };
+        var newOption = new Option<bool>("--new") { Description = "Archive the existing autosave, transcript and notes for this game, then start fresh (named slots are kept)" }.WithImmutableDefault();
+        var maxStepsOption = new Option<int>("--max-steps")
+        {
+            Description = "Maximum number of model responses per run before halting (1-500)",
+            DefaultValueFactory = _ => 30
+        };
+        maxStepsOption.Validators.Add(result =>
+        {
+            var value = result.GetValueOrDefault<int>();
+            if (value < 1 || value > 500)
+                result.AddError("--max-steps must be between 1 and 500.");
+        });
+        var instructionsOption = new Option<string?>("--instructions") { Description = "Free text appended to the system prompt (persona, goal, play style)" };
+        var interpreterOption = new Option<string?>("--interpreter") { Description = "Path to the dfrotz executable (defaults to dfrotz on PATH, then /usr/games/dfrotz)" };
+        var modelOption = CreateModelOption();
+        var providerOption = CreateProviderOption();
+        var reasoningEffortOption = new Option<string?>("--reasoning-effort") { Description = "Reasoning effort level (supported values depend on --provider)" };
+
+        command.Add(gameOption);
+        command.Add(newOption);
+        command.Add(maxStepsOption);
+        command.Add(instructionsOption);
+        command.Add(interpreterOption);
+        command.Add(modelOption);
+        command.Add(providerOption);
+        command.Add(reasoningEffortOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+        {
+            var gameArgument = parseResult.GetValue(gameOption)!;
+            var startNew = parseResult.GetValue(newOption);
+            var maxSteps = parseResult.GetValue(maxStepsOption);
+            var instructions = parseResult.GetValue(instructionsOption);
+            var interpreterArgument = parseResult.GetValue(interpreterOption);
+
+            return RunLlmActionAsync(
+                parseResult.GetValue(providerOption)!,
+                parseResult.GetValue(modelOption),
+                new LlmActionRequirements("if", new HashSet<LlmCapability> { LlmCapability.TextChat, LlmCapability.ToolCalling }, parseResult.GetValue(reasoningEffortOption)),
+                async (services, compatibility) =>
+                {
+                    var game = Path.GetFullPath(gameArgument);
+                    if (!File.Exists(game))
+                        throw new InvalidOperationException($"Game file not found: {game}");
+
+                    var interpreter = DfrotzLocator.Resolve(interpreterArgument)
+                        ?? throw new InvalidOperationException("dfrotz not found. Install frotz (e.g. apt install frotz) or pass --interpreter.");
+
+                    if (!isInteractive())
+                        throw new InvalidOperationException("llm if requires an interactive terminal");
+
+                    IfSaveStore store;
+                    try
+                    {
+                        store = IfSaveStore.Open(game);
+                    }
+                    catch (IfStoreException ex)
+                    {
+                        throw new InvalidOperationException(ex.Message);
+                    }
+
+                    using (store)
+                    {
+                        if (startNew)
+                            store.ArchiveCurrent();
+
+                        var engine = new DfrotzGameEngine(new IfProcessRunner(), interpreter, game, store);
+                        var session = new IfSession(engine, store, Path.GetFileNameWithoutExtension(game));
+
+                        var start = await session.StartAsync(cancellationToken);
+                        if (!start.Success)
+                            throw new InvalidOperationException(start.Text);
+
+                        var loop = new IfAgentLoop(
+                            () => services.GetRequiredService<IChatClient>(),
+                            services.GetRequiredService<IChatReasoningConfigurator>(),
+                            session,
+                            instructions,
+                            compatibility.NormalisedReasoningEffort);
+
+                        new IfComponent(session, loop.StepAsync, maxSteps)
+                            .Run(AnsiConsole.Console, new ConsoleTerminalInput(), cancellationToken);
+                    }
                 });
         });
 

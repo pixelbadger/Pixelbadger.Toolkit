@@ -129,7 +129,7 @@ Tools: interpreters_brainfuck, interpreters_ook, interpreters_bf-to-ook</pre>
 
     <div class="warning-box">
       <strong>Non-exposable entries are rejected.</strong> <code>mcp</code>, <code>config</code>, <code>web serve-html</code>,
-      <code>demoscene</code>, <code>oauth token</code>, <code>oauth profile add</code> and <code>oauth profile update</code>
+      <code>demoscene</code>, <code>oauth token</code>, <code>oauth profile add</code>, <code>oauth profile update</code> and <code>llm if</code>
       cannot be saved. For example, <code>pbtk mcp save --name x --include config</code> prints
       <code>Error: Unknown or non-exposable entry 'config'.</code> and exits with status 1. Names that do not match
       the pattern print <code>Error: Invalid profile name '&lt;name&gt;'. Profile names must match ^[a-z0-9-]+$.</code>
@@ -345,6 +345,7 @@ exit code: 1</pre>
       <li><code>web serve-html</code></li>
       <li><code>demoscene</code> (all of it)</li>
       <li><code>oauth token</code>, <code>oauth profile add</code> and <code>oauth profile update</code></li>
+      <li><code>llm if</code> (interactive full-screen TUI that needs a terminal and runs until you quit)</li>
     </ul>
     <div class="info-box">
       <code>oauth profile delete</code> and the other <code>oauth</code> actions are not in this list, so they can be exposed.
