@@ -9,7 +9,8 @@ public static partial class IfCommandValidator
 
     private static readonly HashSet<string> MetaVerbs = new(StringComparer.OrdinalIgnoreCase)
     {
-        "save", "restore", "quit", "q", "restart", "script", "unscript"
+        "save", "restore", "quit", "q", "restart", "script", "unscript",
+        "transcript", "recording", "replay"
     };
 
     /// <summary>Returns null when valid, else the error message.</summary>

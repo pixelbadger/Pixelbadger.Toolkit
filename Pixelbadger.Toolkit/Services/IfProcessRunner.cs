@@ -78,6 +78,9 @@ public sealed class IfProcessRunner : IIfProcessRunner
         catch (TimeoutException)
         {
             Kill(process);
+            string drained;
+            lock (gate) drained = buffer.ToString();
+            return new IfProcessResult(-1, drained, true);
         }
 
         string output;

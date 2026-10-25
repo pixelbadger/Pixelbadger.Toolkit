@@ -13,7 +13,6 @@ public class IfComponent
 {
     public const int MinWidth = 60;
     public const int MinHeight = 16;
-    private const int MaxInputLength = 200;
     private static readonly TimeSpan StepShutdownWait = TimeSpan.FromSeconds(15);
     private const string HaltedMessage = "Halted. Type a command, !note, /save <name>, /restore <name>, /slots or /quit. Enter on an empty line resumes.";
     private const string UnknownCommandMessage = "Unknown command. Try /save, /restore, /slots, /quit.";
@@ -195,7 +194,7 @@ public class IfComponent
             return await SubmitAsync(line);
         }
         if (key.KeyChar >= ' ' && !char.IsControl(key.KeyChar) && (key.Modifiers & ConsoleModifiers.Control) == 0
-            && _input.Length < MaxInputLength)
+            && _input.Length < IfCommandValidator.MaxLength)
         {
             _input.Append(key.KeyChar);
         }

@@ -42,6 +42,10 @@ public sealed partial class IfSaveStore : IIfSaveStore
     internal static string DefaultRootDirectory { get; } =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".pbtk", "if");
 
+    // Windows reports ERROR_SHARING_VIOLATION (32); Unix reports the raw errno from the non-blocking flock (EWOULDBLOCK, 11).
+    private static bool IsSharingViolation(IOException ex) =>
+        OperatingSystem.IsWindows() ? (ex.HResult & 0xFFFF) == 32 : ex.HResult == 11;
+
     public static IfSaveStore Open(string gameFile, string? rootDirectory = null)
     {
         var root = rootDirectory ?? DefaultRootDirectory;
@@ -57,7 +61,7 @@ public sealed partial class IfSaveStore : IIfSaveStore
         {
             lockStream = new FileStream(Path.Combine(directory, "run.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None, 1, FileOptions.DeleteOnClose);
         }
-        catch (IOException)
+        catch (IOException ex) when (IsSharingViolation(ex))
         {
             throw new IfStoreException("Another llm if run is using this game's saves.");
         }
