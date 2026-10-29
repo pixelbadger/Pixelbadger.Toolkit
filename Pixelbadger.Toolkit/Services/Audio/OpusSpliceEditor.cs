@@ -29,7 +29,7 @@ public static class OpusSpliceEditor
         packets.AddRange(audio.Packets);
         packets.AddRange(file.AudioPackets.Skip(index));
         var endTrim = index == file.AudioPackets.Count ? audio.EndTrim : file.EndTrim;
-        return new SpliceResult(file with { AudioPackets = packets, EndTrim = endTrim }, atSample, layout.OutputTime(index), 0);
+        return new SpliceResult(file with { AudioPackets = packets, EndTrim = endTrim }, atSample, layout.SnappedTime(index, atSample, file.DurationSamples), 0);
     }
 
     /// <summary>
@@ -42,7 +42,7 @@ public static class OpusSpliceEditor
         var duration = file.DurationSamples;
         var layout = Layout.Of(file);
         var index = layout.Snap(atSample, duration);
-        var snapped = layout.OutputTime(index);
+        var snapped = layout.SnappedTime(index, atSample, duration);
         var count = file.AudioPackets.Count;
 
         var full = encode(null);
@@ -105,10 +105,16 @@ public static class OpusSpliceEditor
 
         public long OutputTime(int boundary) => Math.Max(0, Starts[boundary] - _preSkip);
 
+        /// <summary>The reported snapped time: the audible end when appending at exactly the duration, else the boundary's output time.</summary>
+        public long SnappedTime(int boundary, long atSample, long duration)
+            => atSample == duration && boundary == Starts.Length - 1 ? duration : OutputTime(boundary);
+
         public int Snap(long atSample, long duration)
         {
             if (atSample < 0 || atSample > duration)
                 throw new ArgumentOutOfRangeException(nameof(atSample), atSample, $"Sample must be between 0 and {duration}");
+            if (atSample == duration)
+                return Starts.Length - 1;
             var best = 0;
             var bestDistance = long.MaxValue;
             for (var i = 0; i < Starts.Length; i++)

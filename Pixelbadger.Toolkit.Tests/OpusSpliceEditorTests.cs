@@ -153,10 +153,8 @@ public class OpusSpliceEditorTests : IDisposable
         var result = OpusSpliceEditor.Insert(file, file.DurationSamples, audio);
         result.File.EndTrim.Should().Be(audio.EndTrim);
         result.File.AudioPackets.Take(file.AudioPackets.Count).Should().Equal(file.AudioPackets);
-        result.SnappedSample.Should().Be(file.TotalPacketSamples - 312);
         result.SnappedSample.Should().Be(file.DurationSamples);
-        var expected = result.SnappedSample + audio.Packets.Count * 960L - audio.EndTrim;
-        result.File.DurationSamples.Should().Be(expected);
+        result.File.DurationSamples.Should().Be(file.TotalPacketSamples - 312 + audio.Packets.Count * 960L - audio.EndTrim);
         Decode(result.File).Stderr.Should().BeEmpty();
     }
 
@@ -218,6 +216,69 @@ public class OpusSpliceEditorTests : IDisposable
         result.ReplacedSamples.Should().Be(0);
         result.File.AudioPackets.Take(file.AudioPackets.Count).Should().Equal(file.AudioPackets);
         Decode(result.File).Stderr.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Insert_ShouldAppend_WhenAtDurationOfRealRecording()
+    {
+        var file = Record(2.0);
+        file.EndTrim.Should().BeGreaterThan(0);
+        var audio = Audio(1.0, 880);
+
+        var result = OpusSpliceEditor.Insert(file, file.DurationSamples, audio);
+
+        result.SnappedSample.Should().Be(96000);
+        result.ReplacedSamples.Should().Be(0);
+        result.File.EndTrim.Should().Be(audio.EndTrim);
+        result.File.AudioPackets.Take(file.AudioPackets.Count).Should().Equal(file.AudioPackets);
+        result.File.AudioPackets.Skip(file.AudioPackets.Count).Should().Equal(audio.Packets);
+        result.File.DurationSamples.Should().Be(file.TotalPacketSamples - 312 + 312 + 48000);
+        result.File.DurationSamples.Should().Be(144960);
+        var (samples, err) = Decode(RoundTrip(result.File));
+        err.Should().BeEmpty();
+        AssertDominant(samples, 2.1, 2.9, 880, 440);
+        AssertDominant(samples, 0.1, 0.9, 440, 880);
+    }
+
+    [Fact]
+    public void Overwrite_ShouldAppendFullEncode_WhenAtDurationOfRealRecording()
+    {
+        var file = Record(2.0);
+        var full = Audio(1.0, 880);
+        var result = OpusSpliceEditor.Overwrite(file, file.DurationSamples, k => k is null ? full : throw new InvalidOperationException());
+        result.SnappedSample.Should().Be(96000);
+        result.ReplacedSamples.Should().Be(0);
+        result.File.EndTrim.Should().Be(full.EndTrim);
+        result.File.AudioPackets.Take(file.AudioPackets.Count).Should().Equal(file.AudioPackets);
+        result.File.AudioPackets.Skip(file.AudioPackets.Count).Should().Equal(full.Packets);
+        result.File.DurationSamples.Should().Be(144960);
+        var (samples, err) = Decode(RoundTrip(result.File));
+        err.Should().BeEmpty();
+        AssertDominant(samples, 2.1, 2.9, 880, 440);
+    }
+
+    [Fact]
+    public void Insert_ShouldUseNearestBoundary_WhenOneSampleBeforeDuration()
+    {
+        var file = Record(2.0);
+        var audio = Audio(0.1, 880);
+        var result = OpusSpliceEditor.Insert(file, file.DurationSamples - 1, audio);
+        // boundaries at 960i-312: 95688 (i=100) is nearest to 95999; the end boundary (96648) is not chosen
+        result.SnappedSample.Should().Be(95688);
+        result.File.AudioPackets.Take(100).Should().Equal(file.AudioPackets.Take(100));
+        result.File.AudioPackets.Skip(100 + audio.Packets.Count).Should().Equal(file.AudioPackets.Skip(100));
+        result.File.EndTrim.Should().Be(file.EndTrim);
+    }
+
+    [Fact]
+    public void Insert_ShouldStartNewAudioAtBoundaryPlusLookahead_WhenInsertingAtOneSecond()
+    {
+        var file = Record(2.0);
+        var result = OpusSpliceEditor.Insert(file, 48000, Audio(1.0, 880));
+        result.SnappedSample.Should().Be(47688);
+        var (samples, err) = Decode(RoundTrip(result.File));
+        err.Should().BeEmpty();
+        Goertzel(samples, 1.01, 1.05, 880).Should().BeGreaterThan(Goertzel(samples, 1.01, 1.05, 440));
     }
 
     [Fact]
