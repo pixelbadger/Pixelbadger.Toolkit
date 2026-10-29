@@ -143,7 +143,7 @@ public sealed class OpusEncoder : IOpusEncoder
         get
         {
             var h = Handle();
-            OpusNative.Check(OpusNative.opus_encoder_ctl_get_uint(h, OpusNative.GetFinalRange, out var value), "OPUS_GET_FINAL_RANGE");
+            OpusNative.Check(OpusNative.EncoderCtlGetUInt(h, OpusNative.GetFinalRange, out var value), "OPUS_GET_FINAL_RANGE");
             return value;
         }
     }
@@ -161,10 +161,10 @@ public sealed class OpusEncoder : IOpusEncoder
 
     private int GetInt(int request, string name)
     {
-        OpusNative.Check(OpusNative.opus_encoder_ctl_get(Handle(), request, out var value), name);
+        OpusNative.Check(OpusNative.EncoderCtlGet(Handle(), request, out var value), name);
         return value;
     }
 
     private void SetInt(int request, int value, string name)
-        => OpusNative.Check(OpusNative.opus_encoder_ctl_set(Handle(), request, value), name);
+        => OpusNative.Check(OpusNative.EncoderCtlSet(Handle(), request, value), name);
 }

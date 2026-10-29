@@ -137,6 +137,49 @@ internal static partial class OpusNative
     [LibraryImport(LibraryName)]
     internal static partial int opus_repacketizer_get_nb_frames(IntPtr rp);
 
+    // D3: opus_*_ctl are C variadic functions. On Apple arm64 the AAPCS64 variant used by macOS passes variadic
+    // arguments on the stack, never in registers, so a plain (st, request, value) call puts value in x2 where
+    // libopus does not look. The padded imports below fill x2..x7 with dummies so that the value is the 9th
+    // argument, i.e. the first stack slot. Every ctl call goes through the helpers further down, which pick the variant.
+    [LibraryImport(LibraryName, EntryPoint = "opus_encoder_ctl")]
+    private static partial int opus_encoder_ctl_set_apple(IntPtr encoder, int request, nint pad2, nint pad3, nint pad4, nint pad5, nint pad6, nint pad7, int value);
+
+    [LibraryImport(LibraryName, EntryPoint = "opus_encoder_ctl")]
+    private static partial int opus_encoder_ctl_get_apple(IntPtr encoder, int request, nint pad2, nint pad3, nint pad4, nint pad5, nint pad6, nint pad7, out int value);
+
+    [LibraryImport(LibraryName, EntryPoint = "opus_encoder_ctl")]
+    private static partial int opus_encoder_ctl_get_uint_apple(IntPtr encoder, int request, nint pad2, nint pad3, nint pad4, nint pad5, nint pad6, nint pad7, out uint value);
+
+    [LibraryImport(LibraryName, EntryPoint = "opus_decoder_ctl")]
+    private static partial int opus_decoder_ctl_set_apple(IntPtr decoder, int request, nint pad2, nint pad3, nint pad4, nint pad5, nint pad6, nint pad7, int value);
+
+    [LibraryImport(LibraryName, EntryPoint = "opus_decoder_ctl")]
+    private static partial int opus_decoder_ctl_get_apple(IntPtr decoder, int request, nint pad2, nint pad3, nint pad4, nint pad5, nint pad6, nint pad7, out int value);
+
+    [LibraryImport(LibraryName, EntryPoint = "opus_decoder_ctl")]
+    private static partial int opus_decoder_ctl_get_uint_apple(IntPtr decoder, int request, nint pad2, nint pad3, nint pad4, nint pad5, nint pad6, nint pad7, out uint value);
+
+    /// <summary>True on Apple-silicon macOS, where variadic ctl arguments must be passed on the stack.</summary>
+    internal static bool UsePaddedCtl => OperatingSystem.IsMacOS() && RuntimeInformation.ProcessArchitecture == Architecture.Arm64;
+
+    internal static int EncoderCtlSet(IntPtr st, int request, int value)
+        => UsePaddedCtl ? opus_encoder_ctl_set_apple(st, request, 0, 0, 0, 0, 0, 0, value) : opus_encoder_ctl_set(st, request, value);
+
+    internal static int EncoderCtlGet(IntPtr st, int request, out int value)
+        => UsePaddedCtl ? opus_encoder_ctl_get_apple(st, request, 0, 0, 0, 0, 0, 0, out value) : opus_encoder_ctl_get(st, request, out value);
+
+    internal static int EncoderCtlGetUInt(IntPtr st, int request, out uint value)
+        => UsePaddedCtl ? opus_encoder_ctl_get_uint_apple(st, request, 0, 0, 0, 0, 0, 0, out value) : opus_encoder_ctl_get_uint(st, request, out value);
+
+    internal static int DecoderCtlSet(IntPtr st, int request, int value)
+        => UsePaddedCtl ? opus_decoder_ctl_set_apple(st, request, 0, 0, 0, 0, 0, 0, value) : opus_decoder_ctl_set(st, request, value);
+
+    internal static int DecoderCtlGet(IntPtr st, int request, out int value)
+        => UsePaddedCtl ? opus_decoder_ctl_get_apple(st, request, 0, 0, 0, 0, 0, 0, out value) : opus_decoder_ctl_get(st, request, out value);
+
+    internal static int DecoderCtlGetUInt(IntPtr st, int request, out uint value)
+        => UsePaddedCtl ? opus_decoder_ctl_get_uint_apple(st, request, 0, 0, 0, 0, 0, 0, out value) : opus_decoder_ctl_get_uint(st, request, out value);
+
     internal static string ErrorText(int code)
         => Marshal.PtrToStringUTF8(opus_strerror(code)) ?? $"error {code}";
 

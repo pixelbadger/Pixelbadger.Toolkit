@@ -68,7 +68,7 @@ public sealed class OpusDecoder : IOpusDecoder
     public int Gain
     {
         get => GetInt(OpusNative.GetGain, "OPUS_GET_GAIN");
-        set => OpusNative.Check(OpusNative.opus_decoder_ctl_set(Handle(), OpusNative.SetGain, value), "OPUS_SET_GAIN");
+        set => OpusNative.Check(OpusNative.DecoderCtlSet(Handle(), OpusNative.SetGain, value), "OPUS_SET_GAIN");
     }
 
     public int LastPacketDuration => GetInt(OpusNative.GetLastPacketDuration, "OPUS_GET_LAST_PACKET_DURATION");
@@ -78,7 +78,7 @@ public sealed class OpusDecoder : IOpusDecoder
         get
         {
             var h = Handle();
-            OpusNative.Check(OpusNative.opus_decoder_ctl_get_uint(h, OpusNative.GetFinalRange, out var value), "OPUS_GET_FINAL_RANGE");
+            OpusNative.Check(OpusNative.DecoderCtlGetUInt(h, OpusNative.GetFinalRange, out var value), "OPUS_GET_FINAL_RANGE");
             return value;
         }
     }
@@ -98,7 +98,7 @@ public sealed class OpusDecoder : IOpusDecoder
 
     private int GetInt(int request, string name)
     {
-        OpusNative.Check(OpusNative.opus_decoder_ctl_get(Handle(), request, out var value), name);
+        OpusNative.Check(OpusNative.DecoderCtlGet(Handle(), request, out var value), name);
         return value;
     }
 }
