@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pixelbadger Toolkit — Audio</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header>
+  <h1>Audio <span class="badge">audio</span></h1>
+  <div class="subtitle">Record Ogg Opus audio, then insert or overwrite sections of an existing file by splicing packets</div>
+  <div class="meta">Pixelbadger Toolkit &mdash; <code>pbtk audio</code> &mdash; <a href="index.html" style="color:#60a5fa">&#8592; all topics</a></div>
+</header>
+
+<nav>
+  <a href="#overview">Overview</a>
+  <a href="#requirements">Requirements</a>
+  <a href="#record">record</a>
+  <a href="#insert">insert</a>
+  <a href="#overwrite">overwrite</a>
+  <a href="#how-edits-work">How edits work</a>
+  <a href="#command-ref">Command Reference</a>
+</nav>
+
+<div class="content">
+
+  <!-- OVERVIEW -->
+  <section id="overview">
+    <h2>Overview</h2>
+    <p>
+      The <code>audio</code> topic records audio to an Ogg Opus file and edits existing Ogg Opus files.
+      <code>record</code> captures live audio from a microphone (through <code>ffmpeg</code>) or reads a WAV
+      file, and writes a new <code>.opus</code> file. <code>insert</code> and <code>overwrite</code> put new
+      audio into an existing file at a given time, editing the file in place.
+    </p>
+    <p>
+      Edits do not decode and re-encode the whole file. Existing audio packets are copied byte for byte, and
+      only the new audio is encoded. Edits are described in <a href="#how-edits-work">How edits work</a>.
+    </p>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk audio</span>
+      <span class="val"> &lt;action&gt;</span>
+      <span class="opt"> [options]</span>
+    </div>
+  </section>
+
+  <!-- REQUIREMENTS -->
+  <section id="requirements">
+    <h2>Requirements</h2>
+    <p>
+      <strong>libopus</strong> is required for every action. The toolkit loads the system library at run time
+      and does not bundle it. If it cannot be found, the command prints the install guidance and exits with
+      code <code>1</code>.
+    </p>
+    <table>
+      <thead><tr><th>Platform</th><th>Install libopus</th></tr></thead>
+      <tbody>
+        <tr><td>Debian / Ubuntu</td><td><code>apt install libopus0</code></td></tr>
+        <tr><td>macOS</td><td><code>brew install opus</code></td></tr>
+        <tr><td>Windows</td><td>Put <code>opus.dll</code> on <code>PATH</code></td></tr>
+      </tbody>
+    </table>
+
+    <p>
+      <strong>ffmpeg</strong> is needed only for live capture, that is, when <code>--from-wav</code> is not
+      given. <code>--from-wav</code> works without ffmpeg. If ffmpeg is missing for a capture, the command exits
+      with code <code>1</code> and suggests installing it (<code>apt install ffmpeg</code> or
+      <code>brew install ffmpeg</code>) or using <code>--from-wav</code>.
+    </p>
+
+    <h3>Capture devices</h3>
+    <table>
+      <thead><tr><th>Platform</th><th>Default <code>--capture-format</code></th><th>Default <code>--device</code></th></tr></thead>
+      <tbody>
+        <tr><td>Linux</td><td><code>pulse</code></td><td><code>default</code></td></tr>
+        <tr><td>macOS</td><td><code>avfoundation</code></td><td><code>:0</code></td></tr>
+        <tr><td>Windows</td><td><code>dshow</code></td><td>None: <code>--device</code> is required, e.g. <code>--device "audio=Microphone"</code></td></tr>
+      </tbody>
+    </table>
+    <p>
+      <code>--capture-format</code> is an ffmpeg input format name, and <code>--device</code> is the device
+      name ffmpeg uses for that format. Use them to choose a different microphone or to capture from another
+      source.
+    </p>
+
+    <p>
+      Live capture needs ffmpeg and an audio input device. For scripted or headless use, give
+      <code>--from-wav</code> instead.
+    </p>
+  </section>
+
+  <!-- RECORD -->
+  <section id="record">
+    <h2>record</h2>
+    <p>
+      Creates a new Ogg Opus file at <code>--out-file</code>. The audio comes from a live capture, or from a
+      WAV file when <code>--from-wav</code> is given. An existing file at <code>--out-file</code> is
+      overwritten.
+    </p>
+    <p>
+      Without <code>--duration</code>, a live capture runs until you press <kbd>Enter</kbd> or
+      <kbd>Ctrl+C</kbd>. The command prints <code>Recording... press Enter or Ctrl+C to stop</code> first, then
+      finishes the file cleanly and exits with code <code>0</code>. With <code>--duration</code>, the capture
+      stops after that length. <code>--from-wav</code> with <code>--duration</code> truncates the WAV to that
+      length.
+    </p>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk audio record</span>
+      <span class="opt"> --out-file</span> <span class="val">./memo.opus</span>
+      <span class="opt"> --duration</span> <span class="val">10s</span>
+    </div>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk audio record</span>
+      <span class="opt"> --out-file</span> <span class="val">./memo.opus</span>
+      <span class="opt"> --from-wav</span> <span class="val">./take.wav</span>
+    </div>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk audio record</span>
+      <span class="opt"> --out-file</span> <span class="val">./memo.opus</span>
+      <span class="opt"> --channels</span> <span class="val">2</span>
+      <span class="opt"> --bitrate</span> <span class="val">96000</span>
+      <span class="opt"> --device</span> <span class="val">"audio=Microphone"</span>
+      <span class="opt"> --capture-format</span> <span class="val">dshow</span>
+      <span class="opt"> --duration</span> <span class="val">30s</span>
+    </div>
+
+    <h3>Options</h3>
+    <table>
+      <thead><tr><th>Option</th><th>Required</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--out-file</code></td><td>Yes</td><td>&mdash;</td><td>Path of the <code>.opus</code> file to write. An existing file is overwritten.</td></tr>
+        <tr><td><code>--duration</code></td><td>No</td><td>Until Enter or Ctrl+C</td><td>Length to capture or to keep from a WAV. Accepts a time (see <a href="#time-format">Time format</a>).</td></tr>
+        <tr><td><code>--from-wav</code></td><td>No</td><td>&mdash;</td><td>Read audio from this WAV file instead of capturing. Does not need ffmpeg.</td></tr>
+        <tr><td><code>--channels</code></td><td>No</td><td><code>1</code></td><td>Channel count of the new file: <code>1</code> (mono) or <code>2</code> (stereo)</td></tr>
+        <tr><td><code>--bitrate</code></td><td>No</td><td><code>64000</code></td><td>Opus bitrate in bits per second, from 6000 to 510000</td></tr>
+        <tr><td><code>--device</code></td><td>No</td><td>Platform default (see <a href="#requirements">Requirements</a>)</td><td>Capture device name passed to ffmpeg. Required on Windows.</td></tr>
+        <tr><td><code>--capture-format</code></td><td>No</td><td>Platform default (see <a href="#requirements">Requirements</a>)</td><td>ffmpeg input format used for capture</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Output</h3>
+    <p>On success the command exits with code <code>0</code> and prints the path and the duration:</p>
+    <div class="cmd-block">
+      <span class="val">Recorded './memo.opus': 10.000s</span>
+    </div>
+  </section>
+
+  <!-- INSERT -->
+  <section id="insert">
+    <h2>insert</h2>
+    <p>
+      Inserts new audio into an existing Ogg Opus file at <code>--at</code>. The existing audio is kept, and
+      everything after the insertion point moves later. The file is edited in place (see
+      <a href="#how-edits-work">How edits work</a>). The new audio is encoded at the file's own channel count
+      and sample rate of 48 kHz. <code>--at</code> may equal the file's duration, which appends the new audio.
+    </p>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk audio insert</span>
+      <span class="opt"> --file</span> <span class="val">./memo.opus</span>
+      <span class="opt"> --at</span> <span class="val">1:05.5</span>
+      <span class="opt"> --duration</span> <span class="val">3s</span>
+    </div>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk audio insert</span>
+      <span class="opt"> --file</span> <span class="val">./memo.opus</span>
+      <span class="opt"> --at</span> <span class="val">1.0</span>
+      <span class="opt"> --from-wav</span> <span class="val">./aside.wav</span>
+    </div>
+
+    <h3>Options</h3>
+    <table>
+      <thead><tr><th>Option</th><th>Required</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--file</code></td><td>Yes</td><td>&mdash;</td><td>Existing Ogg Opus file to edit in place</td></tr>
+        <tr><td><code>--at</code></td><td>Yes</td><td>&mdash;</td><td>Time in the file where the new audio is inserted, from 0 to the file's duration. Accepts a time (see <a href="#time-format">Time format</a>).</td></tr>
+        <tr><td><code>--duration</code></td><td>No</td><td>Until Enter or Ctrl+C</td><td>Length to capture or to keep from a WAV. Without it, a live capture runs until Enter or Ctrl+C.</td></tr>
+        <tr><td><code>--from-wav</code></td><td>No</td><td>&mdash;</td><td>Insert audio from this WAV file instead of capturing. Does not need ffmpeg.</td></tr>
+        <tr><td><code>--bitrate</code></td><td>No</td><td><code>64000</code></td><td>Opus bitrate for the new audio, from 6000 to 510000 bits per second</td></tr>
+        <tr><td><code>--device</code></td><td>No</td><td>Platform default (see <a href="#requirements">Requirements</a>)</td><td>Capture device name passed to ffmpeg. Required on Windows.</td></tr>
+        <tr><td><code>--capture-format</code></td><td>No</td><td>Platform default (see <a href="#requirements">Requirements</a>)</td><td>ffmpeg input format used for capture</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Output</h3>
+    <p>
+      On success the command exits with code <code>0</code>. It prints the length of the new audio, the snapped
+      time where it was placed, the requested time, and the resulting duration:
+    </p>
+    <div class="cmd-block">
+      <span class="val">Inserted 1.000s at 1.020s (requested 1.013s) into './memo.opus': 3.000s</span>
+    </div>
+  </section>
+
+  <!-- OVERWRITE -->
+  <section id="overwrite">
+    <h2>overwrite</h2>
+    <p>
+      Replaces audio in an existing Ogg Opus file, starting at <code>--at</code>, with new audio. The file's
+      length stays the same unless the new audio runs past the end, in which case the file grows. The
+      replaced span is rounded up to whole packets, so the replacement covers the new audio fully. The file is
+      edited in place, and the same options as <code>insert</code> apply.
+    </p>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk audio overwrite</span>
+      <span class="opt"> --file</span> <span class="val">./memo.opus</span>
+      <span class="opt"> --at</span> <span class="val">12</span>
+      <span class="opt"> --from-wav</span> <span class="val">./fix.wav</span>
+    </div>
+
+    <h3>Options</h3>
+    <table>
+      <thead><tr><th>Option</th><th>Required</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--file</code></td><td>Yes</td><td>&mdash;</td><td>Existing Ogg Opus file to edit in place</td></tr>
+        <tr><td><code>--at</code></td><td>Yes</td><td>&mdash;</td><td>Time in the file where the replacement starts, from 0 to the file's duration. Accepts a time (see <a href="#time-format">Time format</a>).</td></tr>
+        <tr><td><code>--duration</code></td><td>No</td><td>Until Enter or Ctrl+C</td><td>Length to capture or to keep from a WAV. Without it, a live capture runs until Enter or Ctrl+C.</td></tr>
+        <tr><td><code>--from-wav</code></td><td>No</td><td>&mdash;</td><td>Replacement audio from this WAV file instead of capturing. Does not need ffmpeg.</td></tr>
+        <tr><td><code>--bitrate</code></td><td>No</td><td><code>64000</code></td><td>Opus bitrate for the new audio, from 6000 to 510000 bits per second</td></tr>
+        <tr><td><code>--device</code></td><td>No</td><td>Platform default (see <a href="#requirements">Requirements</a>)</td><td>Capture device name passed to ffmpeg. Required on Windows.</td></tr>
+        <tr><td><code>--capture-format</code></td><td>No</td><td>Platform default (see <a href="#requirements">Requirements</a>)</td><td>ffmpeg input format used for capture</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Output</h3>
+    <p>On success the command exits with code <code>0</code> and prints the same kind of line as <code>insert</code>:</p>
+    <div class="cmd-block">
+      <span class="val">Overwrote 0.500s at 12.000s (requested 12.000s) in './memo.opus': 12.500s</span>
+    </div>
+  </section>
+
+  <!-- HOW EDITS WORK -->
+  <section id="how-edits-work">
+    <h2>How edits work</h2>
+    <p>
+      <code>insert</code> and <code>overwrite</code> use packet splicing. The packets of the original file are
+      copied unchanged, and only the new audio is encoded, by a fresh Opus encoder. The Ogg header and tags
+      packets are kept byte for byte, and the granule positions are recalculated for the new packet sequence.
+    </p>
+    <ul>
+      <li><strong>Snapping:</strong> the requested time snaps to the nearest packet boundary, usually every 20 ms.
+        Ties go to the earlier boundary. The command prints the snapped time, so check it when precision matters.</li>
+      <li><strong>Lookahead offset:</strong> the Opus encoder needs about 6.5 ms of lookahead. Mid-file, that lookahead
+        cannot be trimmed, so the new audio starts about 6.5 ms after the snapped boundary. Edits at 0 are not
+        affected, because the lookahead is absorbed by the file's pre-skip.</li>
+      <li><strong>Joins:</strong> a short decoder transient is possible at each join. No crossfade or smoothing is applied.</li>
+      <li><strong>In place and atomic:</strong> the edited file is written to a temporary file in the same directory,
+        then renamed over the original. If an edit fails or is cancelled, the original file is unchanged and no
+        temporary file is left behind.</li>
+      <li><strong>Appending:</strong> <code>insert</code> with <code>--at</code> equal to the file's duration adds the new
+        audio at the end.</li>
+      <li><strong>Growing:</strong> <code>overwrite</code> grows the file when the new audio runs past the end.
+        <code>insert</code> always adds the new audio's length to the file.</li>
+      <li><strong>Channels:</strong> edits keep the file's channel count, so the new audio is converted to match:
+        a mono source is duplicated to stereo, and a stereo source is averaged to mono.</li>
+    </ul>
+
+    <h3>WAV input</h3>
+    <p>
+      <code>--from-wav</code> reads 16-bit PCM or 32-bit IEEE float WAV files, mono or stereo. Supported sample
+      rates are 8, 12, 16, 24 and 48 kHz. Other rates are rejected, and the error suggests resampling first, for
+      example <code>ffmpeg -i in.wav -ar 48000 out.wav</code>. Audio at rates below 48 kHz is upsampled to 48 kHz
+      by linear interpolation.
+    </p>
+
+    <h3 id="time-format">Time format</h3>
+    <p>
+      <code>--at</code> accepts <code>[[hh:]mm:]ss[.fff]</code>, a number of seconds such as <code>2.5</code>, or
+      a number with a suffix: <code>ms</code>, <code>s</code> or <code>m</code>, for example <code>500ms</code>,
+      <code>2s</code> or <code>1.5m</code>. <code>--duration</code> accepts the same forms. Negative values are
+      rejected.
+    </p>
+
+    <h3>Packet lengths</h3>
+    <p>
+      Existing packets are copied whatever their frame size, from 2.5 to 120 ms. The 20 ms frame size applies to
+      the new audio only.
+    </p>
+
+    <div class="info-box">
+      <strong>Scope:</strong> the <code>audio</code> topic handles mono and stereo Ogg Opus files. Multichannel
+      files, chained or multiplexed Ogg streams, and other formats are rejected with an error.
+    </div>
+  </section>
+
+  <!-- COMMAND REFERENCE -->
+  <section id="command-ref">
+    <h2>Command Reference</h2>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Command</th>
+          <th>Required options</th>
+          <th>Optional options</th>
+          <th>Output</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>audio record</code></td>
+          <td><code>--out-file</code></td>
+          <td><code>--duration</code>, <code>--from-wav</code>, <code>--channels</code>, <code>--bitrate</code>, <code>--device</code>, <code>--capture-format</code></td>
+          <td><code>Recorded '&lt;path&gt;': &lt;D&gt;s</code></td>
+        </tr>
+        <tr>
+          <td><code>audio insert</code></td>
+          <td><code>--file</code>, <code>--at</code></td>
+          <td><code>--duration</code>, <code>--from-wav</code>, <code>--bitrate</code>, <code>--device</code>, <code>--capture-format</code></td>
+          <td><code>Inserted &lt;N&gt;s at &lt;S&gt;s (requested &lt;R&gt;s) into '&lt;path&gt;': &lt;D&gt;s</code></td>
+        </tr>
+        <tr>
+          <td><code>audio overwrite</code></td>
+          <td><code>--file</code>, <code>--at</code></td>
+          <td><code>--duration</code>, <code>--from-wav</code>, <code>--bitrate</code>, <code>--device</code>, <code>--capture-format</code></td>
+          <td><code>Overwrote &lt;N&gt;s at &lt;S&gt;s (requested &lt;R&gt;s) in '&lt;path&gt;': &lt;D&gt;s</code></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Errors</h3>
+    <div class="warning-box">
+      <strong>Error exits:</strong> each action exits with code <code>1</code> and prints <code>Error: &lt;message&gt;</code>
+      in these cases:
+      <ul style="margin-top:0.5rem">
+        <li>The file given to <code>--file</code> or <code>--from-wav</code> does not exist: <code>File '&lt;path&gt;' not found</code>.</li>
+        <li><code>--at</code> is beyond the end of the file: <code>Time &lt;R&gt;s is beyond the end of '&lt;path&gt;' (&lt;D&gt;s)</code>.</li>
+        <li>A live capture would need a keypress but no interactive console is available, for example over MCP or with redirected stdin: <code>--duration or --from-wav is required when no interactive console is available</code>.</li>
+        <li>ffmpeg is needed but not on <code>PATH</code>: <code>ffmpeg was not found on PATH. Install ffmpeg (e.g. 'apt install ffmpeg' or 'brew install ffmpeg') or use --from-wav.</code></li>
+        <li>Windows capture without <code>--device</code>: <code>--device is required on Windows, e.g. --device "audio=Microphone"</code>.</li>
+        <li><code>--channels</code> is not 1 or 2, or <code>--bitrate</code> is outside 6000 to 510000.</li>
+        <li>No audio was captured: <code>No audio was captured</code>.</li>
+        <li>libopus is missing, the input is not a valid or supported Ogg Opus or WAV file, a time is malformed, or a capture fails. These print the specific message from the library or input check.</li>
+      </ul>
+    </div>
+
+    <h3>MCP</h3>
+    <p>
+      The <code>audio</code> actions are available through <a href="mcp.html"><code>pbtk mcp</code></a>. A
+      call that would capture live audio without <code>--duration</code> or <code>--from-wav</code> is refused
+      with exit code <code>1</code>, because it would wait for a keypress that an MCP call cannot send. Pass
+      <code>--duration</code> or <code>--from-wav</code> for MCP calls.
+    </p>
+  </section>
+
+</div>
+
+<footer>
+  Pixelbadger Toolkit &mdash; Audio Documentation
+</footer>
+
+</body>
+</html>
