@@ -341,8 +341,10 @@
         file, where N is the length of the new audio. A 1 s insert adds 51 packets, which is 1.020 s.</li>
       <li><strong>Overwrite inside the file:</strong> the replaced span is the longest run of whole original packets,
         starting at the snapped boundary, whose total length is at most N (the length of the new audio), and at
-        least one packet. When the boundary lies inside the file's pre-skip (see the padding note above), the silence
-        that pads the take does not count against N, so a short take at the very start is never dropped. The first part of the new take, exactly as long as the replaced packets, is encoded into
+        least one packet. At the very start of a file whose pre-skip is larger than pbtk's (typical of other encoders), the
+        replaced span is instead the shortest run of whole packets that covers the pre-skip plus the whole take, so the
+        take stays audible; this can replace up to one packet (20 ms) of original audio past the requested end. Everywhere
+        else the rule above applies. The first part of the new take, exactly as long as the replaced packets, is encoded into
         packets that fill them (20 ms frames first, then a shorter frame for any remainder), so the file keeps its
         length exactly, whatever the original packet size. Original audio resumes at or before the requested end.
         The rest of the new take is dropped, because it would otherwise overlap the original audio that resumes.

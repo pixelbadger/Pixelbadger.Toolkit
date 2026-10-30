@@ -579,9 +579,9 @@ public class OpusSpliceEditorTests : IDisposable
 
         var result = OpusSpliceEditor.Overwrite(file, 0, r => { requests.Add(r); return src(r); }, 2400);
 
-        // allowance N + pad = 2400 + 3528 = 5928 -> six 960-sample packets (5760)
-        requests.Should().Equal(new EncodeRequest(0, 1920), new EncodeRequest(3528, 5760));
-        result.ReplacedSamples.Should().Be(5760);
+        // spec v8 #32: shortest run >= (PreSkip - s) + N = 3840 + 2400 = 6240 -> seven 960-sample packets (6720)
+        requests.Should().Equal(new EncodeRequest(0, 6720), new EncodeRequest(3528, 6720));
+        result.ReplacedSamples.Should().Be(6720);
         result.File.DurationSamples.Should().Be(file.DurationSamples);
         var (samples, err) = Decode(RoundTrip(result.File));
         err.Should().BeEmpty();
@@ -590,19 +590,47 @@ public class OpusSpliceEditorTests : IDisposable
     }
 
     [Fact]
-    public void Overwrite_ShouldKeepAllButOnePacketOfTake_WhenHalfSecondTakeAtZeroWithLargePreSkip()
+    public void Overwrite_ShouldKeepWholeTake_WhenHalfSecondTakeAtZeroWithLargePreSkip()
     {
         var file = Record(2.0) with { HeadPacket = new OpusHead(1, 1, 3840, 48000, 0, 0).ToBytes() };
 
         var result = Over(file, 0, 0.5, 880);
 
-        // allowance 24000 + 3528 = 27528 -> 28 packets = 26880; audible new audio = 26880 - 3840 = 23040 = 0.5 s minus one packet
-        result.ReplacedSamples.Should().Be(26880);
+        // spec v8 #32: shortest run >= 3840 + 24000 = 27840 -> 29 packets = 27840; audible new audio = 24000 = the whole take
+        result.ReplacedSamples.Should().Be(27840);
         result.File.DurationSamples.Should().Be(file.DurationSamples);
         var (samples, err) = Decode(RoundTrip(result.File));
         err.Should().BeEmpty();
-        AssertDominant(samples, 0.005, 0.47, 880, 440);
-        AssertDominant(samples, 0.52, 0.9, 440, 880);
+        AssertDominant(samples, 0.005, 0.49, 880, 440);
+        AssertDominant(samples, 0.53, 0.9, 440, 880);
+    }
+
+    [Theory]
+    [InlineData(100)]
+    [InlineData(312)]
+    [InlineData(960)]
+    [InlineData(1271)]
+    [InlineData(1272)]
+    [InlineData(2400)]
+    [InlineData(24000)]
+    public void Overwrite_ShouldKeepTakeAudible_WhenPreSkipIs3840AndTakeIsAtZero(int takeSamples)
+    {
+        // Regression (D27, spec v8 #32): the run used to be rounded down to whole packets, so takes of 312..1271 samples fell entirely inside the pre-skip.
+        const int preSkip = 3840;
+        var file = Record(2.0) with { HeadPacket = new OpusHead(1, 1, preSkip, 48000, 0, 0).ToBytes() };
+        var pcm = OpusTestHelpers.Sine(1, takeSamples, 880);
+        var packetSamples = 960;
+
+        var result = OpusSpliceEditor.Overwrite(file, 0, r => _encoder.Encode(OpusPcmEncoder.PrependSilence(pcm, r.FrontPadSamples, 1).ToArray(), new OpusEncodeSettings(1), r.ExactSamples), takeSamples);
+
+        result.SnappedSample.Should().Be(0);
+        result.ReplacedSamples.Should().BeGreaterThanOrEqualTo(preSkip + takeSamples);
+        (result.ReplacedSamples - packetSamples).Should().BeLessThan(preSkip + takeSamples);
+        result.File.DurationSamples.Should().Be(file.DurationSamples);
+        var (samples, err) = Decode(RoundTrip(result.File));
+        err.Should().BeEmpty();
+        samples.Length.Should().Be((int)file.DurationSamples);
+        AssertDominant(samples, 0, Math.Min(takeSamples, 960) / (double)Rate, 880, 440);
     }
 
     [Fact]
