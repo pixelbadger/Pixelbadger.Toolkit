@@ -27,6 +27,8 @@ public static class AudioCommand
     /// </summary>
     private static Task<int> RunDetachedAsync(CancellationToken cancellationToken, Func<Task> work)
     {
+        // In-process hosts (the MCP server) capture output: they must keep their own exit code and shut down freely.
+        var hostsProcess = !ToolkitConsole.IsCaptured;
         var completion = new TaskCompletionSource<int>();
         var thread = new Thread(() =>
         {
@@ -41,10 +43,10 @@ public static class AudioCommand
                 code = WriteError(ex);
             }
 
-            if (cancellationToken.IsCancellationRequested)
+            if (hostsProcess && cancellationToken.IsCancellationRequested)
                 Environment.ExitCode = code;
             completion.SetResult(code);
-        }) { IsBackground = false, Name = "audio" };
+        }) { IsBackground = !hostsProcess, Name = "audio" };
         thread.Start();
         return completion.Task;
     }

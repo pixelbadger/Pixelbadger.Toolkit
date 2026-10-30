@@ -212,6 +212,32 @@ public class AudioCommandTests : IDisposable
     }
 
     [Fact]
+    public async Task Invoke_ShouldLeaveProcessExitCodeUnchanged_WhenCapturedActionRunsWithCancelledToken()
+    {
+        var wav = Wav("in.wav", 4800);
+        var path = Path.Combine(_dir, "out.opus");
+        var root = ToolkitCommandTree.Create(_store);
+        var output = new StringWriter();
+        var saved = Environment.ExitCode;
+        try
+        {
+            Environment.ExitCode = 0;
+            using var cts = new CancellationTokenSource();
+            cts.Cancel();
+            int code;
+            using (ToolkitConsole.Capture(ToolkitConsole.CreateCaptureConsole(output), output, new StringWriter()))
+                code = await ConfigBootstrap.InvokeAsync(root, ["audio", "record", "--out-file", path, "--from-wav", wav, "--bitrate", "1"], _store, cancellationToken: cts.Token);
+
+            code.Should().Be(1);
+            Environment.ExitCode.Should().Be(0);
+        }
+        finally
+        {
+            Environment.ExitCode = saved;
+        }
+    }
+
+    [Fact]
     public async Task Invoke_ShouldUseConfiguredBitrate_WhenConfigDefaultIsSet()
     {
         var wav = Wav("in.wav", 48000);

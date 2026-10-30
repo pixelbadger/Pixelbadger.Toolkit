@@ -39,6 +39,9 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Install audio dependencies
+      run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg libopus0 util-linux
+
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
