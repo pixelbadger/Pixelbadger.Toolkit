@@ -6,7 +6,7 @@ namespace Pixelbadger.Toolkit.Tests;
 public class AudioCaptureDefaultsTests
 {
     [Fact]
-    public void ForCurrentPlatform_ShouldReturnPlatformPair()
+    public void ForCurrentPlatform_ShouldReturnPlatformPair_WhenQueriedOnThisOperatingSystem()
     {
         var (format, device) = AudioCaptureDefaults.ForCurrentPlatform();
         if (OperatingSystem.IsWindows())

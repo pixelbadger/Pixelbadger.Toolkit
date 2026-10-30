@@ -9,6 +9,9 @@ namespace Pixelbadger.Toolkit.Commands;
 
 public static class AudioCommand
 {
+    // Comfortably inside System.CommandLine's 2 s process termination timeout.
+    private static readonly TimeSpan ReleaseAfterCancel = TimeSpan.FromSeconds(1);
+
     public static Command Create()
     {
         var command = new Command("audio", "Record Ogg Opus audio, and insert or overwrite sections of an existing file by packet splicing");
@@ -25,11 +28,21 @@ public static class AudioCommand
     /// timeout (2 s) elapses and the process would exit mid-write; a foreground thread keeps the process alive until the
     /// file is fully written, and then restores the real exit code.
     /// </summary>
+    /// <remarks>
+    /// System.CommandLine completes a forced-termination source on every Ctrl+C whose wait times out, and throws (killing the
+    /// process and losing the take) when a second press does so too. So after a cancellation the action's task is released
+    /// early, well inside the timeout, so no press ever waits that long; the thread carries on and sets the final exit code.
+    /// Presses after System.CommandLine has stood down are swallowed until the work is done.
+    /// </remarks>
     private static Task<int> RunDetachedAsync(CancellationToken cancellationToken, Func<Task> work)
     {
         // In-process hosts (the MCP server) capture output: they must keep their own exit code and shut down freely.
         var hostsProcess = !ToolkitConsole.IsCaptured;
-        var completion = new TaskCompletionSource<int>();
+        var completion = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var gate = new object();
+        var finished = false;
+        ConsoleCancelEventHandler? swallow = null;
+
         var thread = new Thread(() =>
         {
             int code;
@@ -38,6 +51,10 @@ public static class AudioCommand
                 work().GetAwaiter().GetResult();
                 code = 0;
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                code = WriteCancelled();
+            }
             catch (Exception ex)
             {
                 code = WriteError(ex);
@@ -45,20 +62,60 @@ public static class AudioCommand
 
             if (hostsProcess && cancellationToken.IsCancellationRequested)
                 Environment.ExitCode = code;
-            completion.SetResult(code);
+            lock (gate)
+            {
+                finished = true;
+                if (swallow is not null)
+                    Console.CancelKeyPress -= swallow;
+            }
+
+            completion.TrySetResult(code);
         }) { IsBackground = !hostsProcess, Name = "audio" };
+
+        if (hostsProcess)
+        {
+            cancellationToken.Register(() =>
+            {
+                lock (gate)
+                {
+                    if (finished || swallow is not null)
+                        return;
+                    swallow = (_, e) => e.Cancel = true;
+                    Console.CancelKeyPress += swallow;
+                }
+
+                _ = Task.Delay(ReleaseAfterCancel).ContinueWith(_ => completion.TrySetResult(130), TaskScheduler.Default);
+            });
+        }
+
         thread.Start();
         return completion.Task;
     }
 
     private static int WriteError(Exception ex)
     {
-        // Redirected output has no real terminal width; stop Spectre wrapping the message mid-sentence.
-        if (!ToolkitConsole.IsCaptured && Console.IsOutputRedirected && AnsiConsole.Profile.Width < 4096)
-            AnsiConsole.Profile.Width = 4096;
+        WidenRedirectedOutput();
         AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
         return 1;
     }
+
+    /// <summary>A cancelled fixed-length take is abandoned: nothing was written. 130 is the conventional exit code for a Ctrl+C.</summary>
+    private static int WriteCancelled()
+    {
+        WidenRedirectedOutput();
+        AnsiConsole.WriteLine("Cancelled; no changes were written");
+        return 130;
+    }
+
+    // Redirected output has no real terminal width; stop Spectre wrapping the message mid-sentence.
+    private static void WidenRedirectedOutput()
+    {
+        if (!ToolkitConsole.IsCaptured && Console.IsOutputRedirected && AnsiConsole.Profile.Width < 4096)
+            AnsiConsole.Profile.Width = 4096;
+    }
+
+    private static AudioInputCollector NewCollector(TextWriter output) =>
+        new(new ConsoleTerminalInput(), output, ffmpegLocator: AudioSeams.FfmpegLocator);
 
     private static Option<string?> DurationOption(string description) =>
         new("--duration") { Description = description };
@@ -98,7 +155,7 @@ public static class AudioCommand
         command.SetAction((parseResult, cancellationToken) => RunDetachedAsync(cancellationToken, async () =>
         {
             var output = ToolkitConsole.Out;
-            var component = new AudioRecordComponent(new OpusCodecFactory(), new AudioInputCollector(new ConsoleTerminalInput(), output), output);
+            var component = new AudioRecordComponent(new OpusCodecFactory(), NewCollector(output), output);
             await component.RunAsync(new AudioRecordOptions(
                 parseResult.GetValue(outFileOption)!,
                 parseResult.GetValue(durationOption),
@@ -120,7 +177,7 @@ public static class AudioCommand
         command.SetAction((parseResult, cancellationToken) => RunDetachedAsync(cancellationToken, async () =>
         {
             var output = ToolkitConsole.Out;
-            var component = new AudioInsertComponent(new OpusCodecFactory(), new AudioInputCollector(new ConsoleTerminalInput(), output), output);
+            var component = new AudioInsertComponent(new OpusCodecFactory(), NewCollector(output), output);
             await component.RunAsync(new AudioEditOptions(
                 parseResult.GetValue(fileOption)!,
                 parseResult.GetValue(atOption)!,
@@ -142,7 +199,7 @@ public static class AudioCommand
         command.SetAction((parseResult, cancellationToken) => RunDetachedAsync(cancellationToken, async () =>
         {
             var output = ToolkitConsole.Out;
-            var component = new AudioOverwriteComponent(new OpusCodecFactory(), new AudioInputCollector(new ConsoleTerminalInput(), output), output);
+            var component = new AudioOverwriteComponent(new OpusCodecFactory(), NewCollector(output), output);
             await component.RunAsync(new AudioEditOptions(
                 parseResult.GetValue(fileOption)!,
                 parseResult.GetValue(atOption)!,

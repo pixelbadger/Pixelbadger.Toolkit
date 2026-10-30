@@ -28,7 +28,7 @@ public class OpusTocTests
 
     [Theory]
     [MemberData(nameof(AllConfigsAndCodes))]
-    public void GetSampleCount_ShouldMatchRfcTable_ForEveryConfigAndCode(int config, int code)
+    public void GetSampleCount_ShouldMatchRfcTable_WhenAnyConfigAndCodeGiven(int config, int code)
     {
         var frame = FrameSamples[config];
         var toc = (byte)((config << 3) | code);
@@ -85,7 +85,7 @@ public class OpusTocTests
     }
 
     [Fact]
-    public void GetSampleCount_ShouldAccept120Ms_AndRejectLonger()
+    public void GetSampleCount_ShouldAccept120MsAndRejectLonger_WhenFrameCountVaries()
     {
         // config 3 (SILK 60 ms): 2 frames = 120 ms ok, 3 frames = 180 ms rejected.
         OpusToc.GetSampleCount(new byte[] { 0x1B, 2 }).Should().Be(5760);
@@ -94,7 +94,7 @@ public class OpusTocTests
     }
 
     [Fact]
-    public void GetSampleCount_ShouldReturn960_ForTypicalCeltFullbandPacket()
+    public void GetSampleCount_ShouldReturn960_WhenPacketIsTypicalCeltFullband()
     {
         OpusToc.GetSampleCount(new byte[] { 0xFC, 0xFF, 0xFE }).Should().Be(960);
     }

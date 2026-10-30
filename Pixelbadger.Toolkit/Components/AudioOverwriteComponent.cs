@@ -27,13 +27,13 @@ public sealed class AudioOverwriteComponent
         var at = AudioTimeParser.Parse(options.At);
         var duration = AudioCommandSupport.ParseOptionalTime(options.Duration);
 
-        var file = AudioCommandSupport.ReadOpusFile(options.File);
+        var (file, stamp) = AudioCommandSupport.ReadOpusFile(options.File);
         var requested = AudioCommandSupport.ToSamples(at);
         if (requested > file.DurationSamples)
             throw new InvalidOperationException(
                 $"Time {AudioCommandSupport.Seconds(requested)}s is beyond the end of '{options.File}' ({AudioCommandSupport.Seconds(file.DurationSamples)}s)");
 
-        OpusLibrary.EnsureAvailable();
+        AudioCommandSupport.EnsureOpusAvailable();
         var channels = file.Head.ChannelCount;
         var request = new AudioInputRequest(channels, duration, options.FromWav, options.Device, options.CaptureFormat);
         _collector.Validate(request);
@@ -45,7 +45,7 @@ public sealed class AudioOverwriteComponent
         var settings = new OpusEncodeSettings(channels, options.Bitrate);
         var result = OpusSpliceEditor.Overwrite(file, requested, request => encoder.Encode(OpusPcmEncoder.PrependSilence(pcm, request.FrontPadSamples, channels), settings, request.ExactSamples),
             pcm.Length / channels);
-        AudioCommandSupport.WriteOpusFile(options.File, result.File);
+        AudioCommandSupport.WriteOpusFile(options.File, result.File, request, cancellationToken, stamp);
 
         _output.WriteLine(
             $"Overwrote {AudioCommandSupport.Seconds(pcm.Length / channels)}s at {AudioCommandSupport.Seconds(result.SnappedSample)}s " +

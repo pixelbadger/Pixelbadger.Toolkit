@@ -125,7 +125,7 @@ public class OggPageReaderTests : IDisposable
     [InlineData(254)]
     [InlineData(65025)]
     [InlineData(70000)]
-    public void Reader_ShouldRoundTripPacketsAcrossPages_ForLacingEdgeSizes(int length)
+    public void Reader_ShouldRoundTripPacketsAcrossPages_WhenPacketSizeIsALacingEdge(int length)
     {
         var packet = Enumerable.Range(0, length).Select(i => (byte)(i * 7 + 1)).ToArray();
         var file = new OggOpusFile(

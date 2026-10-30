@@ -78,7 +78,7 @@ public class WavReaderTests
     }
 
     [Fact]
-    public void Read_ShouldAcceptExtensiblePcm()
+    public void Read_ShouldAcceptExtensiblePcm_WhenFormatIsWaveFormatExtensible()
     {
         var audio = Read(Wav(Chunk("fmt ", FmtExtensible(1, 2, 24000, 16)), Chunk("data", Shorts(5, 6))));
         audio.Samples.Should().Equal(5, 6);
@@ -86,7 +86,7 @@ public class WavReaderTests
     }
 
     [Fact]
-    public void Read_ShouldAcceptExtensibleFloat()
+    public void Read_ShouldAcceptExtensibleFloat_WhenSubformatIsFloat()
     {
         var audio = Read(Wav(Chunk("fmt ", FmtExtensible(3, 1, 48000, 32)), Chunk("data", Floats(0.25f))));
         audio.Samples.Should().Equal(8192);
@@ -101,7 +101,7 @@ public class WavReaderTests
     }
 
     [Fact]
-    public void Read_ShouldHandleOddSizedChunkPadding()
+    public void Read_ShouldHandleOddSizedChunkPadding_WhenChunksHaveOddLength()
     {
         var audio = Read(Wav(Chunk("junk", new byte[] { 1, 2, 3 }), Chunk("fmt ", Fmt(1, 1, 8000, 16)),
             Chunk("odd!", new byte[] { 9 }), Chunk("data", Shorts(11, 12))));

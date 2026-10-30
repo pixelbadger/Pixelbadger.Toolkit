@@ -9,8 +9,9 @@ public interface IAudioInputCollector
     void Validate(AudioInputRequest request);
 
     /// <summary>
-    /// Produces 48 kHz interleaved PCM at <see cref="AudioInputRequest.Channels"/>. A stop by Enter or by
-    /// cancelling <paramref name="cancellationToken"/> ends a live capture normally and returns what was captured.
+    /// Produces 48 kHz interleaved PCM at <see cref="AudioInputRequest.Channels"/>. Without a duration, a stop by Enter or by
+    /// cancelling <paramref name="cancellationToken"/> ends a live capture normally and returns what was captured. With a duration
+    /// (or a WAV), cancelling aborts: <see cref="OperationCanceledException"/> is thrown and nothing is returned.
     /// </summary>
     Task<short[]> CollectAsync(AudioInputRequest request, CancellationToken cancellationToken);
 }

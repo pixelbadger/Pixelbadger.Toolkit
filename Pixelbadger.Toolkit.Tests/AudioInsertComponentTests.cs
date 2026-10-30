@@ -258,4 +258,99 @@ public class AudioInsertComponentTests : IDisposable
         (await act.Should().ThrowAsync<InvalidOperationException>()).WithMessage("No audio was captured");
         (await File.ReadAllBytesAsync(path)).Should().Equal(original);
     }
+
+    private void ReturnsThen(short[] pcm, Action sideEffect) =>
+        _collector.Setup(c => c.CollectAsync(It.IsAny<AudioInputRequest>(), It.IsAny<CancellationToken>()))
+            .Returns(() => { sideEffect(); return Task.FromResult(pcm); });
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task RunAsync_ShouldFailAndKeepOtherWritersContent_WhenFileChangedWhileRecording(bool changeLength)
+    {
+        var path = await RecordingAsync(96000);
+        var otherWriter = (await File.ReadAllBytesAsync(path)).ToArray();
+        if (changeLength)
+            otherWriter = [.. otherWriter, 1, 2, 3];
+        var otherWriteTime = File.GetLastWriteTimeUtc(path).AddMinutes(5);
+        ReturnsThen(AudioTestSupport.Tone(880, 48000), () =>
+        {
+            File.WriteAllBytes(path, otherWriter);
+            File.SetLastWriteTimeUtc(path, otherWriteTime);
+        });
+
+        var act = () => Component().RunAsync(Options(path, "1"), CancellationToken.None);
+
+        (await act.Should().ThrowAsync<InvalidOperationException>()).WithMessage($"File '{path}' changed while recording; no changes were written");
+        (await File.ReadAllBytesAsync(path)).Should().Equal(otherWriter);
+        Directory.GetFiles(_dir, "*.tmp", SearchOption.AllDirectories).Should().BeEmpty();
+        Directory.GetFiles(_dir).Should().ContainSingle();
+        _output.ToString().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task RunAsync_ShouldLeaveOriginalByteIdenticalAndNoTempFile_WhenWriteFailsInsideAtomicReplace()
+    {
+        var path = await RecordingAsync(96000);
+        var original = await File.ReadAllBytesAsync(path);
+        Returns(AudioTestSupport.Tone(880, 48000));
+        long tempBytesWritten = 0;
+        using var seam = AudioSeams.Override(afterWrite: stream =>
+        {
+            tempBytesWritten = stream.Length;
+            throw new IOException("disk full");
+        });
+
+        var act = () => Component().RunAsync(Options(path, "1"), CancellationToken.None);
+
+        (await act.Should().ThrowAsync<IOException>()).WithMessage("disk full");
+        tempBytesWritten.Should().BeGreaterThan(0, "the failure happened after the new file was written to the temp file");
+        (await File.ReadAllBytesAsync(path)).Should().Equal(original);
+        Directory.GetFiles(_dir, "*.tmp", SearchOption.AllDirectories).Should().BeEmpty();
+        Directory.GetFiles(_dir).Should().ContainSingle();
+        _output.ToString().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task RunAsync_ShouldWriteNothingAndThrowCancelled_WhenCancelledAfterCaptureWithDuration()
+    {
+        var path = await RecordingAsync(96000);
+        var original = await File.ReadAllBytesAsync(path);
+        using var cts = new CancellationTokenSource();
+        ReturnsThen(AudioTestSupport.Tone(880, 48000), cts.Cancel);
+
+        var act = () => Component().RunAsync(Options(path, "1", "1s"), cts.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        (await File.ReadAllBytesAsync(path)).Should().Equal(original);
+        Directory.GetFiles(_dir).Should().ContainSingle();
+        _output.ToString().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task RunAsync_ShouldWriteNothingAndThrowCancelled_WhenCancelledAfterCaptureWithWav()
+    {
+        var path = await RecordingAsync(96000);
+        var original = await File.ReadAllBytesAsync(path);
+        using var cts = new CancellationTokenSource();
+        ReturnsThen(AudioTestSupport.Tone(880, 48000), cts.Cancel);
+
+        var act = () => Component().RunAsync(new AudioEditOptions(path, "1", null, "x.wav", 64000, null, null), cts.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        (await File.ReadAllBytesAsync(path)).Should().Equal(original);
+    }
+
+    [Fact]
+    public async Task RunAsync_ShouldSaveCapturedAudio_WhenCancelledAfterCaptureWithoutDuration()
+    {
+        var path = await RecordingAsync(96000);
+        using var cts = new CancellationTokenSource();
+        ReturnsThen(AudioTestSupport.Tone(880, 48000), cts.Cancel);
+
+        await Component().RunAsync(Options(path, "1"), cts.Token);
+
+        Load(path).DurationSamples.Should().Be(96000 + 48960);
+        _output.ToString().Should().Contain("Inserted 1.000s at 0.994s");
+    }
 }

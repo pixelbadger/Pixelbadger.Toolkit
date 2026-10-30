@@ -200,4 +200,61 @@ public class AudioRecordComponentTests : IDisposable
 
         _output.ToString().Should().Contain("': 1.500s");
     }
+
+    private void ReturnsThen(short[] pcm, Action sideEffect) =>
+        _collector.Setup(c => c.CollectAsync(It.IsAny<AudioInputRequest>(), It.IsAny<CancellationToken>()))
+            .Returns(() => { sideEffect(); return Task.FromResult(pcm); });
+
+    [Fact]
+    public async Task RunAsync_ShouldLeaveNoFile_WhenWriteFailsInsideAtomicReplace()
+    {
+        Returns(AudioTestSupport.Tone(440, 4800));
+        using var seam = AudioSeams.Override(afterWrite: _ => throw new IOException("disk full"));
+
+        var act = () => Component().RunAsync(Options(Out()), CancellationToken.None);
+
+        (await act.Should().ThrowAsync<IOException>()).WithMessage("disk full");
+        Directory.GetFiles(_dir).Should().BeEmpty();
+        _output.ToString().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task RunAsync_ShouldKeepExistingOutFileAndThrowCancelled_WhenCancelledAfterCaptureWithDuration()
+    {
+        var existing = Out();
+        await File.WriteAllBytesAsync(existing, [1, 2, 3]);
+        using var cts = new CancellationTokenSource();
+        ReturnsThen(AudioTestSupport.Tone(440, 4800), cts.Cancel);
+
+        var act = () => Component().RunAsync(Options(existing, duration: "1s"), cts.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        (await File.ReadAllBytesAsync(existing)).Should().Equal(1, 2, 3);
+        Directory.GetFiles(_dir).Should().ContainSingle();
+        _output.ToString().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task RunAsync_ShouldWriteNoFileAndThrowCancelled_WhenCancelledAfterCaptureWithWav()
+    {
+        using var cts = new CancellationTokenSource();
+        ReturnsThen(AudioTestSupport.Tone(440, 4800), cts.Cancel);
+
+        var act = () => Component().RunAsync(Options(Out(), wav: "x.wav"), cts.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        Directory.GetFiles(_dir).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task RunAsync_ShouldSaveCapturedAudio_WhenCancelledAfterCaptureWithoutDuration()
+    {
+        using var cts = new CancellationTokenSource();
+        ReturnsThen(AudioTestSupport.Tone(440, 48000), cts.Cancel);
+
+        await Component().RunAsync(Options(Out()), cts.Token);
+
+        Load(Out()).DurationSamples.Should().Be(48000);
+        _output.ToString().Should().Be($"Recorded '{Out()}': 1.000s{Environment.NewLine}");
+    }
 }

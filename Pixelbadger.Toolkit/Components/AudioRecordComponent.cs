@@ -29,7 +29,7 @@ public sealed class AudioRecordComponent
         AudioCommandSupport.ValidateBitrate(options.Bitrate);
         var duration = AudioCommandSupport.ParseOptionalTime(options.Duration);
 
-        OpusLibrary.EnsureAvailable();
+        AudioCommandSupport.EnsureOpusAvailable();
         var request = new AudioInputRequest(options.Channels, duration, options.FromWav, options.Device, options.CaptureFormat);
         _collector.Validate(request);
 
@@ -38,7 +38,7 @@ public sealed class AudioRecordComponent
 
         var encoded = new OpusPcmEncoder(_factory).Encode(pcm, new OpusEncodeSettings(options.Channels, options.Bitrate));
         var file = OpusSpliceEditor.CreateRecording(encoded, options.Channels);
-        AudioCommandSupport.WriteOpusFile(options.OutFile, file);
+        AudioCommandSupport.WriteOpusFile(options.OutFile, file, request, cancellationToken);
 
         _output.WriteLine($"Recorded '{options.OutFile}': {AudioCommandSupport.Seconds(file.DurationSamples)}s");
     }

@@ -6,7 +6,7 @@ namespace Pixelbadger.Toolkit.Tests;
 public class PcmConverterTests
 {
     [Fact]
-    public void SupportedRates_ShouldListExactRates()
+    public void SupportedRates_ShouldListExactRates_WhenRead()
     {
         PcmConverter.SupportedRates.Should().Equal(8000, 12000, 16000, 24000, 48000);
     }
@@ -17,7 +17,7 @@ public class PcmConverterTests
     [InlineData(16000)]
     [InlineData(24000)]
     [InlineData(48000)]
-    public void ToOpusInput_ShouldProduceExactLength_ForEachSupportedRate(int rate)
+    public void ToOpusInput_ShouldProduceExactLength_WhenRateIsSupported(int rate)
     {
         var n = 480;
         var audio = new PcmAudio(rate, 1, Enumerable.Range(0, n).Select(i => (short)i).ToArray());

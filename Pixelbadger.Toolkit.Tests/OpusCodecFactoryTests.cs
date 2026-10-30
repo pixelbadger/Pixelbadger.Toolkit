@@ -8,7 +8,7 @@ public class OpusCodecFactoryTests
     private readonly IOpusCodecFactory _factory = new OpusCodecFactory();
 
     [Fact]
-    public void CreateEncoder_ShouldReturnEncoderWithRequestedFormat()
+    public void CreateEncoder_ShouldReturnEncoderWithRequestedFormat_WhenArgumentsValid()
     {
         using var e = _factory.CreateEncoder(48000, 2, OpusApplication.Audio);
         e.Should().BeOfType<OpusEncoder>();
@@ -17,7 +17,7 @@ public class OpusCodecFactoryTests
     }
 
     [Fact]
-    public void CreateDecoder_ShouldReturnDecoderWithRequestedFormat()
+    public void CreateDecoder_ShouldReturnDecoderWithRequestedFormat_WhenArgumentsValid()
     {
         using var d = _factory.CreateDecoder(48000, 1);
         d.Should().BeOfType<OpusDecoder>();
@@ -40,7 +40,7 @@ public class OpusCodecFactoryTests
     }
 
     [Fact]
-    public void FactoryCodecs_ShouldRoundTripAFrame()
+    public void FactoryCodecs_ShouldRoundTripAFrame_WhenEncodedThenDecoded()
     {
         using var e = _factory.CreateEncoder(48000, 1, OpusApplication.Audio);
         using var d = _factory.CreateDecoder(48000, 1);

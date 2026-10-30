@@ -54,7 +54,7 @@ public class AudioTimeParserTests
     }
 
     [Fact]
-    public void Parse_ShouldUseInvariantCulture()
+    public void Parse_ShouldUseInvariantCulture_WhenCurrentCultureUsesCommaDecimals()
     {
         var previous = System.Globalization.CultureInfo.CurrentCulture;
         try

@@ -41,7 +41,7 @@ public class FfmpegLocatorTests : IDisposable
     }
 
     [Fact]
-    public void Resolve_ShouldSkipMalformedEntries()
+    public void Resolve_ShouldSkipMalformedEntries_WhenPathContainsInvalidDirectory()
     {
         var expected = Path.Combine(_dir, FileName);
         File.WriteAllText(expected, "x");

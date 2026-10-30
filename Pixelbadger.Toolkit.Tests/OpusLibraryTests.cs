@@ -45,7 +45,7 @@ public class OpusLibraryTests
     }
 
     [Fact]
-    public void OpusException_ShouldExposeErrorCodeAndMessage()
+    public void OpusException_ShouldExposeErrorCodeAndMessage_WhenConstructed()
     {
         var ex = new OpusException(-1, "opus_encode failed: invalid argument");
         ex.ErrorCode.Should().Be(-1);

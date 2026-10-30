@@ -3,8 +3,10 @@ using System.Text.Json;
 using FluentAssertions;
 using Pixelbadger.Toolkit.CommandLine;
 using Pixelbadger.Toolkit.Commands;
+using Pixelbadger.Toolkit.Opus;
 using Pixelbadger.Toolkit.Opus.Ogg;
 using Pixelbadger.Toolkit.Services;
+using Pixelbadger.Toolkit.Services.Audio;
 using Spectre.Console;
 
 namespace Pixelbadger.Toolkit.Tests;
@@ -134,18 +136,29 @@ public class AudioCommandTests : IDisposable
     }
 
     [Fact]
-    public async Task Invoke_ShouldInsertThenOverwrite_WhenEditingRecordedFile()
+    public async Task Invoke_ShouldInsertThenOverwriteAndChangeTheFile_WhenEditingRecordedFile()
     {
         var path = Path.Combine(_dir, "memo.opus");
         await RunAsync("audio", "record", "--out-file", path, "--from-wav", Wav("a.wav", 96000));
+        var recorded = Load(path);
 
         var insert = await RunAsync("audio", "insert", "--file", path, "--at", "1", "--from-wav", Wav("b.wav", 48000, 880));
+        var inserted = Load(path);
         var overwrite = await RunAsync("audio", "overwrite", "--file", path, "--at", "1.0", "--from-wav", Wav("c.wav", 24000, 660));
+        var overwritten = Load(path);
 
         insert.Code.Should().Be(0);
         insert.Out.Should().Be($"Inserted 1.000s at 0.994s (requested 1.000s) into '{path}': 3.020s{Environment.NewLine}");
+        inserted.DurationSamples.Should().Be(96000 + 48960);
+        inserted.AudioPackets.Should().HaveCount(recorded.AudioPackets.Count + 51);
+        inserted.AudioPackets.Take(50).Should().BeEquivalentTo(recorded.AudioPackets.Take(50), o => o.WithStrictOrdering());
         overwrite.Code.Should().Be(0);
         overwrite.Out.Should().Be($"Overwrote 0.500s at 0.994s (requested 1.000s) in '{path}': 3.020s{Environment.NewLine}");
+        overwritten.DurationSamples.Should().Be(inserted.DurationSamples, "an overwrite inside the file keeps its length");
+        overwritten.AudioPackets.Should().HaveCount(inserted.AudioPackets.Count);
+        overwritten.AudioPackets.Take(50).Should().BeEquivalentTo(inserted.AudioPackets.Take(50), o => o.WithStrictOrdering());
+        overwritten.AudioPackets.Skip(50).Take(25).Zip(inserted.AudioPackets.Skip(50).Take(25)).Should().OnlyContain(p => !p.First.SequenceEqual(p.Second));
+        overwritten.AudioPackets.Skip(75).Should().BeEquivalentTo(inserted.AudioPackets.Skip(75), o => o.WithStrictOrdering());
     }
 
     [Fact]
@@ -162,21 +175,40 @@ public class AudioCommandTests : IDisposable
     }
 
     [Fact]
-    public async Task Invoke_ShouldReportMissingFfmpeg_WhenPathHasNoFfmpeg()
+    public async Task Invoke_ShouldReportMissingFfmpeg_WhenFfmpegCannotBeLocated()
     {
-        var previous = Environment.GetEnvironmentVariable("PATH");
-        try
-        {
-            Environment.SetEnvironmentVariable("PATH", _dir);
-            var (code, output) = await RunAsync("audio", "record", "--out-file", Path.Combine(_dir, "o.opus"), "--duration", "1s");
+        using var seam = AudioSeams.Override(ffmpegLocator: () => null);
 
-            code.Should().Be(1);
-            output.Trim().Should().Be("Error: ffmpeg was not found on PATH. Install ffmpeg (e.g. 'apt install ffmpeg' or 'brew install ffmpeg') or use --from-wav.");
-        }
-        finally
-        {
-            Environment.SetEnvironmentVariable("PATH", previous);
-        }
+        var (code, output) = await RunAsync("audio", "record", "--out-file", Path.Combine(_dir, "o.opus"), "--duration", "1s");
+
+        code.Should().Be(1);
+        output.Trim().Should().Be("Error: ffmpeg was not found on PATH. Install ffmpeg (e.g. 'apt install ffmpeg' or 'brew install ffmpeg') or use --from-wav.");
+        File.Exists(Path.Combine(_dir, "o.opus")).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData("record")]
+    [InlineData("insert")]
+    [InlineData("overwrite")]
+    public async Task Invoke_ShouldPrintInstallGuidanceAndExitOne_WhenLibopusIsMissing(string action)
+    {
+        var target = Path.Combine(_dir, "t.opus");
+        if (action != "record")
+            await RunAsync("audio", "record", "--out-file", target, "--from-wav", Wav("seed.wav", 48000));
+        var before = File.Exists(target) ? await File.ReadAllBytesAsync(target) : null;
+        using var seam = AudioSeams.Override(ensureOpus: () => OpusLibrary.EnsureAvailable(["libopus-that-does-not-exist"]));
+        string[] args = action == "record"
+            ? ["audio", "record", "--out-file", target, "--from-wav", Wav("w.wav", 4800)]
+            : ["audio", action, "--file", target, "--at", "0", "--from-wav", Wav("w.wav", 4800)];
+
+        var (code, output) = await RunAsync(args);
+
+        code.Should().Be(1);
+        output.Trim().Should().Be("Error: The native Opus library (libopus) was not found. Install it: Debian/Ubuntu 'apt install libopus0', macOS 'brew install opus', Windows: put opus.dll on PATH.");
+        if (before is null)
+            File.Exists(target).Should().BeFalse();
+        else
+            (await File.ReadAllBytesAsync(target)).Should().Equal(before);
     }
 
     [Fact]
@@ -212,7 +244,7 @@ public class AudioCommandTests : IDisposable
     }
 
     [Fact]
-    public async Task Invoke_ShouldLeaveProcessExitCodeUnchanged_WhenCapturedActionRunsWithCancelledToken()
+    public async Task Invoke_ShouldLeaveProcessExitCodeUnchanged_WhenCapturedActionFailsWithCancelledToken()
     {
         var wav = Wav("in.wav", 4800);
         var path = Path.Combine(_dir, "out.opus");
@@ -230,6 +262,61 @@ public class AudioCommandTests : IDisposable
 
             code.Should().Be(1);
             Environment.ExitCode.Should().Be(0);
+        }
+        finally
+        {
+            Environment.ExitCode = saved;
+        }
+    }
+
+    [Fact]
+    public async Task Invoke_ShouldReportCancelledWithExit130AndWriteNothing_WhenCapturedActionCancelledWithWav()
+    {
+        var wav = Wav("in.wav", 4800);
+        var path = Path.Combine(_dir, "out.opus");
+        var root = ToolkitCommandTree.Create(_store);
+        var output = new StringWriter();
+        var saved = Environment.ExitCode;
+        try
+        {
+            Environment.ExitCode = 0;
+            using var cts = new CancellationTokenSource();
+            cts.Cancel();
+            int code;
+            using (ToolkitConsole.Capture(ToolkitConsole.CreateCaptureConsole(output), output, new StringWriter()))
+                code = await ConfigBootstrap.InvokeAsync(root, ["audio", "record", "--out-file", path, "--from-wav", wav], _store, cancellationToken: cts.Token);
+
+            code.Should().Be(130);
+            output.ToString().Should().Be("Cancelled; no changes were written" + Environment.NewLine);
+            File.Exists(path).Should().BeFalse();
+            Environment.ExitCode.Should().Be(0, "an in-process host keeps its own exit code");
+        }
+        finally
+        {
+            Environment.ExitCode = saved;
+        }
+    }
+
+    [Theory]
+    [InlineData("--bitrate", "1", 1)]
+    [InlineData("--duration", "1s", 130)]
+    public async Task Invoke_ShouldSetProcessExitCodeToActionResult_WhenUncapturedActionRunsWithCancelledToken(string option, string value, int expected)
+    {
+        var wav = Wav("in.wav", 4800);
+        var path = Path.Combine(_dir, "out.opus");
+        var root = ToolkitCommandTree.Create(_store);
+        var saved = Environment.ExitCode;
+        try
+        {
+            Environment.ExitCode = 0;
+            using var cts = new CancellationTokenSource();
+            cts.Cancel();
+
+            var code = await ConfigBootstrap.InvokeAsync(root, ["audio", "record", "--out-file", path, "--from-wav", wav, option, value], _store, cancellationToken: cts.Token);
+
+            code.Should().Be(expected);
+            Environment.ExitCode.Should().Be(expected, "after a cancellation the real exit code is carried by the process exit code");
+            File.Exists(path).Should().BeFalse();
         }
         finally
         {

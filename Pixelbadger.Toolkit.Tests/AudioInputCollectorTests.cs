@@ -146,6 +146,39 @@ public class AudioInputCollectorTests : IDisposable
         var pcm = await Collector(new FakeSource(1, totalSamples: 5000)).CollectAsync(request, CancellationToken.None);
 
         pcm.Length.Should().Be(5000);
+        _output.ToString().Should().Be("Warning: capture ended after 0.104s, before the requested 10.000s" + Environment.NewLine);
+    }
+
+    [Fact]
+    public async Task CollectAsync_ShouldNotWarn_WhenCaptureReachesDuration()
+    {
+        var request = new AudioInputRequest(1, TimeSpan.FromSeconds(0.1), null, null, null);
+
+        await Collector(new FakeSource(1)).CollectAsync(request, CancellationToken.None);
+
+        _output.ToString().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task CollectAsync_ShouldNotWarn_WhenWavIsShorterThanDuration()
+    {
+        var wav = Wav(48000, 1, AudioTestSupport.Tone(440, 4800));
+
+        await Collector().CollectAsync(new AudioInputRequest(1, TimeSpan.FromSeconds(5), wav, null, null), CancellationToken.None);
+
+        _output.ToString().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task CollectAsync_ShouldKeepEverySampleInOrder_WhenCaptureSpansSeveralBuffers()
+    {
+        // 3 s of mono is 144000 samples: more than one internal block, so a block boundary falls inside the capture.
+        var request = new AudioInputRequest(1, TimeSpan.FromSeconds(3), null, null, null);
+
+        var pcm = await Collector(new FakeSource(1)).CollectAsync(request, CancellationToken.None);
+
+        pcm.Length.Should().Be(144000);
+        pcm.Select((v, i) => v == (short)(i % 1000 + 1)).Should().OnlyContain(ok => ok);
     }
 
     [Fact]
@@ -173,7 +206,7 @@ public class AudioInputCollectorTests : IDisposable
     }
 
     [Fact]
-    public async Task CollectAsync_ShouldFinishNormallyWithCapturedAudio_WhenCancelledByCtrlC()
+    public async Task CollectAsync_ShouldFinishNormallyWithCapturedAudio_WhenCancelledByCtrlCWithoutDuration()
     {
         var source = new FakeSource(1);
         using var cts = new CancellationTokenSource();
@@ -189,7 +222,7 @@ public class AudioInputCollectorTests : IDisposable
     }
 
     [Fact]
-    public async Task CollectAsync_ShouldFinishNormally_WhenCancelledWhileDurationCaptureRuns()
+    public async Task CollectAsync_ShouldThrowCancelledAndDisposeSource_WhenCancelledWhileDurationCaptureRuns()
     {
         var source = new FakeSource(1);
         using var cts = new CancellationTokenSource();
@@ -198,9 +231,23 @@ public class AudioInputCollectorTests : IDisposable
         var task = collector.CollectAsync(new AudioInputRequest(1, TimeSpan.FromMinutes(5), null, null, null), cts.Token);
         while (source.Reads < 5) await Task.Delay(2);
         cts.Cancel();
-        var pcm = await task;
 
-        pcm.Length.Should().BeInRange(1, 960 * 400);
+        Func<Task> act = () => task;
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        source.Disposed.Should().BeTrue();
+        _output.ToString().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task CollectAsync_ShouldThrowCancelled_WhenCancelledBeforeWavRead()
+    {
+        var wav = Wav(48000, 1, AudioTestSupport.Tone(440, 4800));
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        var act = () => Collector().CollectAsync(new AudioInputRequest(1, null, wav, null, null), cts.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
     }
 
     [Fact]
@@ -216,18 +263,51 @@ public class AudioInputCollectorTests : IDisposable
     }
 
     [Fact]
-    public async Task CollectAsync_ShouldThrowCaptureError_WhenSourceFailsAndNoStopRequested()
+    public async Task CollectAsync_ShouldThrowCaptureError_WhenSourceFailsAndNoStopRequestedWithinTwoSeconds()
     {
         var failure = new AudioCaptureException("ffmpeg capture failed (exit 1): boom");
         var collector = Collector(new FakeSource(1, failure: failure));
+        var watch = System.Diagnostics.Stopwatch.StartNew();
 
         var act = () => collector.CollectAsync(new AudioInputRequest(1, TimeSpan.FromSeconds(5), null, null, null), CancellationToken.None);
 
         (await act.Should().ThrowAsync<AudioCaptureException>()).WithMessage("ffmpeg capture failed (exit 1): boom");
+        watch.Elapsed.Should().BeGreaterThanOrEqualTo(TimeSpan.FromSeconds(1.9), "the failure is only reported after the two-second stop window");
     }
 
     [Fact]
-    public async Task CollectAsync_ShouldFinishNormally_WhenFfmpegDiesAsCtrlCArrives()
+    public async Task CollectAsync_ShouldTreatFailureAsUserStop_WhenCancelledOneAndAHalfSecondsAfterSourceDied()
+    {
+        var source = new FakeSource(1, failure: new AudioCaptureException("ffmpeg capture failed (exit 255): no error output"));
+        using var cts = new CancellationTokenSource();
+        var collector = Collector(source);
+
+        var task = collector.CollectAsync(new AudioInputRequest(1, null, null, null, null), cts.Token);
+        while (source.Reads < 3) await Task.Delay(1);
+        cts.CancelAfter(1500);
+        var pcm = await task;
+
+        pcm.Length.Should().Be(2 * 960, "the two reads before the failure were kept");
+        source.Disposed.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task CollectAsync_ShouldAbortWithCancelled_WhenDurationCaptureFailsAsCtrlCArrives()
+    {
+        var source = new FakeSource(1, failure: new AudioCaptureException("ffmpeg capture failed (exit 255): no error output"));
+        using var cts = new CancellationTokenSource();
+        var collector = Collector(source);
+
+        var task = collector.CollectAsync(new AudioInputRequest(1, TimeSpan.FromSeconds(30), null, null, null), cts.Token);
+        while (source.Reads < 3) await Task.Delay(1);
+        cts.CancelAfter(100);
+
+        Func<Task> act = () => task;
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
+
+    [Fact]
+    public async Task CollectAsync_ShouldFinishNormally_WhenFfmpegDiesAsCtrlCArrivesWithoutDuration()
     {
         var source = new FakeSource(1, failure: new AudioCaptureException("ffmpeg capture failed (exit 255): no error output"));
         using var cts = new CancellationTokenSource();

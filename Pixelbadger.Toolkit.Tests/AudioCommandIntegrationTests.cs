@@ -274,10 +274,27 @@ public class AudioCommandIntegrationTests : IDisposable
     }
 
     [Fact]
-    public async Task Record_ShouldWriteCompleteFileAndExitZero_WhenCtrlCStopsCaptureOnTerminal()
+    public async Task Record_ShouldWarnAndKeepCapturedAudio_WhenDeviceEndsBeforeDuration()
     {
-        // The tool needs a terminal on stdin to wait for Enter, so run it under `script`, which provides a pty.
-        var path = Path_("ctrlc.opus");
+        var path = Path_("short.opus");
+
+        var r = await Pbtk("audio", "record", "--out-file", path, "--capture-format", "lavfi", "--device", "sine=frequency=440:duration=1", "--duration", "3s");
+
+        r.ExitCode.Should().Be(0, r.Err);
+        r.Out.Should().Be(
+            $"Warning: capture ended after 1.000s, before the requested 3.000s{Environment.NewLine}" +
+            $"Recorded '{path}': 1.000s{Environment.NewLine}");
+        AssertDurationConsistent(path, 48000);
+    }
+
+    private sealed record PtyResult(int ExitCode, string Text);
+
+    /// <summary>
+    /// Runs the tool under `script` (which provides a pty, so the tool sees a terminal on stdin), waits for it to be capturing,
+    /// then calls <paramref name="interrupt"/> with the tool's pid. A terminal Ctrl+C reaches the tool and its ffmpeg child alike.
+    /// </summary>
+    private async Task<PtyResult> RunUnderPtyAsync(string marker, string toolArguments, string? waitForText, TimeSpan captureTime, Func<int, IReadOnlyList<int>, Task> interrupt)
+    {
         var dll = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../Pixelbadger.Toolkit/bin",
             new DirectoryInfo(AppContext.BaseDirectory.TrimEnd('/')).Parent!.Name, "net10.0/Pixelbadger.Toolkit.dll"));
         var configHome = Path_("config");
@@ -293,12 +310,7 @@ public class AudioCommandIntegrationTests : IDisposable
         psi.Environment["NO_COLOR"] = "1";
         psi.Environment["XDG_CONFIG_HOME"] = configHome;
         psi.Environment["APPDATA"] = configHome;
-        foreach (var a in new[]
-                 {
-                     "-qefc",
-                     $"dotnet \"{dll}\" audio record --out-file \"{path}\" --capture-format lavfi --device \"{RealtimeSine(440)}\"",
-                     "/dev/null"
-                 })
+        foreach (var a in new[] { "-qefc", $"dotnet \"{dll}\" {toolArguments}", "/dev/null" })
             psi.ArgumentList.Add(a);
 
         using var script = Process.Start(psi)!;
@@ -307,27 +319,105 @@ public class AudioCommandIntegrationTests : IDisposable
         script.BeginOutputReadLine();
         var stderr = script.StandardError.ReadToEndAsync();
 
-        await WaitUntilAsync(() => { lock (stdout) return stdout.ToString().Contains("Recording..."); }, "the Recording... message");
-        await Task.Delay(1000);
-        var tool = FindProcess(p => p.Command.StartsWith("dotnet", StringComparison.Ordinal) && p.Command.Contains(path));
+        if (waitForText is not null)
+            await WaitUntilAsync(() => { lock (stdout) return stdout.ToString().Contains(waitForText); }, waitForText);
+        else
+            await WaitUntilAsync(() => FindProcess(p => p.Command.StartsWith("dotnet", StringComparison.Ordinal) && p.Command.Contains(marker)) is not null, "the tool process");
+        await Task.Delay(captureTime);
+        var tool = FindProcess(p => p.Command.StartsWith("dotnet", StringComparison.Ordinal) && p.Command.Contains(marker));
         tool.Should().NotBeNull("the tool process must be running under script");
-        var targets = new List<int> { tool!.Value.Pid };
-        targets.AddRange(ChildrenOf(tool.Value.Pid));
-        // A terminal Ctrl+C reaches the tool and its ffmpeg child alike.
-        foreach (var pid in targets) Signal(pid);
+        await interrupt(tool!.Value.Pid, ChildrenOf(tool.Value.Pid).ToList());
 
-        using var exitTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        using var exitTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(60));
         await script.WaitForExitAsync(exitTimeout.Token);
-        var text = stdout.ToString() + await stderr;
+        return new PtyResult(script.ExitCode, stdout.ToString() + await stderr);
+    }
 
-        script.ExitCode.Should().Be(0, text);
-        text.Should().Contain($"Recorded '{path}': ");
+    private static Task InterruptAll(int pid, IReadOnlyList<int> children)
+    {
+        // A terminal Ctrl+C reaches the tool and its ffmpeg child alike.
+        Signal(pid);
+        foreach (var child in children) Signal(child);
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task Record_ShouldWriteCompleteFileAndExitZero_WhenCtrlCStopsCaptureOnTerminal()
+    {
+        var path = Path_("ctrlc.opus");
+
+        var r = await RunUnderPtyAsync(path,
+            $"audio record --out-file \"{path}\" --capture-format lavfi --device \"{RealtimeSine(440)}\"",
+            "Recording...", TimeSpan.FromSeconds(1), InterruptAll);
+
+        r.ExitCode.Should().Be(0, r.Text);
+        r.Text.Should().Contain($"Recorded '{path}': ");
         var file = Load(path);
         var seconds = file.DurationSamples / 48000.0;
         seconds.Should().BeInRange(0.5, 3.0);
         AudioTestSupport.Probe(path).Codec.Should().Be("opus");
         AudioTestSupport.DecodeWithFfmpeg(path).Should().HaveCount((int)file.DurationSamples);
-        text.Should().Contain($"Recorded '{path}': {seconds.ToString("0.000", CultureInfo.InvariantCulture)}s");
+        r.Text.Should().Contain($"Recorded '{path}': {seconds.ToString("0.000", CultureInfo.InvariantCulture)}s");
+    }
+
+    [Fact]
+    public async Task Record_ShouldSaveTheTakeAndExitZero_WhenCtrlCIsPressedTwiceWhileFinalising()
+    {
+        // The fast (unpaced) sine source piles up minutes of audio in a few seconds, so encoding it outlasts the 0.4 s between presses.
+        var path = Path_("twice.opus");
+        var secondPressFoundProcess = false;
+
+        var r = await RunUnderPtyAsync(path,
+            $"audio record --out-file \"{path}\" --capture-format lavfi --device \"{Sine(440)}\"",
+            "Recording...", TimeSpan.FromSeconds(3), async (pid, children) =>
+            {
+                await InterruptAll(pid, children);
+                await Task.Delay(400);
+                secondPressFoundProcess = Signal(pid);
+            });
+
+        secondPressFoundProcess.Should().BeTrue("the second Ctrl+C must arrive while the tool is still saving the take");
+        r.ExitCode.Should().Be(0, r.Text);
+        r.Text.Should().NotContain("Unhandled exception");
+        var file = Load(path);
+        r.Text.Should().Contain($"Recorded '{path}': {(file.DurationSamples / 48000.0).ToString("0.000", CultureInfo.InvariantCulture)}s");
+        file.DurationSamples.Should().BeGreaterThan(48000 * 60, "minutes of audio were captured");
+        AudioTestSupport.Probe(path).Codec.Should().Be("opus");
+    }
+
+    [Fact]
+    public async Task Record_ShouldExit130AndWriteNothing_WhenCtrlCStopsCaptureWithDuration()
+    {
+        var path = Path_("aborted.opus");
+
+        var r = await RunUnderPtyAsync(path,
+            $"audio record --out-file \"{path}\" --capture-format lavfi --device \"{RealtimeSine(440)}\" --duration 30s",
+            null, TimeSpan.FromSeconds(1.5), InterruptAll);
+
+        r.ExitCode.Should().Be(130, r.Text);
+        r.Text.Should().Contain("Cancelled; no changes were written");
+        r.Text.Should().NotContain("Recorded");
+        File.Exists(path).Should().BeFalse();
+        Directory.GetFiles(_dir, "*.tmp", SearchOption.AllDirectories).Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData("insert")]
+    [InlineData("overwrite")]
+    public async Task Edit_ShouldExit130AndLeaveFileByteIdentical_WhenCtrlCStopsCaptureWithDuration(string action)
+    {
+        var path = await RecordAsync("memo.opus", 440, "2s");
+        var original = await File.ReadAllBytesAsync(path);
+
+        var r = await RunUnderPtyAsync(path,
+            $"audio {action} --file \"{path}\" --at 1 --capture-format lavfi --device \"{RealtimeSine(880)}\" --duration 30s",
+            null, TimeSpan.FromSeconds(1.5), InterruptAll);
+
+        r.ExitCode.Should().Be(130, r.Text);
+        r.Text.Should().Contain("Cancelled; no changes were written");
+        (await File.ReadAllBytesAsync(path)).Should().Equal(original);
+        Directory.GetFiles(_dir, "*.tmp", SearchOption.AllDirectories).Should().BeEmpty();
+        Directory.GetFiles(_dir, "*.opus").Should().ContainSingle();
     }
 
     private static async Task WaitUntilAsync(Func<bool> condition, string what)
@@ -381,9 +471,11 @@ public class AudioCommandIntegrationTests : IDisposable
         }
     }
 
-    private static void Signal(int pid)
+    /// <summary>Sends SIGINT; false when the process was already gone.</summary>
+    private static bool Signal(int pid)
     {
-        using var kill = Process.Start(new ProcessStartInfo("kill", $"-INT {pid}") { UseShellExecute = false })!;
+        using var kill = Process.Start(new ProcessStartInfo("kill", $"-INT {pid}") { UseShellExecute = false, RedirectStandardError = true })!;
         kill.WaitForExit();
+        return kill.ExitCode == 0;
     }
 }

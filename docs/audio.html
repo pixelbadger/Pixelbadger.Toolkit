@@ -108,6 +108,25 @@
       length.
     </p>
 
+    <h3 id="stopping">Stopping a capture</h3>
+    <table>
+      <thead><tr><th>Command</th><th><kbd>Enter</kbd></th><th><kbd>Ctrl+C</kbd></th></tr></thead>
+      <tbody>
+        <tr><td>Live capture without <code>--duration</code></td><td>Stops the capture. The take is saved and the exit code is <code>0</code>.</td><td>Stops the capture. The take is saved and the exit code is <code>0</code>.</td></tr>
+        <tr><td>Live capture with <code>--duration</code>, or <code>--from-wav</code></td><td>Ignored. The capture runs for the full duration.</td><td>Aborts. Nothing is written (no output file for <code>record</code>, the original file untouched for <code>insert</code> and <code>overwrite</code>, no temporary file left behind). Prints <code>Cancelled; no changes were written</code> and exits with code <code>130</code>.</td></tr>
+      </tbody>
+    </table>
+    <p>
+      When a take is being saved after a stop, further <kbd>Ctrl+C</kbd> presses are ignored, so pressing it
+      twice does not lose the take. Over MCP, cancelling or timing out a call aborts it by the same rule, because
+      MCP calls always carry <code>--duration</code> or <code>--from-wav</code>.
+    </p>
+
+    <div class="info-box">
+      <strong>Memory:</strong> a recording is held in memory until it is saved, at about 350 MB per hour of
+      mono audio (twice that for stereo). Very long recordings need that much free memory.
+    </div>
+
     <div class="cmd-block">
       <span class="prompt">$ </span><span class="cmd">pbtk audio record</span>
       <span class="opt"> --out-file</span> <span class="val">./memo.opus</span>
@@ -135,7 +154,7 @@
       <thead><tr><th>Option</th><th>Required</th><th>Default</th><th>Description</th></tr></thead>
       <tbody>
         <tr><td><code>--out-file</code></td><td>Yes</td><td>&mdash;</td><td>Path of the <code>.opus</code> file to write. An existing file is overwritten.</td></tr>
-        <tr><td><code>--duration</code></td><td>No</td><td>Until Enter or Ctrl+C</td><td>Length to capture or to keep from a WAV. Accepts a time (see <a href="#time-format">Time format</a>).</td></tr>
+        <tr><td><code>--duration</code></td><td>No</td><td>Until Enter or Ctrl+C</td><td>Length to capture or to keep from a WAV. Accepts a time (see <a href="#time-format">Time format</a>). With it, <kbd>Ctrl+C</kbd> aborts instead of saving (see <a href="#stopping">Stopping a capture</a>).</td></tr>
         <tr><td><code>--from-wav</code></td><td>No</td><td>&mdash;</td><td>Read audio from this WAV file instead of capturing. Does not need ffmpeg.</td></tr>
         <tr><td><code>--channels</code></td><td>No</td><td><code>1</code></td><td>Channel count of the new file: <code>1</code> (mono) or <code>2</code> (stereo)</td></tr>
         <tr><td><code>--bitrate</code></td><td>No</td><td><code>64000</code></td><td>Opus bitrate in bits per second, from 6000 to 510000</td></tr>
@@ -157,6 +176,22 @@
       container, such as <code>ffprobe</code>, report a duration that is 6.5 ms longer, because they include the
       encoder's pre-skip.
     </p>
+    <p>
+      If a capture ends before the requested <code>--duration</code>, because the device or source ended, the
+      command prints a warning and continues with what was captured, exiting with code <code>0</code>. Here the
+      source (an ffmpeg <code>sine</code> generator limited to 1 s) ends after 1 s of a requested 3 s:
+    </p>
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk audio record</span>
+      <span class="opt"> --out-file</span> <span class="val">./short.opus</span>
+      <span class="opt"> --capture-format</span> <span class="val">lavfi</span>
+      <span class="opt"> --device</span> <span class="val">"sine=frequency=440:duration=1"</span>
+      <span class="opt"> --duration</span> <span class="val">3s</span>
+    </div>
+    <div class="cmd-block">
+      <span class="val">Warning: capture ended after 1.000s, before the requested 3.000s</span><br>
+      <span class="val">Recorded './short.opus': 1.000s</span>
+    </div>
   </section>
 
   <!-- INSERT -->
@@ -189,7 +224,7 @@
       <tbody>
         <tr><td><code>--file</code></td><td>Yes</td><td>&mdash;</td><td>Existing Ogg Opus file to edit in place</td></tr>
         <tr><td><code>--at</code></td><td>Yes</td><td>&mdash;</td><td>Time in the file where the new audio is inserted, from 0 to the file's duration. Accepts a time (see <a href="#time-format">Time format</a>).</td></tr>
-        <tr><td><code>--duration</code></td><td>No</td><td>Until Enter or Ctrl+C</td><td>Length to capture or to keep from a WAV. Without it, a live capture runs until Enter or Ctrl+C.</td></tr>
+        <tr><td><code>--duration</code></td><td>No</td><td>Until Enter or Ctrl+C</td><td>Length to capture or to keep from a WAV. Without it, a live capture runs until Enter or Ctrl+C. With it, Ctrl+C aborts and the file is left untouched (see <a href="#stopping">Stopping a capture</a>).</td></tr>
         <tr><td><code>--from-wav</code></td><td>No</td><td>&mdash;</td><td>Insert audio from this WAV file instead of capturing. Does not need ffmpeg.</td></tr>
         <tr><td><code>--bitrate</code></td><td>No</td><td><code>64000</code></td><td>Opus bitrate for the new audio, from 6000 to 510000 bits per second</td></tr>
         <tr><td><code>--device</code></td><td>No</td><td>Platform default (see <a href="#requirements">Requirements</a>)</td><td>Capture device name passed to ffmpeg. Required on Windows.</td></tr>
@@ -222,8 +257,9 @@
     <p>
       Replaces audio in an existing Ogg Opus file, starting at <code>--at</code>, with new audio. The file's
       length stays the same unless the new audio runs past the end, in which case the file grows. Inside the
-      file, the replaced span is the whole 20 ms packets that fit in the new audio (at least one), and the
-      original audio resumes at or before the end of the new audio. The file is edited in place, and the same
+      file, the replaced span is the longest run of whole original packets, starting at the snapped time, that
+      is no longer than the new audio (at least one packet), and the original audio resumes at or before the
+      end of the new audio. The file is edited in place, and the same
       options as <code>insert</code> apply. <code>--at</code> may equal the file's duration, which appends.
     </p>
 
@@ -240,7 +276,7 @@
       <tbody>
         <tr><td><code>--file</code></td><td>Yes</td><td>&mdash;</td><td>Existing Ogg Opus file to edit in place</td></tr>
         <tr><td><code>--at</code></td><td>Yes</td><td>&mdash;</td><td>Time in the file where the replacement starts, from 0 to the file's duration. Accepts a time (see <a href="#time-format">Time format</a>).</td></tr>
-        <tr><td><code>--duration</code></td><td>No</td><td>Until Enter or Ctrl+C</td><td>Length to capture or to keep from a WAV. Without it, a live capture runs until Enter or Ctrl+C.</td></tr>
+        <tr><td><code>--duration</code></td><td>No</td><td>Until Enter or Ctrl+C</td><td>Length to capture or to keep from a WAV. Without it, a live capture runs until Enter or Ctrl+C. With it, Ctrl+C aborts and the file is left untouched (see <a href="#stopping">Stopping a capture</a>).</td></tr>
         <tr><td><code>--from-wav</code></td><td>No</td><td>&mdash;</td><td>Replacement audio from this WAV file instead of capturing. Does not need ffmpeg.</td></tr>
         <tr><td><code>--bitrate</code></td><td>No</td><td><code>64000</code></td><td>Opus bitrate for the new audio, from 6000 to 510000 bits per second</td></tr>
         <tr><td><code>--device</code></td><td>No</td><td>Platform default (see <a href="#requirements">Requirements</a>)</td><td>Capture device name passed to ffmpeg. Required on Windows.</td></tr>
@@ -283,13 +319,20 @@
         exactly on the 1.000 s mark.</li>
       <li><strong>Lookahead offset:</strong> the Opus encoder needs about 6.5 ms of lookahead. Mid-file, that lookahead
         cannot be trimmed, so the new audio starts about 6.5 ms after the snapped boundary. Edits at 0 are not
-        affected, because the lookahead is absorbed by the file's pre-skip.</li>
+        affected, because the lookahead is absorbed by the file's pre-skip. When an edit lands at the very start
+        of a file whose pre-skip is larger than the lookahead, the new audio is padded with silence so the
+        decoder's pre-skip discards only that silence, and the whole new take is kept.</li>
       <li><strong>Insert length:</strong> <code>insert</code> adds ceil((N + 6.5 ms) / 20 ms) &times; 20 ms to the
         file, where N is the length of the new audio. A 1 s insert adds 51 packets, which is 1.020 s.</li>
-      <li><strong>Overwrite inside the file:</strong> the replaced span is floor(N / 20 ms) packets, and at least one.
-        Original audio resumes at or before the requested end, so the file keeps its length. The last 26.5 ms or
-        less of the new take is dropped, because it would otherwise overlap the original audio that resumes. A
-        0.5 s overwrite replaces exactly 25 packets.</li>
+      <li><strong>Overwrite inside the file:</strong> the replaced span is the longest run of whole original packets,
+        starting at the snapped boundary, whose total length is at most N (the length of the new audio), and at
+        least one packet. The first part of the new take, exactly as long as the replaced packets, is encoded into
+        packets that fill them (20 ms frames first, then a shorter frame for any remainder), so the file keeps its
+        length exactly, whatever the original packet size. Original audio resumes at or before the requested end.
+        The rest of the new take is dropped, because it would otherwise overlap the original audio that resumes.
+        With 20 ms packets, a 0.5 s overwrite replaces exactly 25 packets. For a file made with 60 ms packets,
+        overwriting 0.5 s at 1.0 s replaces 8 packets (0.48 s) and keeps the length:
+        <div class="cmd-block"><span class="val">Overwrote 0.500s at 1.014s (requested 1.000s) in './sixty.opus': 2.000s</span></div></li>
       <li><strong>Overwrite reaching the end:</strong> when the new audio reaches or passes the end of the file, all
         original packets from the snapped time on are replaced and the whole new take is kept, so the file grows. The
         resulting length is the snapped time + 6.5 ms + N exactly.</li>
@@ -297,6 +340,16 @@
       <li><strong>In place and atomic:</strong> the edited file is written to a temporary file in the same directory,
         then renamed over the original. If an edit fails or is cancelled, the original file is unchanged and no
         temporary file is left behind.</li>
+      <li><strong>Changed while recording:</strong> an edit notes the file's length and last-write time when it
+        reads the file, and checks them again just before replacing it. If either changed, because something else
+        wrote to the file during the capture, the edit fails and the other writer's file is kept:
+        <div class="cmd-block"><span class="val">Error: File './edit.opus' changed while recording; no changes were written</span></div></li>
+      <li><strong>Symlinks and permissions:</strong> if <code>--file</code> is a symbolic link, the file it points to is
+        edited and the link stays a link. The edited file keeps the original's Unix file mode (on Windows, its
+        attributes). For example, editing <code>./link.opus</code>, a link to a file with mode <code>0600</code>:
+        <div class="cmd-block"><span class="val">Inserted 1.000s at 1.014s (requested 1.000s) into './link.opus': 3.020s</span></div>
+        leaves <code>link.opus -&gt; sixty.opus</code> in place, and <code>sixty.opus</code> still has mode
+        <code>-rw-------</code>.</li>
       <li><strong>Appending:</strong> <code>insert</code> or <code>overwrite</code> with <code>--at</code> equal to the
         file's duration adds the new audio at the end. The last original packet's padding, up to 20 ms of near
         silence that was trimmed from the end, becomes audible before the new audio.</li>
@@ -330,7 +383,9 @@
 
     <div class="info-box">
       <strong>Scope:</strong> the <code>audio</code> topic handles mono and stereo Ogg Opus files. Multichannel
-      files, chained or multiplexed Ogg streams, and other formats are rejected with an error.
+      files, chained or multiplexed Ogg streams, and other formats are rejected with an error. A file whose
+      header declares a channel count other than 1 or 2 is rejected with
+      <code>Unsupported Ogg Opus channel count 3; only mono and stereo files are supported</code>.
     </div>
   </section>
 
@@ -381,8 +436,18 @@
         <li>Windows capture without <code>--device</code>: <code>--device is required on Windows, e.g. --device "audio=Microphone"</code>.</li>
         <li><code>--channels</code> is not 1 or 2, or <code>--bitrate</code> is outside 6000 to 510000.</li>
         <li>No audio was captured: <code>No audio was captured</code>.</li>
+        <li>The file being edited was changed by something else during the capture: <code>File '&lt;path&gt;' changed while recording; no changes were written</code>.</li>
+        <li>The file's header declares a channel count other than 1 or 2: <code>Unsupported Ogg Opus channel count &lt;n&gt;; only mono and stereo files are supported</code>.</li>
         <li>libopus is missing, the input is not a valid or supported Ogg Opus or WAV file, a time is malformed, or a capture fails. These print the specific message from the library or input check.</li>
       </ul>
+    </div>
+
+    <h3>Cancelled</h3>
+    <div class="info-box">
+      <strong>Cancelled exit:</strong> <kbd>Ctrl+C</kbd> during a capture that has <code>--duration</code> (or uses
+      <code>--from-wav</code>) is not an error. Nothing is written, the command prints
+      <code>Cancelled; no changes were written</code> and exits with code <code>130</code>. See
+      <a href="#stopping">Stopping a capture</a>.
     </div>
 
     <h3>MCP</h3>
@@ -390,7 +455,8 @@
       The <code>audio</code> actions are available through <a href="mcp.html"><code>pbtk mcp</code></a>. A
       call that would capture live audio without <code>--duration</code> or <code>--from-wav</code> is refused
       with exit code <code>1</code>, because it would wait for a keypress that an MCP call cannot send. Pass
-      <code>--duration</code> or <code>--from-wav</code> for MCP calls.
+      <code>--duration</code> or <code>--from-wav</code> for MCP calls. Cancelling or timing out such a call aborts it:
+      nothing is written and the exit code is <code>130</code>.
     </p>
   </section>
 
