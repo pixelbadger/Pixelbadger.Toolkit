@@ -145,10 +145,18 @@
     </table>
 
     <h3>Output</h3>
-    <p>On success the command exits with code <code>0</code> and prints the path and the duration:</p>
+    <p>
+      On success the command exits with code <code>0</code> and prints the path and the duration. For the first
+      example above:
+    </p>
     <div class="cmd-block">
       <span class="val">Recorded './memo.opus': 10.000s</span>
     </div>
+    <p>
+      The duration is the exact length of the audio, counted in samples at 48 kHz. Tools that read the Ogg
+      container, such as <code>ffprobe</code>, report a duration that is 6.5 ms longer, because they include the
+      encoder's pre-skip.
+    </p>
   </section>
 
   <!-- INSERT -->
@@ -192,10 +200,19 @@
     <h3>Output</h3>
     <p>
       On success the command exits with code <code>0</code>. It prints the length of the new audio, the snapped
-      time where it was placed, the requested time, and the resulting duration:
+      time where it was placed, the requested time, and the resulting duration. For the first example above, run
+      on a 2:00 recording:
     </p>
     <div class="cmd-block">
-      <span class="val">Inserted 1.000s at 1.020s (requested 1.013s) into './memo.opus': 3.000s</span>
+      <span class="val">Inserted 3.000s at 65.494s (requested 65.500s) into './memo.opus': 123.020s</span>
+    </div>
+    <p>
+      The file grew by 3.020 s, not 3.000 s: an insert adds the new audio's length plus the encoder's 6.5 ms
+      lookahead, rounded up to whole 20 ms packets (see <a href="#how-edits-work">How edits work</a>). The
+      second example inserts a 1 s WAV at 1.0 s, which snaps to 0.994 s:
+    </p>
+    <div class="cmd-block">
+      <span class="val">Inserted 1.000s at 0.994s (requested 1.000s) into './memo.opus': 124.040s</span>
     </div>
   </section>
 
@@ -204,9 +221,10 @@
     <h2>overwrite</h2>
     <p>
       Replaces audio in an existing Ogg Opus file, starting at <code>--at</code>, with new audio. The file's
-      length stays the same unless the new audio runs past the end, in which case the file grows. The
-      replaced span is rounded up to whole packets, so the replacement covers the new audio fully. The file is
-      edited in place, and the same options as <code>insert</code> apply.
+      length stays the same unless the new audio runs past the end, in which case the file grows. Inside the
+      file, the replaced span is the whole 20 ms packets that fit in the new audio (at least one), and the
+      original audio resumes at or before the end of the new audio. The file is edited in place, and the same
+      options as <code>insert</code> apply. <code>--at</code> may equal the file's duration, which appends.
     </p>
 
     <div class="cmd-block">
@@ -231,9 +249,20 @@
     </table>
 
     <h3>Output</h3>
-    <p>On success the command exits with code <code>0</code> and prints the same kind of line as <code>insert</code>:</p>
+    <p>
+      On success the command exits with code <code>0</code> and prints the same kind of line as
+      <code>insert</code>. For the example above, with a 0.5 s <code>fix.wav</code> and a 2:00 recording, the
+      length stays the same:
+    </p>
     <div class="cmd-block">
-      <span class="val">Overwrote 0.500s at 12.000s (requested 12.000s) in './memo.opus': 12.500s</span>
+      <span class="val">Overwrote 0.500s at 11.994s (requested 12.000s) in './memo.opus': 120.000s</span>
+    </div>
+    <p>
+      When the new audio reaches the end of the file, the file grows to fit it. Overwriting from 1:58 on a 2:00
+      recording with 5 s of audio, for example, gives a file 3.0 s longer:
+    </p>
+    <div class="cmd-block">
+      <span class="val">Overwrote 5.000s at 117.994s (requested 118.000s) in './memo.opus': 123.000s</span>
     </div>
   </section>
 
@@ -247,18 +276,32 @@
     </p>
     <ul>
       <li><strong>Snapping:</strong> the requested time snaps to the nearest packet boundary, usually every 20 ms.
-        Ties go to the earlier boundary. The command prints the snapped time, so check it when precision matters.</li>
+        Ties go to the earlier boundary. The command prints the snapped time, so check it when precision matters.
+        In a file made by <code>pbtk audio record</code>, packet boundaries sit 6.5 ms before each 20 ms mark
+        (at 0.994 s, 1.014 s, 1.034 s and so on), because the file's pre-skip is 312 samples. A request for
+        1.0 s therefore snaps to 0.994 s, and the new audio, which starts 6.5 ms after the boundary, begins
+        exactly on the 1.000 s mark.</li>
       <li><strong>Lookahead offset:</strong> the Opus encoder needs about 6.5 ms of lookahead. Mid-file, that lookahead
         cannot be trimmed, so the new audio starts about 6.5 ms after the snapped boundary. Edits at 0 are not
         affected, because the lookahead is absorbed by the file's pre-skip.</li>
+      <li><strong>Insert length:</strong> <code>insert</code> adds ceil((N + 6.5 ms) / 20 ms) &times; 20 ms to the
+        file, where N is the length of the new audio. A 1 s insert adds 51 packets, which is 1.020 s.</li>
+      <li><strong>Overwrite inside the file:</strong> the replaced span is floor(N / 20 ms) packets, and at least one.
+        Original audio resumes at or before the requested end, so the file keeps its length. The last 26.5 ms or
+        less of the new take is dropped, because it would otherwise overlap the original audio that resumes. A
+        0.5 s overwrite replaces exactly 25 packets.</li>
+      <li><strong>Overwrite reaching the end:</strong> when the new audio reaches or passes the end of the file, all
+        original packets from the snapped time on are replaced and the whole new take is kept, so the file grows. The
+        resulting length is the snapped time + 6.5 ms + N exactly.</li>
       <li><strong>Joins:</strong> a short decoder transient is possible at each join. No crossfade or smoothing is applied.</li>
       <li><strong>In place and atomic:</strong> the edited file is written to a temporary file in the same directory,
         then renamed over the original. If an edit fails or is cancelled, the original file is unchanged and no
         temporary file is left behind.</li>
-      <li><strong>Appending:</strong> <code>insert</code> with <code>--at</code> equal to the file's duration adds the new
-        audio at the end.</li>
-      <li><strong>Growing:</strong> <code>overwrite</code> grows the file when the new audio runs past the end.
-        <code>insert</code> always adds the new audio's length to the file.</li>
+      <li><strong>Appending:</strong> <code>insert</code> or <code>overwrite</code> with <code>--at</code> equal to the
+        file's duration adds the new audio at the end. The last original packet's padding, up to 20 ms of near
+        silence that was trimmed from the end, becomes audible before the new audio.</li>
+      <li><strong>Growing:</strong> <code>overwrite</code> grows the file when the new audio reaches the end.
+        <code>insert</code> always grows the file.</li>
       <li><strong>Channels:</strong> edits keep the file's channel count, so the new audio is converted to match:
         a mono source is duplicated to stereo, and a stereo source is averaged to mono.</li>
     </ul>

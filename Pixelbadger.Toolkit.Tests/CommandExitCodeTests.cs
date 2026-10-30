@@ -1,6 +1,8 @@
 using FluentAssertions;
 using Pixelbadger.Toolkit.CommandLine;
 using Pixelbadger.Toolkit.Commands;
+using Pixelbadger.Toolkit.Opus;
+using Pixelbadger.Toolkit.Services.Audio;
 using Spectre.Console;
 
 namespace Pixelbadger.Toolkit.Tests;
@@ -18,12 +20,21 @@ public class CommandExitCodeTests : IDisposable
         Directory.CreateDirectory(_dir);
         File.WriteAllText(Path.Combine(_dir, "null.json"), "null");
         File.WriteAllText(Path.Combine(_dir, "garbage.json"), "garbage");
+        File.WriteAllText(Path.Combine(_dir, "garbage.opus"), "garbage");
+        WriteOneSecondOpus(Path.Combine(_dir, "ok.opus"));
     }
 
     public void Dispose()
     {
         AnsiConsole.Console = _originalConsole;
         if (Directory.Exists(_dir)) Directory.Delete(_dir, true);
+    }
+
+    private static void WriteOneSecondOpus(string path)
+    {
+        var encoded = new OpusPcmEncoder(new OpusCodecFactory()).Encode(AudioTestSupport.Tone(440, 48000), new OpusEncodeSettings(1));
+        using var stream = File.Create(path);
+        OpusSpliceEditor.CreateRecording(encoded, 1).Write(stream, 1);
     }
 
     private async Task<(int Code, string Out, string Err)> RunAsync(params string[] args)
@@ -90,6 +101,20 @@ public class CommandExitCodeTests : IDisposable
         ["web serve-html --file {m}.html", "File '{m}.html' not found"],
         // sqlite
         ["sqlite tui --db {m}.db", "Database file '{m}.db' not found"],
+        // audio ({a} = valid one second .opus, {o} = garbage .opus)
+        ["audio insert --file {m}.opus --at 0 --duration 1s", "File '{m}.opus' not found"],
+        ["audio overwrite --file {m}.opus --at 0 --duration 1s", "File '{m}.opus' not found"],
+        ["audio record --out-file {d}/o.opus --from-wav {m}.wav", "File '{m}.wav' not found"],
+        ["audio insert --file {a} --at 5 --duration 1s", "Time 5.000s is beyond the end of '{a}' (1.000s)"],
+        ["audio overwrite --file {a} --at 1.001 --duration 1s", "Time 1.001s is beyond the end of '{a}' (1.000s)"],
+        ["audio insert --file {a} --at abc --duration 1s", "Invalid time 'abc'. Use [[hh:]mm:]ss[.fff], seconds, or a number with an ms, s or m suffix."],
+        ["audio record --out-file {d}/o.opus --duration -1", "Invalid time '-1'. Use [[hh:]mm:]ss[.fff], seconds, or a number with an ms, s or m suffix."],
+        ["audio record --out-file {d}/o.opus --channels 3 --duration 1s", "--channels must be 1 or 2"],
+        ["audio record --out-file {d}/o.opus --bitrate 1000 --duration 1s", "--bitrate must be between 6000 and 510000"],
+        ["audio record --out-file {d}/o.opus", "--duration or --from-wav is required when no interactive console is available"],
+        ["audio insert --file {a} --at 0", "--duration or --from-wav is required when no interactive console is available"],
+        ["audio insert --file {o} --at 0 --duration 1s", "Not an Ogg Opus file"],
+        ["audio overwrite --file {o} --at 0 --duration 1s", "Not an Ogg Opus file"],
         // llm
         ["llm generate-image --provider claude --prompt x --out-file {d}/o.png", "The 'generate-image' action requires image generation which is not supported by the 'claude' provider."],
     ];
@@ -109,7 +134,8 @@ public class CommandExitCodeTests : IDisposable
 
     private string Expand(string text) => text
         .Replace("{m}", Missing("missing")).Replace("{n}", Path.Combine(_dir, "null.json"))
-        .Replace("{g}", Path.Combine(_dir, "garbage.json")).Replace("{d}", _dir);
+        .Replace("{g}", Path.Combine(_dir, "garbage.json")).Replace("{a}", Path.Combine(_dir, "ok.opus"))
+        .Replace("{o}", Path.Combine(_dir, "garbage.opus")).Replace("{d}", _dir);
 
     [Fact]
     public async Task Invoke_ShouldReturnOneAndPrintExactErrorLast_WhenWebServerFailsToStart()
