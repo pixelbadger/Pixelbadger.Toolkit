@@ -40,6 +40,28 @@ public class ToolkitConsoleTests : IDisposable
     }
 
     [Fact]
+    public void IsCaptured_ShouldBeFalseThenTrueThenFalse_WhenCaptureScopeOpensAndCloses()
+    {
+        ToolkitConsole.IsCaptured.Should().BeFalse();
+        var o = new StringWriter();
+        using (ToolkitConsole.Capture(ToolkitConsole.CreateCaptureConsole(o), o, new StringWriter()))
+        {
+            ToolkitConsole.IsCaptured.Should().BeTrue();
+        }
+
+        ToolkitConsole.IsCaptured.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task IsCaptured_ShouldFollowAsyncFlow_WhenCapturedAndAwaited()
+    {
+        var o = new StringWriter();
+        using var scope = ToolkitConsole.Capture(ToolkitConsole.CreateCaptureConsole(o), o, new StringWriter());
+
+        (await Task.Run(() => ToolkitConsole.IsCaptured)).Should().BeTrue();
+    }
+
+    [Fact]
     public void OpenStandardInput_ShouldBeEmpty_WhenCaptured()
     {
         var o = new StringWriter();

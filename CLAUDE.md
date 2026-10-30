@@ -99,6 +99,10 @@ The project is .NET 10, and uses Microsoft's System.CommandLine library for buil
   - `pbtk gpt train --source corpus.txt --out ./.gpt --loss-graph ./loss.html`
   - `pbtk gpt train --source corpus.txt --out ./.gpt --validation-split 0.1 --eval-interval 50`
   - `pbtk gpt complete --model ./.gpt --prompt "ROMEO:" --max-tokens 200`
+  - `pbtk audio record --out-file ./memo.opus --duration 10s`
+  - `pbtk audio record --out-file ./memo.opus --from-wav ./take.wav`
+  - `pbtk audio insert --file ./memo.opus --at 1:05.5 --duration 3s`
+  - `pbtk audio overwrite --file ./memo.opus --at 12 --from-wav ./fix.wav`
   - `pbtk mcp serve`
   - `pbtk mcp serve --profile text-tools --port 5200`
   - `pbtk mcp save --name text-tools --include strings interpreters/brainfuck --port 5200`
@@ -306,6 +310,7 @@ Available topics and actions:
 - **markov**: train, complete
 - **demoscene**: showcase
 - **gpt**: train, complete
+- **audio**: record, insert, overwrite
 - **mcp**: serve, save, delete, list
 - **config**: mirrors every topic/group/action; sets, shows (bare) and unsets (--unset) per-user option defaults
 
@@ -322,6 +327,8 @@ Available topics and actions:
 - Microsoft.Extensions.AI.OpenAI (for OpenAI integration)
 - Dapper (config store data access)
 - ModelContextProtocol.AspNetCore (MCP server over stateless HTTP)
+- libopus (system library, loaded at run time through P/Invoke; `apt install libopus0`, `brew install opus`, or `opus.dll` on PATH). Required by `audio`
+- ffmpeg (system tool, on PATH; used by `audio` for live capture only, not needed with `--from-wav`)
 
 ## Environment Variables
 

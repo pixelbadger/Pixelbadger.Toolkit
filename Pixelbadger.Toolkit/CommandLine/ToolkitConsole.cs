@@ -19,6 +19,9 @@ public static class ToolkitConsole
 
     public static TextWriter Error => Current.Value?.Error ?? Console.Error;
 
+    /// <summary>True while the current async flow's output is captured (for example a call served over MCP) rather than going to the process console.</summary>
+    public static bool IsCaptured => Current.Value is not null;
+
     /// <summary>Empty stream when the current flow is captured (never the host process's stdin); else the real stdin.</summary>
     public static Stream OpenStandardInput() => Current.Value is not null ? Stream.Null : Console.OpenStandardInput();
 

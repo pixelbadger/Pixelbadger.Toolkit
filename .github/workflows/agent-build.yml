@@ -22,6 +22,9 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Install audio dependencies
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg libopus0 util-linux
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
@@ -178,6 +181,9 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
+
+      - name: Install audio dependencies
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg libopus0 util-linux
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4

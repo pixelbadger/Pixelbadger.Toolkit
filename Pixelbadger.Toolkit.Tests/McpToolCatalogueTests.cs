@@ -85,6 +85,32 @@ public class McpToolCatalogueTests
         schema["properties"]!.AsObject().Count.Should().Be(0);
     }
 
+    [Theory]
+    [InlineData("audio/record", "audio_record", "out-file")]
+    [InlineData("audio/insert", "audio_insert", "file,at")]
+    [InlineData("audio/overwrite", "audio_overwrite", "file,at")]
+    public void Build_ShouldExposeAudioTools_WhenCatalogueIsBuiltFromTree(string entry, string name, string required)
+    {
+        var tool = Tool(entry);
+        var schema = Node(tool.InputSchema);
+        var props = schema["properties"]!.AsObject();
+
+        tool.Name.Should().Be(name);
+        schema["required"]!.AsArray().Select(n => n!.GetValue<string>()).Should().Equal(required.Split(','));
+        props["duration"]!["type"]!.GetValue<string>().Should().Be("string");
+        props["from-wav"]!["type"]!.GetValue<string>().Should().Be("string");
+        props["bitrate"]!["type"]!.GetValue<string>().Should().Be("integer");
+        props["device"]!["type"]!.GetValue<string>().Should().Be("string");
+        props["capture-format"]!["type"]!.GetValue<string>().Should().Be("string");
+    }
+
+    [Fact]
+    public void Build_ShouldListAllThreeAudioActions_WhenTopicEntryResolved()
+    {
+        McpToolCatalogue.Build(_root, McpEntryResolver.Resolve(_root, "audio")!).Select(t => t.Name)
+            .Should().BeEquivalentTo("audio_record", "audio_insert", "audio_overwrite");
+    }
+
     [Fact]
     public void Build_ShouldThrow_WhenToolNamesCollide()
     {

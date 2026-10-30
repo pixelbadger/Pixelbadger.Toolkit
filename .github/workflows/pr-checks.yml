@@ -181,6 +181,8 @@ jobs:
     if: always() && (needs.check-version.result == 'success' || needs.check-version.result == 'skipped')
     steps:
       - uses: actions/checkout@v4
+      - name: Install audio dependencies
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg libopus0 util-linux
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
@@ -430,6 +432,9 @@ jobs:
           ref: ${{ github.head_ref }}
           fetch-depth: 0
 
+      - name: Install audio dependencies
+        if: steps.limit.outputs.stop != 'true'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg libopus0 util-linux
       - name: Setup .NET
         if: steps.limit.outputs.stop != 'true'
         uses: actions/setup-dotnet@v4
