@@ -481,4 +481,83 @@ public class AudioCommandIntegrationTests : IDisposable
         kill.WaitForExit();
         return kill.ExitCode == 0;
     }
+
+    [Fact]
+    public async Task PlayMidi_ShouldPrintPlainLinesAndWriteAudio_WhenOutputFormatIsS16leFile()
+    {
+        var mid = MidiTestAssets.WriteMidi(_dir, "song.mid", (60, 0.0, 0.5));
+        var sf2 = MidiTestAssets.WriteSoundFont(_dir, "bank.sf2", Waveform.Sine);
+        var target = Path_("out.s16le");
+
+        var r = await Pbtk("audio", "play-midi", "--file", mid, "--soundfont", sf2, "--output-format", "s16le", "--device", target);
+
+        r.ExitCode.Should().Be(0, r.Err);
+        r.Out.Should().Be($"Playing '{mid}' (0:00) with '{sf2}'{Environment.NewLine}Played '{mid}' (0:00){Environment.NewLine}");
+        var bytes = await File.ReadAllBytesAsync(target);
+        bytes.Length.Should().BeGreaterThan(48000 * 4 / 2);
+        bytes.Length.Should().BeLessThanOrEqualTo(48000 * 4 * 4);
+        bytes.Any(b => b != 0).Should().BeTrue();
+    }
+
+    // A fake ffmpeg that never reads stdin gives a deterministic, real-time-independent pacing target: the pipe
+    // fills after 64 KiB (about 0.35 s of audio), so a 20 s song cannot finish and the write is blocked when SIGINT arrives.
+    [Fact]
+    public async Task PlayMidi_ShouldExitWith130AndKillFfmpeg_WhenInterruptedMidPlayback()
+    {
+        if (OperatingSystem.IsWindows()) return;
+
+        var mid = MidiTestAssets.WriteMidi(_dir, "long.mid", (60, 0.0, 20.0));
+        var sf2 = MidiTestAssets.WriteSoundFont(_dir, "bank.sf2", Waveform.Sine);
+        var bin = Path_("bin");
+        Directory.CreateDirectory(bin);
+        var pidFile = Path_("ffmpeg.pid");
+        var fake = Path.Combine(bin, "ffmpeg");
+        await File.WriteAllTextAsync(fake, $"#!/bin/sh\necho $$ > '{pidFile}'\nexec sleep 60\n");
+        File.SetUnixFileMode(fake, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+
+        var startInfo = new ProcessStartInfo("dotnet")
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false
+        };
+        startInfo.ArgumentList.Add(Path.Combine(AppContext.BaseDirectory, "Pixelbadger.Toolkit.dll"));
+        foreach (var arg in new[] { "audio", "play-midi", "--file", mid, "--soundfont", sf2 })
+            startInfo.ArgumentList.Add(arg);
+        startInfo.Environment["TERM"] = "xterm";
+        startInfo.Environment["NO_COLOR"] = "1";
+        startInfo.Environment["XDG_CONFIG_HOME"] = _dir;
+        startInfo.Environment["PATH"] = bin + Path.PathSeparator + Environment.GetEnvironmentVariable("PATH");
+
+        using var process = Process.Start(startInfo)!;
+        var stdout = process.StandardOutput.ReadToEndAsync();
+        var stderr = process.StandardError.ReadToEndAsync();
+        try
+        {
+            var deadline = DateTime.UtcNow.AddSeconds(30);
+            while (!File.Exists(pidFile) || new FileInfo(pidFile).Length == 0)
+            {
+                DateTime.UtcNow.Should().BeBefore(deadline, "the fake ffmpeg should have been started");
+                await Task.Delay(50);
+            }
+
+            var ffmpegPid = int.Parse((await File.ReadAllTextAsync(pidFile)).Trim());
+            await Task.Delay(500);
+
+            using (var kill = Process.Start("kill", ["-INT", process.Id.ToString()])!)
+                await kill.WaitForExitAsync();
+            var stopwatch = Stopwatch.StartNew();
+            var exited = process.WaitForExit(TimeSpan.FromSeconds(2));
+            stopwatch.Stop();
+
+            exited.Should().BeTrue("the tool must stop within 2 s of SIGINT");
+            process.ExitCode.Should().Be(130, await stderr);
+            (await stdout).Should().Contain("Stopped at ");
+            Directory.Exists($"/proc/{ffmpegPid}").Should().BeFalse("ffmpeg must not outlive the tool");
+        }
+        finally
+        {
+            if (!process.HasExited) process.Kill(true);
+        }
+    }
 }

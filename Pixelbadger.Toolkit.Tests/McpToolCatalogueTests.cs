@@ -105,10 +105,10 @@ public class McpToolCatalogueTests
     }
 
     [Fact]
-    public void Build_ShouldListAllThreeAudioActions_WhenTopicEntryResolved()
+    public void Build_ShouldListAllFourAudioActions_WhenTopicEntryResolved()
     {
         McpToolCatalogue.Build(_root, McpEntryResolver.Resolve(_root, "audio")!).Select(t => t.Name)
-            .Should().BeEquivalentTo("audio_record", "audio_insert", "audio_overwrite");
+            .Should().BeEquivalentTo("audio_record", "audio_insert", "audio_overwrite", "audio_play-midi");
     }
 
     [Fact]

@@ -56,12 +56,12 @@ public class AudioCommandTests : IDisposable
     }
 
     [Fact]
-    public void Create_ShouldDefineRecordInsertOverwrite_WhenBuilt()
+    public void Create_ShouldDefineRecordInsertOverwritePlayMidi_WhenBuilt()
     {
         var audio = AudioCommand.Create();
 
         audio.Name.Should().Be("audio");
-        audio.Subcommands.Select(c => c.Name).Should().Equal("record", "insert", "overwrite");
+        audio.Subcommands.Select(c => c.Name).Should().Equal("record", "insert", "overwrite", "play-midi");
     }
 
     [Fact]
