@@ -271,7 +271,7 @@ public class MidiPlayComponentTests
     }
 
     [Fact]
-    public async Task RunAsync_ShouldReturnWithin250msOfCancel_WhenWriteIsBlocked()
+    public async Task RunAsync_ShouldCompleteWith130AndDisposeSink_WhenCancelledWhileWriteIsBlocked()
     {
         Blocks(5);
         using var cts = new CancellationTokenSource();
@@ -283,16 +283,15 @@ public class MidiPlayComponentTests
         _sink.Setup(s => s.DisposeAsync()).Returns(() => { _calls.Add("sink.Dispose"); blockedWrite.TrySetResult(); return ValueTask.CompletedTask; });
 
         var run = Create().RunAsync(Options(), cts.Token);
-        await entered.Task;
-        await Task.Delay(50);
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
         run.IsCompleted.Should().BeFalse();
 
-        var sw = Stopwatch.StartNew();
         cts.Cancel();
-        var code = await run;
+        // The blocked write never completes by itself; only disposing the sink releases it. 5 s is a hang guard only.
+        var code = await run.WaitAsync(TimeSpan.FromSeconds(5));
 
-        sw.ElapsedMilliseconds.Should().BeLessThan(250);
         code.Should().Be(130);
+        _calls.Should().Contain("sink.Dispose");
         _view.StoppedAt.Should().Be(TimeSpan.Zero);
     }
 

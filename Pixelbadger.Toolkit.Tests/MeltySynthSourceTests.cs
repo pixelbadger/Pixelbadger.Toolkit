@@ -67,6 +67,19 @@ public class MeltySynthSourceTests : IDisposable
     }
 
     [Fact]
+    public void Render_ShouldStopBeforeCap_WhenVoicesGoSilent()
+    {
+        // The test SoundFont releases in ~0.5 s, so rendering must end well before the 3 s cap.
+        using var source = _factory.Open(Midi((69, 0, 1.0)), Sf2(Waveform.Sine));
+
+        var (left, _) = RenderAll(source);
+
+        var lengthFrames = (int)Math.Ceiling(source.Length.TotalSeconds * 48000);
+        left.Length.Should().BeGreaterThan(lengthFrames);
+        left.Length.Should().BeLessThan(lengthFrames + 2 * 48000);
+    }
+
+    [Fact]
     public void Render_ShouldStopAtLength_WhenNoNotesPlay()
     {
         using var source = _factory.Open(Midi(), Sf2(Waveform.Sine));

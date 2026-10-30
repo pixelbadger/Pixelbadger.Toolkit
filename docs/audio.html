@@ -389,7 +389,7 @@
       playback finishes, the live view is removed and one line is printed:
     </p>
     <div class="cmd-block">
-      <span class="val">Played './song.mid' (1:05)</span>
+      <span class="val">Played './song.mid' (1:07)</span>
     </div>
     <p>
       When output is redirected, or the command runs over MCP, there is no live view. The command prints these plain
@@ -397,8 +397,13 @@
     </p>
     <div class="cmd-block">
       <span class="val">Playing './song.mid' (1:05) with './GeneralUser.sf2'</span><br>
-      <span class="val">Played './song.mid' (1:05)</span>
+      <span class="val">Played './song.mid' (1:07)</span>
     </div>
+    <p>
+      The <code>Played</code> time includes the release tail (the fade-out of the last notes, up to 3 seconds past the
+      end of the MIDI file), so it can be longer than the <code>Playing</code> time, and the progress display may exceed
+      the total during the fade-out.
+    </p>
     <p>
       On success the command exits with code <code>0</code>.
     </p>

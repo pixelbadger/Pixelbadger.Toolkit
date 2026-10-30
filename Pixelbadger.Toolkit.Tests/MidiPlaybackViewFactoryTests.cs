@@ -21,12 +21,13 @@ public class MidiPlaybackViewFactoryTests
     }
 
     [Fact]
-    public void Create_ShouldReturnPlainView_WhenOutputIsRedirected()
+    public void Create_ShouldReturnPlainView_WhenOutputIsCaptured()
     {
-        // Under test runners stdout is redirected, so the factory must fall back to the plain view.
-        Console.IsOutputRedirected.Should().BeTrue();
+        var output = new StringWriter();
+        using var _ = Pixelbadger.Toolkit.CommandLine.ToolkitConsole.Capture(
+            Pixelbadger.Toolkit.CommandLine.ToolkitConsole.CreateCaptureConsole(output), output, new StringWriter());
 
-        using var view = MidiPlaybackViewFactory.Create(new StringWriter());
+        using var view = MidiPlaybackViewFactory.Create(output);
 
         view.Should().BeOfType<PlainMidiPlaybackView>();
     }

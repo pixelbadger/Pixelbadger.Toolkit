@@ -115,9 +115,19 @@ public class AudioPlayMidiCommandTests : IDisposable
             $"Playing '{mid}' (0:01) with '{sf2}'{Environment.NewLine}Played '{mid}' (0:01){Environment.NewLine}");
         var written = await File.ReadAllBytesAsync(target);
         written.Length.Should().Be(expected.Length);
-        written.Length.Should().BeGreaterThan(48000 * 4);
         written.Should().Equal(expected);
-        written.Any(b => b != 0).Should().BeTrue();
+        // 1.0 s MIDI: stereo s16le frames are 4 bytes; the release tail adds at most 3 s.
+        var frames = written.Length / 4;
+        frames.Should().BeGreaterThan(48000).And.BeLessThanOrEqualTo(48000 + 3 * 48000);
+        PeakAmplitude(written).Should().BeGreaterThan(1000, "the rendered note must be clearly audible, not noise");
+    }
+
+    private static int PeakAmplitude(byte[] s16le)
+    {
+        var peak = 0;
+        for (var i = 0; i + 1 < s16le.Length; i += 2)
+            peak = Math.Max(peak, Math.Abs((int)BitConverter.ToInt16(s16le, i)));
+        return peak;
     }
 
     [Fact]

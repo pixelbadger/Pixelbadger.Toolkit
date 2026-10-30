@@ -70,6 +70,13 @@ public sealed class LiveMidiPlaybackView : IMidiPlaybackView
         }
     }
 
+    /// <summary>Copy of the retained scope window (oldest first), for tests.</summary>
+    internal (float[] Left, float[] Right) WindowSnapshot()
+    {
+        lock (_gate)
+            return (_left.AsSpan(0, _count).ToArray(), _right.AsSpan(0, _count).ToArray());
+    }
+
     public void Finish(TimeSpan elapsed)
     {
         if (!Teardown()) return;
