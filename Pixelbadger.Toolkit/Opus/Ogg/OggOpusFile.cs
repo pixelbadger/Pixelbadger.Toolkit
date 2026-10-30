@@ -119,6 +119,9 @@ public sealed record OggOpusFile(byte[] HeadPacket, byte[] TagsPacket, IReadOnly
             if (head.MappingFamily != 0)
                 throw new InvalidDataException(
                     $"Unsupported Ogg Opus channel mapping family {head.MappingFamily}; only mono and stereo files are supported");
+            if (head.ChannelCount is not (1 or 2))
+                throw new InvalidDataException(
+                    $"Unsupported Ogg Opus channel count {head.ChannelCount}; only mono and stereo files are supported");
         }
         else if (packets.Count == 2)
         {

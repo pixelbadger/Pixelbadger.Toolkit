@@ -23,11 +23,16 @@ public class OpusSpliceEditorTests : IDisposable
         => OpusSpliceEditor.CreateRecording(
             _encoder.Encode(OpusTestHelpers.Sine(channels, (int)(seconds * Rate), frequency), new OpusEncodeSettings(channels)), channels);
 
-    private Func<int?, EncodedAudio> Source(double seconds, double frequency, int channels = 1)
+    private Func<EncodeRequest, EncodedAudio> Src(double seconds, double frequency, int channels = 1)
     {
         var pcm = OpusTestHelpers.Sine(channels, (int)(seconds * Rate), frequency);
-        return k => _encoder.Encode(pcm, new OpusEncodeSettings(channels), k);
+        return r => _encoder.Encode(OpusPcmEncoder.PrependSilence(pcm, r.FrontPadSamples, channels).ToArray(), new OpusEncodeSettings(channels), r.ExactSamples);
     }
+
+    private static Func<EncodeRequest, EncodedAudio> Const(EncodedAudio audio) => _ => audio;
+
+    private SpliceResult Over(OggOpusFile file, long at, double seconds, double frequency, int channels = 1)
+        => OpusSpliceEditor.Overwrite(file, at, Src(seconds, frequency, channels), (long)(seconds * Rate));
 
     private EncodedAudio Audio(double seconds, double frequency, int channels = 1)
         => _encoder.Encode(OpusTestHelpers.Sine(channels, (int)(seconds * Rate), frequency), new OpusEncodeSettings(channels));
@@ -110,7 +115,7 @@ public class OpusSpliceEditorTests : IDisposable
         var originals = file.AudioPackets.ToList();
         var audio = Audio(1.0, 880);
 
-        var result = OpusSpliceEditor.Insert(file, 48000, audio);
+        var result = OpusSpliceEditor.Insert(file, 48000, Const(audio));
 
         result.File.DurationSamples.Should().Be(96000 + 48960);
         result.ReplacedSamples.Should().Be(0);
@@ -136,7 +141,7 @@ public class OpusSpliceEditorTests : IDisposable
     public void Insert_ShouldInsertAtStart_WhenAtZero()
     {
         var file = Record(1.0);
-        var result = OpusSpliceEditor.Insert(file, 0, Audio(0.5, 880));
+        var result = OpusSpliceEditor.Insert(file, 0, Src(0.5, 880));
         result.SnappedSample.Should().Be(0);
         result.File.AudioPackets.Take(file.AudioPackets.Count).Should().NotBeEquivalentTo(file.AudioPackets);
         result.File.AudioPackets.Skip(result.File.AudioPackets.Count - file.AudioPackets.Count).Should().Equal(file.AudioPackets);
@@ -150,7 +155,7 @@ public class OpusSpliceEditorTests : IDisposable
     {
         var file = Record(1.0) with { EndTrim = 0 };
         var audio = Audio(0.5, 880);
-        var result = OpusSpliceEditor.Insert(file, file.DurationSamples, audio);
+        var result = OpusSpliceEditor.Insert(file, file.DurationSamples, Const(audio));
         result.File.EndTrim.Should().Be(audio.EndTrim);
         result.File.AudioPackets.Take(file.AudioPackets.Count).Should().Equal(file.AudioPackets);
         result.SnappedSample.Should().Be(file.DurationSamples);
@@ -164,7 +169,7 @@ public class OpusSpliceEditorTests : IDisposable
         var file = Record(2.0);
         var originals = file.AudioPackets.ToList();
 
-        var result = OpusSpliceEditor.Overwrite(file, 48000, Source(0.5, 880));
+        var result = Over(file, 48000, 0.5, 880);
 
         result.File.DurationSamples.Should().Be(96000);
         result.File.AudioPackets.Should().HaveCount(originals.Count);
@@ -193,14 +198,14 @@ public class OpusSpliceEditorTests : IDisposable
         var originals = file.AudioPackets.ToList();
         var full = Audio(1.0, 880);
 
-        var result = OpusSpliceEditor.Overwrite(file, 72000, k => k is null ? full : throw new InvalidOperationException("no truncated encode expected"));
+        var result = Over(file, 72000, 1.0, 880);
 
         result.SnappedSample.Should().Be(71688);
         result.File.DurationSamples.Should().Be(result.SnappedSample + 312 + 48000);
         result.File.EndTrim.Should().Be(full.EndTrim);
         result.ReplacedSamples.Should().Be(originals.Count * 960L - 75 * 960);
         result.File.AudioPackets.Take(75).Should().Equal(originals.Take(75));
-        result.File.AudioPackets.Skip(75).Should().Equal(full.Packets);
+        result.File.AudioPackets.Skip(75).Should().BeEquivalentTo(full.Packets, o => o.WithStrictOrdering());
         var (samples, err) = Decode(RoundTrip(result.File));
         err.Should().BeEmpty();
         samples.Length.Should().Be((int)result.File.DurationSamples);
@@ -212,7 +217,7 @@ public class OpusSpliceEditorTests : IDisposable
     public void Overwrite_ShouldAppend_WhenNearestBoundaryIsEnd()
     {
         var file = Record(1.0) with { EndTrim = 0 };
-        var result = OpusSpliceEditor.Overwrite(file, file.DurationSamples, Source(0.25, 880));
+        var result = Over(file, file.DurationSamples, 0.25, 880);
         result.ReplacedSamples.Should().Be(0);
         result.File.AudioPackets.Take(file.AudioPackets.Count).Should().Equal(file.AudioPackets);
         Decode(result.File).Stderr.Should().BeEmpty();
@@ -225,7 +230,7 @@ public class OpusSpliceEditorTests : IDisposable
         file.EndTrim.Should().BeGreaterThan(0);
         var audio = Audio(1.0, 880);
 
-        var result = OpusSpliceEditor.Insert(file, file.DurationSamples, audio);
+        var result = OpusSpliceEditor.Insert(file, file.DurationSamples, Const(audio));
 
         result.SnappedSample.Should().Be(96000);
         result.ReplacedSamples.Should().Be(0);
@@ -245,12 +250,12 @@ public class OpusSpliceEditorTests : IDisposable
     {
         var file = Record(2.0);
         var full = Audio(1.0, 880);
-        var result = OpusSpliceEditor.Overwrite(file, file.DurationSamples, k => k is null ? full : throw new InvalidOperationException());
+        var result = Over(file, file.DurationSamples, 1.0, 880);
         result.SnappedSample.Should().Be(96000);
         result.ReplacedSamples.Should().Be(0);
         result.File.EndTrim.Should().Be(full.EndTrim);
         result.File.AudioPackets.Take(file.AudioPackets.Count).Should().Equal(file.AudioPackets);
-        result.File.AudioPackets.Skip(file.AudioPackets.Count).Should().Equal(full.Packets);
+        result.File.AudioPackets.Skip(file.AudioPackets.Count).Should().BeEquivalentTo(full.Packets, o => o.WithStrictOrdering());
         result.File.DurationSamples.Should().Be(144960);
         var (samples, err) = Decode(RoundTrip(result.File));
         err.Should().BeEmpty();
@@ -258,12 +263,24 @@ public class OpusSpliceEditorTests : IDisposable
     }
 
     [Fact]
-    public void Insert_ShouldUseNearestBoundary_WhenOneSampleBeforeDuration()
+    public void Insert_ShouldAppendAtDuration_WhenOneSampleBeforeDuration()
     {
         var file = Record(2.0);
         var audio = Audio(0.1, 880);
-        var result = OpusSpliceEditor.Insert(file, file.DurationSamples - 1, audio);
-        // boundaries at 960i-312: 95688 (i=100) is nearest to 95999; the end boundary (96648) is not chosen
+        var result = OpusSpliceEditor.Insert(file, file.DurationSamples - 1, Const(audio));
+        // the end boundary (audible duration 96000) is 1 sample away; the last interior boundary (95688) is 311 away
+        result.SnappedSample.Should().Be(file.DurationSamples);
+        result.File.AudioPackets.Take(file.AudioPackets.Count).Should().Equal(file.AudioPackets);
+        result.File.EndTrim.Should().Be(audio.EndTrim);
+    }
+
+    [Fact]
+    public void Insert_ShouldUseLastInteriorBoundary_WhenNearerThanEnd()
+    {
+        var file = Record(2.0);
+        var audio = Audio(0.1, 880);
+        var result = OpusSpliceEditor.Insert(file, file.DurationSamples - 600, Const(audio));
+        // 95400 is 288 from 95688 (packet 100) and 600 from the end
         result.SnappedSample.Should().Be(95688);
         result.File.AudioPackets.Take(100).Should().Equal(file.AudioPackets.Take(100));
         result.File.AudioPackets.Skip(100 + audio.Packets.Count).Should().Equal(file.AudioPackets.Skip(100));
@@ -274,7 +291,7 @@ public class OpusSpliceEditorTests : IDisposable
     public void Insert_ShouldStartNewAudioAtBoundaryPlusLookahead_WhenInsertingAtOneSecond()
     {
         var file = Record(2.0);
-        var result = OpusSpliceEditor.Insert(file, 48000, Audio(1.0, 880));
+        var result = OpusSpliceEditor.Insert(file, 48000, Src(1.0, 880));
         result.SnappedSample.Should().Be(47688);
         var (samples, err) = Decode(RoundTrip(result.File));
         err.Should().BeEmpty();
@@ -282,12 +299,64 @@ public class OpusSpliceEditorTests : IDisposable
     }
 
     [Fact]
-    public void Overwrite_ShouldTreatAsReachingEnd_WhenNoFollowingPacketCoversRun()
+    public void Overwrite_ShouldReplaceExactRunInside_WhenTakeEndsBeforeFileEnd()
     {
         var file = Record(1.0);
-        // S + N < D but the run of K packets would extend past the last packet start: falls back to case (b).
-        var result = OpusSpliceEditor.Overwrite(file, 47000, Source(0.0205, 880));
-        result.File.AudioPackets.Count.Should().BeLessThanOrEqualTo(file.AudioPackets.Count + 1);
+        var originals = file.AudioPackets.ToList();
+        var requests = new List<EncodeRequest>();
+        var src = Src(0.0205, 880);
+
+        // boundary 24 is at 22728; N = 984 samples, so S + N < D and the run is exactly one 960-sample packet (inside branch)
+        var result = OpusSpliceEditor.Overwrite(file, 22728, r => { requests.Add(r); return src(r); }, 984);
+
+        result.SnappedSample.Should().Be(22728);
+        result.ReplacedSamples.Should().Be(960);
+        requests.Should().Equal(new EncodeRequest(0, 960));
+        result.File.AudioPackets.Should().HaveCount(originals.Count);
+        result.File.EndTrim.Should().Be(file.EndTrim);
+        result.File.DurationSamples.Should().Be(file.DurationSamples);
+        for (var i = 0; i < originals.Count; i++)
+        {
+            if (i == 24) result.File.AudioPackets[i].Should().NotBeSameAs(originals[i]);
+            else result.File.AudioPackets[i].Should().BeSameAs(originals[i]);
+        }
+
+        Decode(result.File).Stderr.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Overwrite_ShouldReplaceAllRemainingPackets_WhenTakeReachesTheEnd()
+    {
+        var file = Record(1.0);
+        var originals = file.AudioPackets.ToList();
+        var requests = new List<EncodeRequest>();
+        var src = Src(0.5, 880);
+
+        // boundary 40 is at 38088; S + N = 62088 > D = 48000, so the full-encode branch replaces packets 40..end
+        var result = OpusSpliceEditor.Overwrite(file, 38088, r => { requests.Add(r); return src(r); }, 24000);
+
+        result.SnappedSample.Should().Be(38088);
+        requests.Should().Equal(new EncodeRequest(0, null));
+        result.ReplacedSamples.Should().Be((originals.Count - 40) * 960L);
+        result.File.AudioPackets.Take(40).Should().Equal(originals.Take(40));
+        result.File.AudioPackets.Skip(40).Should().BeEquivalentTo(Audio(0.5, 880).Packets, o => o.WithStrictOrdering());
+        result.File.DurationSamples.Should().Be(38088 + 312 + 24000);
+    }
+
+    [Fact]
+    public void Overwrite_ShouldAppendFullEncode_WhenAtFileDuration()
+    {
+        var file = Record(1.0);
+        var requests = new List<EncodeRequest>();
+        var src = Src(0.25, 880);
+
+        var result = OpusSpliceEditor.Overwrite(file, file.DurationSamples, r => { requests.Add(r); return src(r); }, 12000);
+
+        requests.Should().Equal(new EncodeRequest(0, null));
+        result.SnappedSample.Should().Be(file.DurationSamples);
+        result.ReplacedSamples.Should().Be(0);
+        result.File.AudioPackets.Take(file.AudioPackets.Count).Should().Equal(file.AudioPackets);
+        result.File.AudioPackets.Should().HaveCount(file.AudioPackets.Count + 13);
         Decode(result.File).Stderr.Should().BeEmpty();
     }
 
@@ -295,8 +364,11 @@ public class OpusSpliceEditorTests : IDisposable
     public void Overwrite_ShouldReplaceOnePacketMinimum_WhenShorterThan20Ms()
     {
         var file = Record(1.0);
-        var result = OpusSpliceEditor.Overwrite(file, 24000, Source(0.005, 880));
+        var result = Over(file, 24000, 0.005, 880);
         result.ReplacedSamples.Should().Be(960);
+        result.SnappedSample.Should().Be(23688);
+        var replaced = result.File.AudioPackets.Select((p, i) => (p, i)).Where(t => !ReferenceEquals(t.p, file.AudioPackets[t.i])).Select(t => t.i);
+        replaced.Should().Equal(25);
         result.File.AudioPackets.Should().HaveCount(file.AudioPackets.Count);
         result.File.DurationSamples.Should().Be(file.DurationSamples);
     }
@@ -306,7 +378,7 @@ public class OpusSpliceEditorTests : IDisposable
     {
         var file = Record(2.0);
         file = file with { HeadPacket = new OpusHead(1, 1, 0, 48000, 0, 0).ToBytes() };
-        var result = OpusSpliceEditor.Insert(file, 48624L, Audio(0.1, 880));
+        var result = OpusSpliceEditor.Insert(file, 48624L, Src(0.1, 880));
         result.SnappedSample.Should().Be(48960);
         result.RequestedSample.Should().Be(48624);
     }
@@ -315,7 +387,7 @@ public class OpusSpliceEditorTests : IDisposable
     public void Snap_ShouldSnapOnPreSkipShiftedBoundaries_WhenRecordingHasPreSkip()
     {
         var file = Record(2.0);
-        var result = OpusSpliceEditor.Insert(file, 48624, Audio(0.1, 880));
+        var result = OpusSpliceEditor.Insert(file, 48624, Src(0.1, 880));
         result.SnappedSample.Should().Be(48648);
     }
 
@@ -324,17 +396,17 @@ public class OpusSpliceEditorTests : IDisposable
     {
         var file = Record(2.0);
         // boundaries at 47688 and 48648; midpoint 48168
-        OpusSpliceEditor.Insert(file, 48168, Audio(0.1, 880)).SnappedSample.Should().Be(47688);
-        OpusSpliceEditor.Insert(file, 48169, Audio(0.1, 880)).SnappedSample.Should().Be(48648);
+        OpusSpliceEditor.Insert(file, 48168, Src(0.1, 880)).SnappedSample.Should().Be(47688);
+        OpusSpliceEditor.Insert(file, 48169, Src(0.1, 880)).SnappedSample.Should().Be(48648);
     }
 
     [Fact]
     public void Snap_ShouldMapToZero_WhenAtZeroOrWithinFirstBoundaryPair()
     {
         var file = Record(1.0);
-        OpusSpliceEditor.Insert(file, 0, Audio(0.1, 880)).SnappedSample.Should().Be(0);
+        OpusSpliceEditor.Insert(file, 0, Src(0.1, 880)).SnappedSample.Should().Be(0);
         // boundaries 0 (packet 0, clamped) and 648 (packet 1) tie at 324 -> earlier
-        OpusSpliceEditor.Insert(file, 324, Audio(0.1, 880)).SnappedSample.Should().Be(0);
+        OpusSpliceEditor.Insert(file, 324, Src(0.1, 880)).SnappedSample.Should().Be(0);
     }
 
     [Theory]
@@ -343,8 +415,8 @@ public class OpusSpliceEditorTests : IDisposable
     public void Edits_ShouldThrowOutOfRange_WhenSampleOutsideFile(long at)
     {
         var file = Record(1.0);
-        var insert = () => OpusSpliceEditor.Insert(file, at, Audio(0.1, 880));
-        var overwrite = () => OpusSpliceEditor.Overwrite(file, at, Source(0.1, 880));
+        var insert = () => OpusSpliceEditor.Insert(file, at, Src(0.1, 880));
+        var overwrite = () => Over(file, at, 0.1, 880);
         insert.Should().Throw<ArgumentOutOfRangeException>();
         overwrite.Should().Throw<ArgumentOutOfRangeException>();
     }
@@ -354,8 +426,8 @@ public class OpusSpliceEditorTests : IDisposable
     {
         var file = Record(1.0);
         var stereo = Audio(0.1, 880, 2);
-        var insert = () => OpusSpliceEditor.Insert(file, 0, stereo);
-        var overwrite = () => OpusSpliceEditor.Overwrite(file, 0, Source(0.1, 880, 2));
+        var insert = () => OpusSpliceEditor.Insert(file, 0, Const(stereo));
+        var overwrite = () => Over(file, 0, 0.1, 880, 2);
         insert.Should().Throw<ArgumentException>();
         overwrite.Should().Throw<ArgumentException>();
     }
@@ -364,7 +436,7 @@ public class OpusSpliceEditorTests : IDisposable
     public void Insert_ShouldWorkOnStereoFile_WhenChannelsMatch()
     {
         var file = Record(1.0, 440, 2);
-        var result = OpusSpliceEditor.Insert(file, 24000, Audio(0.5, 880, 2));
+        var result = OpusSpliceEditor.Insert(file, 24000, Src(0.5, 880, 2));
         var (samples, err) = Decode(RoundTrip(result.File), 2);
         err.Should().BeEmpty();
         samples.Length.Should().Be((int)result.File.DurationSamples * 2);
@@ -390,16 +462,17 @@ public class OpusSpliceEditorTests : IDisposable
         // 101 packets -> 50 merged; the odd final packet is dropped, so the trim is reset to keep the duration valid
         var longFile = file with { AudioPackets = merged, EndTrim = 0 };
 
-        var result = OpusSpliceEditor.Insert(longFile, 48000, Audio(0.1, 880));
+        var result = OpusSpliceEditor.Insert(longFile, 48000, Src(0.1, 880));
 
         result.SnappedSample.Should().Be(1920L * 25 - 312);
         result.File.AudioPackets.Take(25).Should().Equal(merged.Take(25));
         result.File.AudioPackets.Skip(25 + 6).Should().Equal(merged.Skip(25));
         Decode(RoundTrip(result.File)).Stderr.Should().BeEmpty();
 
-        var over = OpusSpliceEditor.Overwrite(longFile, 48000, Source(0.1, 880));
-        over.ReplacedSamples.Should().Be(1920 * 3);
-        over.File.AudioPackets.Skip(25 + 5).Should().Equal(merged.Skip(25 + 3));
+        var over = Over(longFile, 48000, 0.1, 880);
+        over.ReplacedSamples.Should().Be(1920 * 2);
+        over.File.AudioPackets.Skip(25 + 4).Should().Equal(merged.Skip(25 + 2));
+        over.File.DurationSamples.Should().Be(longFile.DurationSamples);
         Decode(RoundTrip(over.File)).Stderr.Should().BeEmpty();
     }
 
@@ -408,8 +481,121 @@ public class OpusSpliceEditorTests : IDisposable
     {
         var file = Record(1.0);
         var before = file.AudioPackets.ToList();
-        OpusSpliceEditor.Insert(file, 24000, Audio(0.1, 880));
-        OpusSpliceEditor.Overwrite(file, 24000, Source(0.1, 880));
+        OpusSpliceEditor.Insert(file, 24000, Src(0.1, 880));
+        Over(file, 24000, 0.1, 880);
         file.AudioPackets.Should().Equal(before);
+    }
+
+    private OggOpusFile FfmpegRecording(int frameDurationMs, double seconds = 2.0, double frequency = 440)
+    {
+        var path = Path.Combine(_dir, Guid.NewGuid() + ".opus");
+        var psi = new ProcessStartInfo("ffmpeg") { RedirectStandardError = true };
+        foreach (var a in new[]
+                 {
+                     "-v", "error", "-f", "lavfi", "-i", FormattableString.Invariant($"sine=frequency={frequency}:duration={seconds}:sample_rate=48000"),
+                     "-c:a", "libopus", "-frame_duration", frameDurationMs.ToString(), "-y", path
+                 })
+            psi.ArgumentList.Add(a);
+        using var proc = Process.Start(psi)!;
+        var err = proc.StandardError.ReadToEnd();
+        proc.WaitForExit();
+        proc.ExitCode.Should().Be(0, err);
+        using var fs = File.OpenRead(path);
+        return OggOpusFile.Read(fs);
+    }
+
+    [Fact]
+    public void Overwrite_ShouldKeepExactLengthAndResumeOriginal_WhenFileHas60MsPackets()
+    {
+        var file = FfmpegRecording(60);
+        var originals = file.AudioPackets.ToList();
+        originals.Should().OnlyContain(p => OpusToc.GetSampleCount(p) == 2880);
+
+        var result = Over(file, 48000, 0.5, 880);
+
+        result.File.DurationSamples.Should().Be(file.DurationSamples);
+        result.ReplacedSamples.Should().BeLessThanOrEqualTo(24000).And.BeGreaterThan(0);
+        (result.ReplacedSamples % 2880).Should().Be(0);
+        var firstReplaced = (int)((result.SnappedSample + file.Head.PreSkip) / 2880);
+        var removed = (int)(result.ReplacedSamples / 2880);
+        var added = result.File.AudioPackets.Count - originals.Count + removed;
+        result.File.AudioPackets.Take(firstReplaced).Should().Equal(originals.Take(firstReplaced));
+        result.File.AudioPackets.Skip(firstReplaced + added).Should().Equal(originals.Skip(firstReplaced + removed));
+        added.Should().Be((int)(result.ReplacedSamples / 960));
+
+        var (samples, err) = Decode(RoundTrip(result.File));
+        err.Should().BeEmpty();
+        samples.Length.Should().Be((int)file.DurationSamples);
+        AssertDominant(samples, 1.1, 1.4, 880, 440);
+        AssertDominant(samples, 1.6, 1.9, 440, 880);
+        AssertDominant(samples, 0.1, 0.9, 440, 880);
+    }
+
+    [Fact]
+    public void Insert_ShouldKeepWholeTake_WhenPreSkipExceedsBoundaryStart()
+    {
+        var file = Record(2.0);
+        var patched = file with { HeadPacket = new OpusHead(1, 1, 3840, 48000, 0, 0).ToBytes() };
+        patched.DurationSamples.Should().Be(file.DurationSamples - (3840 - 312));
+        var requests = new List<EncodeRequest>();
+        var src = Src(1.0, 880);
+
+        var result = OpusSpliceEditor.Insert(patched, 0, r => { requests.Add(r); return src(r); });
+
+        requests.Select(r => r.FrontPadSamples).Should().Equal(0, 3840 - 312);
+        result.SnappedSample.Should().Be(0);
+        result.File.DurationSamples.Should().Be(patched.DurationSamples + (3840 - 312) + 48000 + 312);
+        var (samples, err) = Decode(RoundTrip(result.File));
+        err.Should().BeEmpty();
+        samples.Length.Should().Be((int)result.File.DurationSamples);
+        AssertDominant(samples, 0.005, 0.1, 880, 440);
+        AssertDominant(samples, 0.5, 0.9, 880, 440);
+        AssertDominant(samples, 1.1, 1.5, 440, 880);
+    }
+
+    [Fact]
+    public void Overwrite_ShouldKeepTakeAndLength_WhenPreSkipExceedsBoundaryStartAtZero()
+    {
+        var file = Record(2.0) with { HeadPacket = new OpusHead(1, 1, 3840, 48000, 0, 0).ToBytes() };
+
+        var result = Over(file, 0, 0.5, 880);
+
+        result.SnappedSample.Should().Be(0);
+        result.File.DurationSamples.Should().Be(file.DurationSamples);
+        var (samples, err) = Decode(RoundTrip(result.File));
+        err.Should().BeEmpty();
+        AssertDominant(samples, 0.005, 0.1, 880, 440);
+        AssertDominant(samples, 0.2, 0.45, 880, 440);
+        AssertDominant(samples, 0.7, 1.0, 440, 880);
+    }
+
+    [Fact]
+    public void Insert_ShouldAppendAndReportDuration_WhenSnapsToEndBoundaryWithLargeEndTrim()
+    {
+        var file = Record(1.0) with { EndTrim = 900 };
+        var audio = Audio(0.25, 880);
+        var duration = file.DurationSamples;
+
+        var result = OpusSpliceEditor.Insert(file, duration - 10, Const(audio));
+
+        result.SnappedSample.Should().Be(duration);
+        result.ReplacedSamples.Should().Be(0);
+        result.File.AudioPackets.Take(file.AudioPackets.Count).Should().Equal(file.AudioPackets);
+        result.File.AudioPackets.Skip(file.AudioPackets.Count).Should().Equal(audio.Packets);
+        result.File.EndTrim.Should().Be(audio.EndTrim);
+    }
+
+    [Fact]
+    public void Overwrite_ShouldAppendAndReportDuration_WhenSnapsToEndBoundaryWithLargeEndTrim()
+    {
+        var file = Record(1.0) with { EndTrim = 900 };
+        var duration = file.DurationSamples;
+
+        var result = Over(file, duration - 10, 0.25, 880);
+
+        result.SnappedSample.Should().Be(duration);
+        result.ReplacedSamples.Should().Be(0);
+        result.File.AudioPackets.Take(file.AudioPackets.Count).Should().Equal(file.AudioPackets);
+        result.File.AudioPackets.Should().HaveCount(file.AudioPackets.Count + 13);
     }
 }

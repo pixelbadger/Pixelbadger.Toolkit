@@ -23,18 +23,25 @@ public sealed class OpusRepacketizer : IDisposable
         _handle.Set(ptr);
     }
 
-    public int FrameCount => OpusNative.opus_repacketizer_get_nb_frames(Handle());
+    public int FrameCount
+    {
+        get
+        {
+            using var h = Handle();
+            return OpusNative.opus_repacketizer_get_nb_frames(h);
+        }
+    }
 
     public void Reset()
     {
-        var h = Handle();
+        using var h = Handle();
         OpusNative.opus_repacketizer_init(h);
         FreeBuffers();
     }
 
     public void Add(ReadOnlySpan<byte> packet)
     {
-        var h = Handle();
+        using var h = Handle();
         if (packet.IsEmpty)
             throw OpusNative.Error(OpusNative.OpusBadArg, "opus_repacketizer_cat");
 
@@ -53,7 +60,7 @@ public sealed class OpusRepacketizer : IDisposable
 
     public byte[] Output()
     {
-        var h = Handle();
+        using var h = Handle();
         var buffer = new byte[MaxOutput()];
         var length = OpusNative.Check(OpusNative.opus_repacketizer_out(h, ref buffer[0], buffer.Length), "opus_repacketizer_out");
         return buffer.AsSpan(0, length).ToArray();
@@ -61,7 +68,7 @@ public sealed class OpusRepacketizer : IDisposable
 
     public byte[] Output(int beginFrame, int endFrame)
     {
-        var h = Handle();
+        using var h = Handle();
         var buffer = new byte[MaxOutput()];
         var length = OpusNative.Check(
             OpusNative.opus_repacketizer_out_range(h, beginFrame, endFrame, ref buffer[0], buffer.Length),
@@ -77,11 +84,7 @@ public sealed class OpusRepacketizer : IDisposable
 
     private int MaxOutput() => (int)Math.Min(int.MaxValue / 2, _totalBytes + 8L * Math.Max(1, FrameCount) + 16);
 
-    private IntPtr Handle()
-    {
-        ObjectDisposedException.ThrowIf(_handle.IsClosed, this);
-        return _handle.DangerousGetHandle();
-    }
+    private NativeLease Handle() => new(_handle, this);
 
     private void FreeBuffers()
     {

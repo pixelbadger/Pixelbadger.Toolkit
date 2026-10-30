@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using FluentAssertions;
 using Pixelbadger.Toolkit.Opus;
 using Pixelbadger.Toolkit.Opus.Native;
@@ -7,13 +8,13 @@ namespace Pixelbadger.Toolkit.Tests;
 public class OpusNativeCtlTests
 {
     [Fact]
-    public void UsePaddedCtl_ShouldBeFalse_WhenNotAppleArm64()
+    public void UsePaddedCtl_ShouldMatchPlatform_WhenQueried()
     {
-        OpusNative.UsePaddedCtl.Should().BeFalse();
+        OpusNative.UsePaddedCtl.Should().Be(OperatingSystem.IsMacOS() && RuntimeInformation.ProcessArchitecture == Architecture.Arm64);
     }
 
     [Fact]
-    public void EncoderCtlHelpers_ShouldSetAndGetValues_WhenUsingNonPaddedPath()
+    public void EncoderCtlHelpers_ShouldSetAndGetValues_WhenValuesInRange()
     {
         using var encoder = new OpusEncoder(48000, 1, OpusApplication.Audio);
         encoder.Bitrate = 40000;
@@ -26,7 +27,7 @@ public class OpusNativeCtlTests
     }
 
     [Fact]
-    public void DecoderCtlHelpers_ShouldSetAndGetValues_WhenUsingNonPaddedPath()
+    public void DecoderCtlHelpers_ShouldSetAndGetValues_WhenValuesInRange()
     {
         using var decoder = new OpusDecoder(48000, 1);
         decoder.Gain = 256;

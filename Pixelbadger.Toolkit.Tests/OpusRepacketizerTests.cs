@@ -13,7 +13,7 @@ public class OpusRepacketizerTests
     }
 
     [Fact]
-    public void Output_ShouldMergeTwoTwentyMsPacketsIntoOneFortyMsPacket()
+    public void Output_ShouldMergeTwoTwentyMsPacketsIntoOneFortyMsPacket_WhenBothAdded()
     {
         var packets = TwoPackets();
         using var r = new OpusRepacketizer();
@@ -49,7 +49,7 @@ public class OpusRepacketizerTests
     }
 
     [Fact]
-    public void Reset_ShouldClearFrames_AndAllowReuse()
+    public void Reset_ShouldClearFramesAndAllowReuse_WhenCalledAfterAdd()
     {
         var packets = TwoPackets();
         using var r = new OpusRepacketizer();
@@ -107,7 +107,7 @@ public class OpusRepacketizerTests
     }
 
     [Fact]
-    public void Dispose_ShouldBeIdempotent_AndUseAfterDisposeShouldThrow()
+    public void Dispose_ShouldBeIdempotentAndUseShouldThrow_WhenDisposed()
     {
         var packets = TwoPackets();
         var r = new OpusRepacketizer();

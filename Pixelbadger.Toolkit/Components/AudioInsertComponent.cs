@@ -43,12 +43,14 @@ public sealed class AudioInsertComponent
         var pcm = await _collector.CollectAsync(request, cancellationToken);
         AudioCommandSupport.RequireAudio(pcm);
 
-        var encoded = new OpusPcmEncoder(_factory).Encode(pcm, new OpusEncodeSettings(channels, options.Bitrate));
-        var result = OpusSpliceEditor.Insert(file, requested, encoded);
+        var encoder = new OpusPcmEncoder(_factory);
+        var settings = new OpusEncodeSettings(channels, options.Bitrate);
+        var result = OpusSpliceEditor.Insert(file, requested,
+            request => encoder.Encode(OpusPcmEncoder.PrependSilence(pcm, request.FrontPadSamples, channels), settings, request.ExactSamples));
         AudioCommandSupport.WriteOpusFile(options.File, result.File);
 
         _output.WriteLine(
-            $"Inserted {AudioCommandSupport.Seconds(encoded.SampleCount)}s at {AudioCommandSupport.Seconds(result.SnappedSample)}s " +
+            $"Inserted {AudioCommandSupport.Seconds(pcm.Length / channels)}s at {AudioCommandSupport.Seconds(result.SnappedSample)}s " +
             $"(requested {AudioCommandSupport.Seconds(requested)}s) into '{options.File}': {AudioCommandSupport.Seconds(result.File.DurationSamples)}s");
     }
 }

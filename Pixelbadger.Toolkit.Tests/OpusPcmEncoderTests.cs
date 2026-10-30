@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Moq;
 using Pixelbadger.Toolkit.Opus;
+using Pixelbadger.Toolkit.Opus.Ogg;
 using Pixelbadger.Toolkit.Services.Audio;
 
 namespace Pixelbadger.Toolkit.Tests;
@@ -57,23 +58,57 @@ public class OpusPcmEncoderTests
         act.Should().Throw<ArgumentException>();
     }
 
-    [Theory]
-    [InlineData(48000, 25)]
-    [InlineData(100, 3)]
-    [InlineData(5000, 1)]
-    public void Encode_ShouldProduceExactlyKPackets_WhenMaxPacketsGiven(int n, int k)
+    [Fact]
+    public void Encode_ShouldMixFrameSizes_WhenExactSamplesNotMultipleOf960()
     {
-        var audio = Real.Encode(OpusTestHelpers.Sine(1, n), new OpusEncodeSettings(1), k);
-        audio.Packets.Should().HaveCount(k);
+        var audio = Real.Encode(OpusTestHelpers.Sine(1, 30000), new OpusEncodeSettings(1), 25080);
+
+        var sizes = audio.Packets.Select(p => OpusToc.GetSampleCount(p)).ToList();
+        sizes.Should().HaveCount(27);
+        sizes.Take(26).Should().OnlyContain(s => s == 960);
+        sizes[26].Should().Be(120);
+        sizes.Sum().Should().Be(25080);
         audio.EndTrim.Should().Be(0);
-        audio.SampleCount.Should().Be(n);
+        audio.Lookahead.Should().Be(312);
+    }
+
+    [Theory]
+    [InlineData(960, new[] { 960 })]
+    [InlineData(1440, new[] { 960, 480 })]
+    [InlineData(1800, new[] { 960, 480, 240, 120 })]
+    [InlineData(120, new[] { 120 })]
+    public void Encode_ShouldUseDescendingFrames_WhenExactSamplesGiven(int exact, int[] expected)
+    {
+        var audio = Real.Encode(OpusTestHelpers.Sine(1, exact), new OpusEncodeSettings(1), exact);
+        audio.Packets.Select(p => OpusToc.GetSampleCount(p)).Should().Equal(expected);
     }
 
     [Fact]
-    public void Encode_ShouldThrow_WhenMaxPacketsNotPositive()
+    public void Encode_ShouldZeroPadAndKeepInputCount_WhenExactSamplesExceedInput()
     {
-        var act = () => Real.Encode(new short[960], new OpusEncodeSettings(1), 0);
+        var audio = Real.Encode(OpusTestHelpers.Sine(1, 100), new OpusEncodeSettings(1), 2880);
+        audio.Packets.Select(p => OpusToc.GetSampleCount(p)).Should().Equal(960, 960, 960);
+        audio.SampleCount.Should().Be(100);
+        audio.EndTrim.Should().Be(0);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-120)]
+    [InlineData(100)]
+    [InlineData(961)]
+    public void Encode_ShouldThrow_WhenExactSamplesInvalid(long exact)
+    {
+        var act = () => Real.Encode(new short[960], new OpusEncodeSettings(1), exact);
         act.Should().Throw<ArgumentOutOfRangeException>();
+    }
+
+    [Fact]
+    public void PrependSilence_ShouldPrefixZerosPerChannel_WhenPadPositive()
+    {
+        var padded = OpusPcmEncoder.PrependSilence(new short[] { 1, 2, 3, 4 }, 2, 2).ToArray();
+        padded.Should().Equal(0, 0, 0, 0, 1, 2, 3, 4);
+        OpusPcmEncoder.PrependSilence(new short[] { 1, 2 }, 0, 1).ToArray().Should().Equal(1, 2);
     }
 
     [Fact]

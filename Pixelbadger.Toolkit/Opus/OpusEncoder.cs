@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Pixelbadger.Toolkit.Opus.Native;
 
 namespace Pixelbadger.Toolkit.Opus;
@@ -46,7 +47,7 @@ public sealed class OpusEncoder : IOpusEncoder
 
     public int Encode(ReadOnlySpan<short> pcm, int frameSize, Span<byte> output)
     {
-        var h = Handle();
+        using var h = Handle();
         if (frameSize <= 0 || pcm.Length < (long)frameSize * Channels)
             throw OpusNative.Error(OpusNative.OpusBadArg, "opus_encode");
         return OpusNative.Check(
@@ -56,7 +57,7 @@ public sealed class OpusEncoder : IOpusEncoder
 
     public int EncodeFloat(ReadOnlySpan<float> pcm, int frameSize, Span<byte> output)
     {
-        var h = Handle();
+        using var h = Handle();
         if (frameSize <= 0 || pcm.Length < (long)frameSize * Channels)
             throw OpusNative.Error(OpusNative.OpusBadArg, "opus_encode_float");
         return OpusNative.Check(
@@ -142,29 +143,53 @@ public sealed class OpusEncoder : IOpusEncoder
     {
         get
         {
-            var h = Handle();
+            using var h = Handle();
             OpusNative.Check(OpusNative.EncoderCtlGetUInt(h, OpusNative.GetFinalRange, out var value), "OPUS_GET_FINAL_RANGE");
             return value;
         }
     }
 
     public void ResetState()
-        => OpusNative.Check(OpusNative.opus_encoder_ctl_void(Handle(), OpusNative.ResetStateRequest), "OPUS_RESET_STATE");
+    {
+        using var h = Handle();
+        OpusNative.Check(OpusNative.opus_encoder_ctl_void(h, OpusNative.ResetStateRequest), "OPUS_RESET_STATE");
+    }
 
     public void Dispose() => _handle.Dispose();
 
-    private IntPtr Handle()
-    {
-        ObjectDisposedException.ThrowIf(_handle.IsClosed, this);
-        return _handle.DangerousGetHandle();
-    }
+    private NativeLease Handle() => new(_handle, this);
 
     private int GetInt(int request, string name)
     {
-        OpusNative.Check(OpusNative.EncoderCtlGet(Handle(), request, out var value), name);
+        using var h = Handle();
+        OpusNative.Check(OpusNative.EncoderCtlGet(h, request, out var value), name);
         return value;
     }
 
     private void SetInt(int request, int value, string name)
-        => OpusNative.Check(OpusNative.EncoderCtlSet(Handle(), request, value), name);
+    {
+        using var h = Handle();
+        OpusNative.Check(OpusNative.EncoderCtlSet(h, request, value), name);
+    }
+}
+
+/// <summary>Keeps a native handle alive (SafeHandle ref-count) for the duration of one native call.</summary>
+internal readonly struct NativeLease : IDisposable
+{
+    private readonly SafeHandle _handle;
+
+    public NativeLease(SafeHandle handle, object owner)
+    {
+        ObjectDisposedException.ThrowIf(handle.IsClosed, owner);
+        var success = false;
+        handle.DangerousAddRef(ref success);
+        _handle = handle;
+        Ptr = handle.DangerousGetHandle();
+    }
+
+    public IntPtr Ptr { get; }
+
+    public void Dispose() => _handle.DangerousRelease();
+
+    public static implicit operator IntPtr(NativeLease lease) => lease.Ptr;
 }

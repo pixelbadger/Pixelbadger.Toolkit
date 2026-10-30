@@ -16,7 +16,7 @@ public class OpusPacketTests
     }
 
     [Fact]
-    public void Inspection_ShouldMatchEncodedMonoPacket()
+    public void Inspection_ShouldMatchEncodedMonoPacket_WhenPacketFromEncoder()
     {
         var p = Packet(1);
         OpusPacket.GetFrameCount(p).Should().Be(1);
@@ -39,7 +39,7 @@ public class OpusPacketTests
     [InlineData(0x78, 1105, 960)]  // Hybrid FB 20ms (config 15)
     [InlineData(0xD0, 1104, 480)]  // CELT SWB 10ms (config 26)
     [InlineData(0xF8, 1105, 960)]  // CELT FB 20ms (config 31)
-    public void Inspection_ShouldMatchKnownTocBytes(byte toc, int bandwidth, int samples)
+    public void Inspection_ShouldMatchKnownTocBytes_WhenTocGiven(byte toc, int bandwidth, int samples)
     {
         var packet = new byte[] { toc, 0, 0 };
         OpusPacket.GetBandwidth(packet).Should().Be((OpusBandwidth)bandwidth);
@@ -49,7 +49,7 @@ public class OpusPacketTests
     }
 
     [Fact]
-    public void GetSampleCount_ShouldScaleWithSampleRate()
+    public void GetSampleCount_ShouldScaleWithSampleRate_WhenRateIs16k()
     {
         var p = Packet(1);
         OpusPacket.GetSampleCount(p, 16000).Should().Be(320);
@@ -67,7 +67,7 @@ public class OpusPacketTests
     }
 
     [Fact]
-    public void GetSampleCount_ShouldThrowOpusException_WhenSampleRateInvalid()
+    public void GetFrameCount_ShouldThrowInvalidPacket_WhenCode3PacketLacksFrameCountByte()
     {
         // Code 3 packet missing its frame count byte is invalid.
         ((Action)(() => OpusPacket.GetFrameCount(new byte[] { 0x03 }))).Should().Throw<OpusException>().Where(x => x.ErrorCode == -4);

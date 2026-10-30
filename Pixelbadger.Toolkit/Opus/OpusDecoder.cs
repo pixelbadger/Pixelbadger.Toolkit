@@ -37,7 +37,7 @@ public sealed class OpusDecoder : IOpusDecoder
 
     public int Decode(ReadOnlySpan<byte> packet, Span<short> pcm, int frameSize, bool decodeFec = false)
     {
-        var h = Handle();
+        using var h = Handle();
         if (frameSize <= 0 || pcm.Length < (long)frameSize * Channels)
             throw OpusNative.Error(OpusNative.OpusBadArg, "opus_decode");
         return OpusNative.Check(
@@ -47,7 +47,7 @@ public sealed class OpusDecoder : IOpusDecoder
 
     public int DecodeFloat(ReadOnlySpan<byte> packet, Span<float> pcm, int frameSize, bool decodeFec = false)
     {
-        var h = Handle();
+        using var h = Handle();
         if (frameSize <= 0 || pcm.Length < (long)frameSize * Channels)
             throw OpusNative.Error(OpusNative.OpusBadArg, "opus_decode_float");
         return OpusNative.Check(
@@ -57,7 +57,7 @@ public sealed class OpusDecoder : IOpusDecoder
 
     public int GetSampleCount(ReadOnlySpan<byte> packet)
     {
-        var h = Handle();
+        using var h = Handle();
         if (packet.IsEmpty)
             throw OpusNative.Error(OpusNative.OpusBadArg, "opus_decoder_get_nb_samples");
         return OpusNative.Check(
@@ -68,7 +68,11 @@ public sealed class OpusDecoder : IOpusDecoder
     public int Gain
     {
         get => GetInt(OpusNative.GetGain, "OPUS_GET_GAIN");
-        set => OpusNative.Check(OpusNative.DecoderCtlSet(Handle(), OpusNative.SetGain, value), "OPUS_SET_GAIN");
+        set
+        {
+            using var h = Handle();
+            OpusNative.Check(OpusNative.DecoderCtlSet(h, OpusNative.SetGain, value), "OPUS_SET_GAIN");
+        }
     }
 
     public int LastPacketDuration => GetInt(OpusNative.GetLastPacketDuration, "OPUS_GET_LAST_PACKET_DURATION");
@@ -77,7 +81,7 @@ public sealed class OpusDecoder : IOpusDecoder
     {
         get
         {
-            var h = Handle();
+            using var h = Handle();
             OpusNative.Check(OpusNative.DecoderCtlGetUInt(h, OpusNative.GetFinalRange, out var value), "OPUS_GET_FINAL_RANGE");
             return value;
         }
@@ -86,19 +90,19 @@ public sealed class OpusDecoder : IOpusDecoder
     public OpusBandwidth Bandwidth => (OpusBandwidth)GetInt(OpusNative.GetBandwidth, "OPUS_GET_BANDWIDTH");
 
     public void ResetState()
-        => OpusNative.Check(OpusNative.opus_decoder_ctl_void(Handle(), OpusNative.ResetStateRequest), "OPUS_RESET_STATE");
+    {
+        using var h = Handle();
+        OpusNative.Check(OpusNative.opus_decoder_ctl_void(h, OpusNative.ResetStateRequest), "OPUS_RESET_STATE");
+    }
 
     public void Dispose() => _handle.Dispose();
 
-    private IntPtr Handle()
-    {
-        ObjectDisposedException.ThrowIf(_handle.IsClosed, this);
-        return _handle.DangerousGetHandle();
-    }
+    private NativeLease Handle() => new(_handle, this);
 
     private int GetInt(int request, string name)
     {
-        OpusNative.Check(OpusNative.DecoderCtlGet(Handle(), request, out var value), name);
+        using var h = Handle();
+        OpusNative.Check(OpusNative.DecoderCtlGet(h, request, out var value), name);
         return value;
     }
 }

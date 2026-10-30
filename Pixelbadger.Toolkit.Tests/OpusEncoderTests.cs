@@ -64,7 +64,7 @@ public class OpusEncoderTests
     [InlineData(6000)]
     [InlineData(64000)]
     [InlineData(256000)]
-    public void Bitrate_ShouldRoundTrip(int value)
+    public void Bitrate_ShouldRoundTrip_WhenValueInRange(int value)
     {
         using var e = new OpusEncoder(48000, 1, OpusApplication.Audio);
         e.Bitrate = value;
@@ -75,7 +75,7 @@ public class OpusEncoderTests
     [InlineData(0)]
     [InlineData(5)]
     [InlineData(10)]
-    public void Complexity_ShouldRoundTrip(int value)
+    public void Complexity_ShouldRoundTrip_WhenValueInRange(int value)
     {
         using var e = new OpusEncoder(48000, 1, OpusApplication.Audio);
         e.Complexity = value;
@@ -85,7 +85,7 @@ public class OpusEncoderTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void BooleanSettings_ShouldRoundTrip(bool value)
+    public void BooleanSettings_ShouldRoundTrip_WhenToggled(bool value)
     {
         using var e = new OpusEncoder(48000, 1, OpusApplication.Audio);
         e.Vbr = value;
@@ -102,7 +102,7 @@ public class OpusEncoderTests
     [InlineData(OpusSignal.Voice)]
     [InlineData(OpusSignal.Music)]
     [InlineData(OpusSignal.Auto)]
-    public void Signal_ShouldRoundTrip(OpusSignal value)
+    public void Signal_ShouldRoundTrip_WhenValueSet(OpusSignal value)
     {
         using var e = new OpusEncoder(48000, 1, OpusApplication.Audio);
         e.Signal = value;
@@ -124,7 +124,7 @@ public class OpusEncoderTests
     }
 
     [Fact]
-    public void Bandwidth_ShouldAcceptMediumband_WithoutError()
+    public void Bandwidth_ShouldAcceptMediumband_WhenForced()
     {
         using var e = new OpusEncoder(48000, 1, OpusApplication.Audio);
         var act = () => e.Bandwidth = OpusBandwidth.Mediumband;
@@ -132,7 +132,7 @@ public class OpusEncoderTests
     }
 
     [Fact]
-    public void Bandwidth_ShouldAcceptAuto_AndReportConcreteBandwidth()
+    public void Bandwidth_ShouldReportConcreteBandwidth_WhenSetToAuto()
     {
         using var e = new OpusEncoder(48000, 1, OpusApplication.Audio);
         e.Bandwidth = OpusBandwidth.Auto;
@@ -144,7 +144,7 @@ public class OpusEncoderTests
     [InlineData(OpusBandwidth.Narrowband)]
     [InlineData(OpusBandwidth.Wideband)]
     [InlineData(OpusBandwidth.Fullband)]
-    public void MaxBandwidth_ShouldRoundTrip(OpusBandwidth value)
+    public void MaxBandwidth_ShouldRoundTrip_WhenValueSet(OpusBandwidth value)
     {
         using var e = new OpusEncoder(48000, 1, OpusApplication.Audio);
         e.MaxBandwidth = value;
@@ -155,7 +155,7 @@ public class OpusEncoderTests
     [InlineData(0)]
     [InlineData(25)]
     [InlineData(100)]
-    public void PacketLossPercentage_ShouldRoundTrip(int value)
+    public void PacketLossPercentage_ShouldRoundTrip_WhenValueInRange(int value)
     {
         using var e = new OpusEncoder(48000, 1, OpusApplication.Audio);
         e.PacketLossPercentage = value;
@@ -166,7 +166,7 @@ public class OpusEncoderTests
     [InlineData(8)]
     [InlineData(16)]
     [InlineData(24)]
-    public void LsbDepth_ShouldRoundTrip(int value)
+    public void LsbDepth_ShouldRoundTrip_WhenValueInRange(int value)
     {
         using var e = new OpusEncoder(48000, 1, OpusApplication.Audio);
         e.LsbDepth = value;
@@ -254,7 +254,7 @@ public class OpusEncoderTests
     }
 
     [Fact]
-    public void Dispose_ShouldBeIdempotent_AndUseAfterDisposeShouldThrow()
+    public void Dispose_ShouldBeIdempotentAndUseShouldThrow_WhenDisposed()
     {
         var e = new OpusEncoder(48000, 1, OpusApplication.Audio);
         e.Dispose();

@@ -5,8 +5,6 @@ namespace Pixelbadger.Toolkit.Services.Audio;
 /// <summary>Edits Ogg Opus files by packet splicing: original packets are never re-encoded.</summary>
 public static class OpusSpliceEditor
 {
-    private const int FrameSamples = 960;
-
     public static OggOpusFile CreateRecording(EncodedAudio audio, int channels)
     {
         ArgumentNullException.ThrowIfNull(audio);
@@ -16,65 +14,90 @@ public static class OpusSpliceEditor
         return OggOpusFile.Create(head, audio.Packets, audio.EndTrim);
     }
 
-    public static SpliceResult Insert(OggOpusFile file, long atSample, EncodedAudio audio)
+    /// <summary>
+    /// Inserts new audio at the nearest packet boundary. <paramref name="encode"/> is first called with no front pad (which also
+    /// reveals the encoder's lookahead L); when the boundary's packet-stream start s is below PreSkip - L it is called again with
+    /// FrontPadSamples = PreSkip - s - L so the decoder's pre-skip never discards new audio.
+    /// </summary>
+    public static SpliceResult Insert(OggOpusFile file, long atSample, Func<EncodeRequest, EncodedAudio> encode)
     {
         ArgumentNullException.ThrowIfNull(file);
-        ArgumentNullException.ThrowIfNull(audio);
-        CheckChannels(file, audio);
+        ArgumentNullException.ThrowIfNull(encode);
         var layout = Layout.Of(file);
         var index = layout.Snap(atSample, file.DurationSamples);
+        var audio = EncodeWithPad(file, layout, index, null, encode);
 
         var packets = new List<byte[]>(file.AudioPackets.Count + audio.Packets.Count);
         packets.AddRange(file.AudioPackets.Take(index));
         packets.AddRange(audio.Packets);
         packets.AddRange(file.AudioPackets.Skip(index));
         var endTrim = index == file.AudioPackets.Count ? audio.EndTrim : file.EndTrim;
-        return new SpliceResult(file with { AudioPackets = packets, EndTrim = endTrim }, atSample, layout.SnappedTime(index, atSample, file.DurationSamples), 0);
+        return new SpliceResult(file with { AudioPackets = packets, EndTrim = endTrim }, atSample, layout.SnappedTime(index, file.DurationSamples), 0);
     }
 
     /// <summary>
-    /// <paramref name="encode"/>(null) returns the full encode, <paramref name="encode"/>(K) a truncated encode of exactly K packets.
+    /// Overwrites audio from the nearest packet boundary. <paramref name="newSampleCount"/> is N, the unpadded take length.
+    /// Inside the file (snapped + N below the duration) the longest run of whole original packets of total length R &lt;= N (at
+    /// least one packet) is replaced by exactly R samples of the take, preserving the length. Otherwise (the take reaches or passes
+    /// the end, including appends) every original packet from the boundary on is replaced by the full encode.
     /// </summary>
-    public static SpliceResult Overwrite(OggOpusFile file, long atSample, Func<int?, EncodedAudio> encode)
+    public static SpliceResult Overwrite(OggOpusFile file, long atSample, Func<EncodeRequest, EncodedAudio> encode, long newSampleCount)
     {
         ArgumentNullException.ThrowIfNull(file);
         ArgumentNullException.ThrowIfNull(encode);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(newSampleCount);
         var duration = file.DurationSamples;
         var layout = Layout.Of(file);
         var index = layout.Snap(atSample, duration);
-        var snapped = layout.SnappedTime(index, atSample, duration);
+        var snapped = layout.SnappedTime(index, duration);
         var count = file.AudioPackets.Count;
 
-        var full = encode(null);
-        CheckChannels(file, full);
-
-        if (snapped + full.SampleCount < duration)
+        if (index < count && snapped + newSampleCount < duration)
         {
-            var k = (int)Math.Max(1, full.SampleCount / FrameSamples);
-            var end = -1;
-            for (var j = index + 1; j < count; j++)
+            var end = index;
+            long run = 0;
+            while (end < count && run + (layout.Starts[end + 1] - layout.Starts[end]) <= newSampleCount)
             {
-                if (layout.Starts[j] - layout.Starts[index] >= (long)k * FrameSamples) { end = j; break; }
+                run += layout.Starts[end + 1] - layout.Starts[end];
+                end++;
             }
 
-            if (end >= 0)
+            if (end == index)
             {
-                var truncated = encode(k);
-                CheckChannels(file, truncated);
-                if (truncated.Packets.Count != k)
-                    throw new InvalidOperationException($"Truncated encode returned {truncated.Packets.Count} packets, expected {k}");
-                var packets = new List<byte[]>(count - (end - index) + k);
-                packets.AddRange(file.AudioPackets.Take(index));
-                packets.AddRange(truncated.Packets);
-                packets.AddRange(file.AudioPackets.Skip(end));
-                return new SpliceResult(file with { AudioPackets = packets }, atSample, snapped, layout.Starts[end] - layout.Starts[index]);
+                end = index + 1;
+                run = layout.Starts[end] - layout.Starts[index];
             }
+
+            var exact = EncodeWithPad(file, layout, index, run, encode);
+            var encodedSamples = exact.Packets.Sum(p => (long)OpusToc.GetSampleCount(p));
+            if (encodedSamples != run)
+                throw new InvalidOperationException($"Exact encode returned {encodedSamples} samples, expected {run}");
+            var packets = new List<byte[]>(count - (end - index) + exact.Packets.Count);
+            packets.AddRange(file.AudioPackets.Take(index));
+            packets.AddRange(exact.Packets);
+            packets.AddRange(file.AudioPackets.Skip(end));
+            return new SpliceResult(file with { AudioPackets = packets }, atSample, snapped, run);
         }
 
+        var full = EncodeWithPad(file, layout, index, null, encode);
         var tail = new List<byte[]>(index + full.Packets.Count);
         tail.AddRange(file.AudioPackets.Take(index));
         tail.AddRange(full.Packets);
         return new SpliceResult(file with { AudioPackets = tail, EndTrim = full.EndTrim }, atSample, snapped, layout.Starts[count] - layout.Starts[index]);
+    }
+
+    private static EncodedAudio EncodeWithPad(OggOpusFile file, Layout layout, int index, long? exactSamples, Func<EncodeRequest, EncodedAudio> encode)
+    {
+        var audio = encode(new EncodeRequest(0, exactSamples));
+        CheckChannels(file, audio);
+        var pad = layout.FrontPad(index, audio.Lookahead);
+        if (pad > 0)
+        {
+            audio = encode(new EncodeRequest(pad, exactSamples));
+            CheckChannels(file, audio);
+        }
+
+        return audio;
     }
 
     private static void CheckChannels(OggOpusFile file, EncodedAudio audio)
@@ -105,9 +128,12 @@ public static class OpusSpliceEditor
 
         public long OutputTime(int boundary) => Math.Max(0, Starts[boundary] - _preSkip);
 
-        /// <summary>The reported snapped time: the audible end when appending at exactly the duration, else the boundary's output time.</summary>
-        public long SnappedTime(int boundary, long atSample, long duration)
-            => atSample == duration && boundary == Starts.Length - 1 ? duration : OutputTime(boundary);
+        /// <summary>Zero samples to prepend so the decoder's pre-skip discards only priming, never new audio (spec v6 #23).</summary>
+        public int FrontPad(int boundary, int lookahead) => (int)Math.Max(0, _preSkip - Starts[boundary] - lookahead);
+
+        /// <summary>The reported snapped time: the audible duration for the end boundary, else the boundary's output time.</summary>
+        public long SnappedTime(int boundary, long duration)
+            => boundary == Starts.Length - 1 ? duration : OutputTime(boundary);
 
         public int Snap(long atSample, long duration)
         {
@@ -119,7 +145,8 @@ public static class OpusSpliceEditor
             var bestDistance = long.MaxValue;
             for (var i = 0; i < Starts.Length; i++)
             {
-                var distance = Math.Abs(OutputTime(i) - atSample);
+                var time = i == Starts.Length - 1 ? duration : OutputTime(i);
+                var distance = Math.Abs(time - atSample);
                 if (distance < bestDistance) { best = i; bestDistance = distance; }
             }
 

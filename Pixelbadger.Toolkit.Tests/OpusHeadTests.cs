@@ -17,7 +17,7 @@ public class OpusHeadTests
     }
 
     [Fact]
-    public void ToBytes_ShouldUseLittleEndianFields()
+    public void ToBytes_ShouldUseLittleEndianFields_WhenSerialised()
     {
         var bytes = new OpusHead(1, 1, 0x0138, 0x0000BB80, 0, 0).ToBytes();
         bytes[10].Should().Be(0x38);

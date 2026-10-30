@@ -97,7 +97,7 @@ public class OpusDecoderTests
     [InlineData(0)]
     [InlineData(256)]
     [InlineData(-256)]
-    public void Gain_ShouldRoundTrip(int value)
+    public void Gain_ShouldRoundTrip_WhenValueInRange(int value)
     {
         using var d = new OpusDecoder(48000, 1);
         d.Gain = value;
@@ -145,17 +145,26 @@ public class OpusDecoderTests
     }
 
     [Fact]
-    public void ResetState_ShouldNotThrow_AndDecodingContinues()
+    public void ResetState_ShouldMatchFreshDecoderOutput_WhenDecoderHadPriorState()
     {
-        using var d = new OpusDecoder(48000, 1);
-        var packet = EncodePacket(1);
-        d.Decode(packet, new short[960], 960);
-        d.ResetState();
-        d.Decode(packet, new short[960], 960).Should().Be(960);
+        var target = EncodePacket(2);
+        using var used = new OpusDecoder(48000, 2);
+        used.Decode(target, new short[1920], 960);
+        used.Decode(target, new short[1920], 960);
+        used.ResetState();
+        using var fresh = new OpusDecoder(48000, 2);
+
+        var afterReset = new short[1920];
+        var fromFresh = new short[1920];
+        used.Decode(target, afterReset, 960).Should().Be(960);
+        fresh.Decode(target, fromFresh, 960).Should().Be(960);
+
+        afterReset.Should().Equal(fromFresh);
+        used.FinalRange.Should().Be(fresh.FinalRange);
     }
 
     [Fact]
-    public void Dispose_ShouldBeIdempotent_AndUseAfterDisposeShouldThrow()
+    public void Dispose_ShouldBeIdempotentAndUseShouldThrow_WhenDisposed()
     {
         var d = new OpusDecoder(48000, 1);
         d.Dispose();

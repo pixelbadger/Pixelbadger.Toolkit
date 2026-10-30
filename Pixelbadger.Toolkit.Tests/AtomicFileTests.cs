@@ -55,7 +55,7 @@ public class AtomicFileTests : IDisposable
     }
 
     [Fact]
-    public void Replace_ShouldUseTempNameInSameDirectory_WhileWriting()
+    public void Replace_ShouldUseTempNameInSameDirectory_WhenWriting()
     {
         var path = Path.Combine(_dir, "a.opus");
         string? tempName = null;
@@ -65,5 +65,50 @@ public class AtomicFileTests : IDisposable
             s.WriteByte(1);
         });
         Path.GetFileName(tempName).Should().StartWith(".a.opus.").And.EndWith(".tmp");
+    }
+
+    [Fact]
+    public void Replace_ShouldEditLinkTargetAndKeepLinkAndMode_WhenPathIsSymlinkToPrivateFile()
+    {
+        var target = Path.Combine(_dir, "real.opus");
+        var link = Path.Combine(_dir, "link.opus");
+        File.WriteAllBytes(target, [1, 2, 3]);
+        File.SetUnixFileMode(target, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        File.CreateSymbolicLink(link, "real.opus");
+
+        AtomicFile.Replace(link, s => s.Write([9, 8]));
+
+        new FileInfo(link).LinkTarget.Should().Be("real.opus");
+        File.ReadAllBytes(target).Should().Equal(9, 8);
+        File.GetUnixFileMode(target).Should().Be(UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        Directory.GetFileSystemEntries(_dir).Should().HaveCount(2);
+    }
+
+    [Fact]
+    public void Replace_ShouldKeepMode_WhenPlainFileHasRestrictedMode()
+    {
+        var path = Path.Combine(_dir, "a.opus");
+        File.WriteAllBytes(path, [1]);
+        File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead);
+
+        AtomicFile.Replace(path, s => s.Write([2]));
+
+        File.GetUnixFileMode(path).Should().Be(UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead);
+    }
+
+    [Fact]
+    public void Replace_ShouldLeaveTargetUntouched_WhenWriteThrowsThroughSymlink()
+    {
+        var target = Path.Combine(_dir, "real.opus");
+        var link = Path.Combine(_dir, "link.opus");
+        File.WriteAllBytes(target, [1, 2, 3]);
+        File.CreateSymbolicLink(link, target);
+
+        var act = () => AtomicFile.Replace(link, _ => throw new IOException("fail"));
+
+        act.Should().Throw<IOException>();
+        File.ReadAllBytes(target).Should().Equal(1, 2, 3);
+        new FileInfo(link).LinkTarget.Should().Be(target);
+        Directory.GetFileSystemEntries(_dir).Should().HaveCount(2);
     }
 }

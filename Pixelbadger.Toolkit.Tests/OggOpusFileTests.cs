@@ -165,7 +165,7 @@ public class OggOpusFileTests : IDisposable
     }
 
     [Fact]
-    public void Write_ShouldHandlePacketCompletingExactlyOnFullPage()
+    public void Write_ShouldHandlePacketCompletingExactlyOnFullPage_WhenSegmentTableFull()
     {
         var p1 = new byte[254 * 255 + 10]; // 255 segments exactly: 254 full + 1 short
         p1[0] = 0xFC;
@@ -197,7 +197,7 @@ public class OggOpusFileTests : IDisposable
     }
 
     [Fact]
-    public void Read_ShouldComputeEndTrimFromLastGranule()
+    public void Read_ShouldComputeEndTrimFromLastGranule_WhenGranuleBelowTotal()
     {
         var packets = Enumerable.Range(0, 10).Select(i => Packet(i)).ToList();
         var file = OggOpusFile.Create(new OpusHead(1, 1, 312, 48000, 0, 0), packets, 500);
@@ -209,14 +209,14 @@ public class OggOpusFileTests : IDisposable
     }
 
     [Fact]
-    public void DurationSamples_ShouldNeverBeNegative()
+    public void DurationSamples_ShouldNeverBeNegative_WhenTrimExceedsPackets()
     {
         var file = OggOpusFile.Create(new OpusHead(1, 1, 312, 48000, 0, 0), new List<byte[]> { Packet(1) }, 900);
         file.DurationSamples.Should().Be(0);
     }
 
     [Fact]
-    public void Create_ShouldBuildTagsWithPixelbadgerVendor()
+    public void Create_ShouldBuildTagsWithPixelbadgerVendor_WhenHeadSupplied()
     {
         var file = OggOpusFile.Create(new OpusHead(1, 2, 312, 48000, 0, 0), new List<byte[]>(), 0);
         var tags = file.TagsPacket;
@@ -258,6 +258,21 @@ public class OggOpusFileTests : IDisposable
         var act = () => OggOpusFile.Read(new MemoryStream(ms.ToArray()));
         act.Should().Throw<InvalidDataException>()
             .WithMessage("Unsupported Ogg Opus channel mapping family 1; only mono and stereo files are supported");
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(3)]
+    [InlineData(255)]
+    public void Read_ShouldThrowChannelCountMessage_WhenFamilyZeroChannelCountInvalid(int channels)
+    {
+        var head = new OpusHead(1, 1, 312, 48000, 0, 0).ToBytes();
+        head[9] = (byte)channels;
+        using var ms = new MemoryStream();
+        new OggPageWriter(ms).WritePage(new OggPage(OggPageFlags.BeginOfStream, 0, 1, 0, new byte[] { 19 }, head));
+        var act = () => OggOpusFile.Read(new MemoryStream(ms.ToArray()));
+        act.Should().Throw<InvalidDataException>()
+            .WithMessage($"Unsupported Ogg Opus channel count {channels}; only mono and stereo files are supported");
     }
 
     [Fact]
