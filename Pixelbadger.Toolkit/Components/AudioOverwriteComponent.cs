@@ -43,7 +43,7 @@ public sealed class AudioOverwriteComponent
 
         var encoder = new OpusPcmEncoder(_factory);
         var settings = new OpusEncodeSettings(channels, options.Bitrate);
-        var result = OpusSpliceEditor.Overwrite(file, requested, request => encoder.Encode(OpusPcmEncoder.PrependSilence(pcm, request.FrontPadSamples, channels), settings, request.ExactSamples),
+        var result = OpusSpliceEditor.Overwrite(file, requested, request => encoder.Encode(pcm, settings, request.ExactSamples, request.FrontPadSamples),
             pcm.Length / channels);
         AudioCommandSupport.WriteOpusFile(options.File, result.File, request, cancellationToken, stamp);
 

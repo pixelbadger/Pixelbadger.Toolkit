@@ -19,6 +19,8 @@ public sealed class AudioInputCollector : IAudioInputCollector
     private readonly Func<string?> _ffmpegLocator;
     private readonly Func<bool> _isNonInteractive;
     private readonly Func<(string Format, string? Device)> _defaults;
+    private readonly int _blockSamples;
+    private readonly long _maxPreallocatedSamples;
 
     public AudioInputCollector(
         ITerminalInput input,
@@ -27,8 +29,24 @@ public sealed class AudioInputCollector : IAudioInputCollector
         Func<string?>? ffmpegLocator = null,
         Func<bool>? isNonInteractive = null,
         Func<(string Format, string? Device)>? defaults = null)
+        : this(input, output, sourceFactory, ffmpegLocator, isNonInteractive, defaults, BlockSamples, MaxPreallocatedSamples)
+    {
+    }
+
+    /// <summary>Test seam: the capture buffer's block size and the largest known length it preallocates as a single array.</summary>
+    internal AudioInputCollector(
+        ITerminalInput input,
+        TextWriter? output,
+        Func<FfmpegCaptureOptions, IAudioCaptureSource>? sourceFactory,
+        Func<string?>? ffmpegLocator,
+        Func<bool>? isNonInteractive,
+        Func<(string Format, string? Device)>? defaults,
+        int blockSamples,
+        long maxPreallocatedSamples)
     {
         ArgumentNullException.ThrowIfNull(input);
+        _blockSamples = blockSamples;
+        _maxPreallocatedSamples = maxPreallocatedSamples;
         _input = input;
         _output = output;
         _sourceFactory = sourceFactory ?? (o => FfmpegCaptureSource.Start(o));
@@ -83,13 +101,18 @@ public sealed class AudioInputCollector : IAudioInputCollector
         if (request.Duration is null)
             (_output ?? ToolkitConsole.Out).WriteLine("Recording... press Enter or Ctrl+C to stop");
 
-        var pcm = await CaptureAsync(options, request.Channels, maxFrames, request.Duration is null, cancellationToken);
+        var (pcm, failure) = await CaptureAsync(options, request.Channels, maxFrames, request.Duration is null, cancellationToken);
         // With --duration, a cancellation aborts the take; without it, the cancellation is the stop request.
         if (abortOnCancel)
             cancellationToken.ThrowIfCancellationRequested();
 
         var requestedFrames = maxFrames;
-        if (request.Duration is not null && pcm.Length / request.Channels < requestedFrames)
+        if (failure is not null)
+        {
+            (_output ?? ToolkitConsole.Out).WriteLine(
+                $"Warning: capture failed after {AudioCommandSupport.Seconds(pcm.Length / request.Channels)}s: {failure}");
+        }
+        else if (request.Duration is not null && pcm.Length / request.Channels < requestedFrames)
         {
             (_output ?? ToolkitConsole.Out).WriteLine(
                 $"Warning: capture ended after {AudioCommandSupport.Seconds(pcm.Length / request.Channels)}s, before the requested {AudioCommandSupport.Seconds(requestedFrames)}s");
@@ -111,11 +134,13 @@ public sealed class AudioInputCollector : IAudioInputCollector
         return pcm.Length <= maxSamples ? pcm : pcm.AsSpan(0, (int)maxSamples).ToArray();
     }
 
-    private async Task<short[]> CaptureAsync(FfmpegCaptureOptions options, int channels, long maxFrames, bool waitForEnter, CancellationToken cancellationToken)
+    /// <summary>Captures until the length, the source's end, or the user's stop. A source failure that is not the user's stop keeps what was captured (reported in the second item); with nothing captured it is thrown.</summary>
+    private async Task<(short[] Pcm, string? Failure)> CaptureAsync(FfmpegCaptureOptions options, int channels, long maxFrames, bool waitForEnter, CancellationToken cancellationToken)
     {
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var maxSamples = maxFrames == long.MaxValue ? long.MaxValue : maxFrames * channels;
-        var samples = new SampleBuffer(BlockSamples, maxSamples);
+        var samples = new SampleBuffer(_blockSamples, maxSamples, _maxPreallocatedSamples);
+        string? failure = null;
         var chunk = ChunkFrames * channels;
         Task? poller = null;
         var source = _sourceFactory(options);
@@ -137,11 +162,14 @@ public sealed class AudioInputCollector : IAudioInputCollector
                 {
                     break;
                 }
-                catch (AudioCaptureException)
+                catch (AudioCaptureException ex)
                 {
                     if (await StoppedByUserAsync(cancellationToken))
                         break;
-                    throw;
+                    if (samples.Count - samples.Count % channels == 0)
+                        throw;
+                    failure = ex.Message;
+                    break;
                 }
 
                 if (read == 0)
@@ -157,7 +185,7 @@ public sealed class AudioInputCollector : IAudioInputCollector
             await source.DisposeAsync();
         }
 
-        return samples.ToArray(samples.Count - samples.Count % channels);
+        return (samples.ToArray(samples.Count - samples.Count % channels), failure);
     }
 
     /// <summary>
@@ -176,78 +204,6 @@ public sealed class AudioInputCollector : IAudioInputCollector
         catch (OperationCanceledException)
         {
             return true;
-        }
-    }
-
-    /// <summary>
-    /// Sample store for a capture. A known length (up to <see cref="MaxPreallocatedSamples"/>) gets one array that reads fill in
-    /// place, so the result needs no copy; otherwise samples go into fixed-size blocks that are copied once, at the end.
-    /// </summary>
-    private sealed class SampleBuffer
-    {
-        private readonly int _blockSamples;
-        private readonly short[]? _single;
-        private readonly List<short[]> _blocks = [];
-        private int _usedInLast;
-        private int _pending;
-
-        public SampleBuffer(int blockSamples, long expectedSamples)
-        {
-            _blockSamples = blockSamples;
-            _usedInLast = blockSamples;
-            if (expectedSamples is > 0 and <= MaxPreallocatedSamples)
-                _single = new short[expectedSamples];
-        }
-
-        public long Count { get; private set; }
-
-        /// <summary>Space for up to <paramref name="want"/> more samples; <see cref="Commit"/> says how many were written.</summary>
-        public Memory<short> Next(int want)
-        {
-            if (_single is not null)
-            {
-                _pending = (int)Math.Min(want, _single.Length - Count);
-                return _single.AsMemory((int)Count, _pending);
-            }
-
-            if (_usedInLast == _blockSamples)
-            {
-                _blocks.Add(new short[_blockSamples]);
-                _usedInLast = 0;
-            }
-
-            _pending = Math.Min(want, _blockSamples - _usedInLast);
-            return _blocks[^1].AsMemory(_usedInLast, _pending);
-        }
-
-        public void Commit(int written)
-        {
-            if (written < 0 || written > _pending)
-                throw new InvalidOperationException("Capture source reported more samples than requested");
-            _usedInLast += written;
-            Count += written;
-        }
-
-        public short[] ToArray(long length)
-        {
-            if (_single is not null)
-            {
-                if (length == _single.Length)
-                    return _single;
-                return _single.AsSpan(0, (int)length).ToArray();
-            }
-
-            var result = new short[length];
-            var offset = 0L;
-            foreach (var block in _blocks)
-            {
-                var n = (int)Math.Min(block.Length, length - offset);
-                if (n <= 0) break;
-                block.AsSpan(0, n).CopyTo(result.AsSpan((int)offset, n));
-                offset += n;
-            }
-
-            return result;
         }
     }
 
@@ -273,5 +229,86 @@ public sealed class AudioInputCollector : IAudioInputCollector
         {
             // No usable keyboard (stdin redirected): only --duration or Ctrl+C can stop the capture.
         }
+    }
+}
+
+/// <summary>
+/// Sample store for a capture. A known length (up to the preallocation limit) gets one array that reads fill in
+/// place, so the result needs no copy; otherwise samples go into fixed-size blocks that are copied once, at the end.
+/// </summary>
+internal sealed class SampleBuffer
+{
+    private readonly int _blockSamples;
+    private readonly short[]? _single;
+    private readonly List<short[]> _blocks = [];
+    private int _usedInLast;
+    private int _pending;
+
+    public SampleBuffer(int blockSamples, long expectedSamples, long maxPreallocatedSamples)
+    {
+        _blockSamples = blockSamples;
+        _usedInLast = blockSamples;
+        if (expectedSamples > 0 && expectedSamples <= maxPreallocatedSamples)
+            _single = new short[expectedSamples];
+    }
+
+    public long Count { get; private set; }
+
+    /// <summary>Blocks still referenced; zero once <see cref="ToArray"/> has consolidated them.</summary>
+    public int RetainedBlocks => _blocks.Count;
+
+    /// <summary>Space for up to <paramref name="want"/> more samples; <see cref="Commit"/> says how many were written.</summary>
+    public Memory<short> Next(int want)
+    {
+        if (_single is not null)
+        {
+            _pending = (int)Math.Min(want, _single.Length - Count);
+            return _single.AsMemory((int)Count, _pending);
+        }
+
+        if (_usedInLast == _blockSamples)
+        {
+            _blocks.Add(new short[_blockSamples]);
+            _usedInLast = 0;
+        }
+
+        _pending = Math.Min(want, _blockSamples - _usedInLast);
+        return _blocks[^1].AsMemory(_usedInLast, _pending);
+    }
+
+    public void Commit(int written)
+    {
+        if (written < 0 || written > _pending)
+            throw new InvalidOperationException("Capture source reported more samples than requested");
+        _usedInLast += written;
+        Count += written;
+    }
+
+    public short[] ToArray(long length)
+    {
+        if (_single is not null)
+        {
+            if (length == _single.Length)
+                return _single;
+            return _single.AsSpan(0, (int)length).ToArray();
+        }
+
+        var result = new short[length];
+        var offset = 0L;
+        // Each block is dropped as soon as it is copied, so the blocks and the result are never both fully live.
+        for (var i = 0; i < _blocks.Count; i++)
+        {
+            var block = _blocks[i];
+            _blocks[i] = [];
+            var n = (int)Math.Min(block.Length, length - offset);
+            if (n > 0)
+            {
+                block.AsSpan(0, n).CopyTo(result.AsSpan((int)offset, n));
+                offset += n;
+            }
+        }
+
+        _blocks.Clear();
+        return result;
     }
 }

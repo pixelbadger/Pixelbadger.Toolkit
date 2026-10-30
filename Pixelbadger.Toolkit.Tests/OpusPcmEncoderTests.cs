@@ -35,6 +35,37 @@ public class OpusPcmEncoderTests
         audio.Packets.Should().OnlyContain(p => p.Length > 0);
     }
 
+    [Theory]
+    [InlineData(1, 5000, 3528, null)]
+    [InlineData(2, 5000, 3528, null)]
+    [InlineData(1, 5000, 100, null)]
+    [InlineData(1, 5000, 3528, 5760L)]
+    [InlineData(2, 700, 3528, 1920L)]
+    [InlineData(1, 5000, 960, 6720L)]
+    public void Encode_ShouldMatchPrependedSilence_WhenFrontPadGivenAsParameter(int channels, int n, int pad, long? exact)
+    {
+        var pcm = OpusTestHelpers.Sine(channels, n, 660);
+        var settings = new OpusEncodeSettings(channels);
+
+        var viaParameter = Real.Encode(pcm, settings, exact, pad);
+        var viaCopy = Real.Encode(OpusPcmEncoder.PrependSilence(pcm, pad, channels), settings, exact);
+
+        viaParameter.Packets.Should().HaveCount(viaCopy.Packets.Count);
+        for (var i = 0; i < viaCopy.Packets.Count; i++)
+            viaParameter.Packets[i].Should().Equal(viaCopy.Packets[i]);
+        viaParameter.SampleCount.Should().Be(viaCopy.SampleCount).And.Be(n + pad);
+        viaParameter.EndTrim.Should().Be(viaCopy.EndTrim);
+        viaParameter.Lookahead.Should().Be(viaCopy.Lookahead);
+    }
+
+    [Fact]
+    public void Encode_ShouldThrow_WhenFrontPadNegative()
+    {
+        var act = () => Real.Encode(OpusTestHelpers.Sine(1, 960), new OpusEncodeSettings(1), null, -1);
+
+        act.Should().Throw<ArgumentOutOfRangeException>();
+    }
+
     [Fact]
     public void Encode_ShouldThrow_WhenPcmEmpty()
     {

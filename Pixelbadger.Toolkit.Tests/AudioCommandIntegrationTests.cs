@@ -292,6 +292,9 @@ public class AudioCommandIntegrationTests : IDisposable
     /// <summary>
     /// Runs the tool under `script` (which provides a pty, so the tool sees a terminal on stdin), waits for it to be capturing,
     /// then calls <paramref name="interrupt"/> with the tool's pid. A terminal Ctrl+C reaches the tool and its ffmpeg child alike.
+    /// The tool is started through `env --default-signal=INT` so the tests are hermetic: a test host launched in the background of a
+    /// non-interactive shell (CI, `cmd &`, nohup) inherits SIGINT as ignored (SigIgn 0x2), and .NET then never installs its SIGINT
+    /// handler, so Ctrl+C is never observed while ffmpeg (which installs its own handler) exits 255.
     /// </summary>
     private async Task<PtyResult> RunUnderPtyAsync(string marker, string toolArguments, string? waitForText, TimeSpan captureTime, Func<int, IReadOnlyList<int>, Task> interrupt)
     {
@@ -310,7 +313,7 @@ public class AudioCommandIntegrationTests : IDisposable
         psi.Environment["NO_COLOR"] = "1";
         psi.Environment["XDG_CONFIG_HOME"] = configHome;
         psi.Environment["APPDATA"] = configHome;
-        foreach (var a in new[] { "-qefc", $"dotnet \"{dll}\" {toolArguments}", "/dev/null" })
+        foreach (var a in new[] { "-qefc", $"env --default-signal=INT dotnet \"{dll}\" {toolArguments}", "/dev/null" })
             psi.ArgumentList.Add(a);
 
         using var script = Process.Start(psi)!;

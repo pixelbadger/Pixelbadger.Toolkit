@@ -54,21 +54,20 @@ public static class OpusSpliceEditor
 
         if (index < count && snapped + newSampleCount < duration)
         {
-            var end = index;
-            long run = 0;
-            while (end < count && run + (layout.Starts[end + 1] - layout.Starts[end]) <= newSampleCount)
+            // The first encode (no front pad) also reveals the encoder's lookahead L. If the boundary lies inside the decoder's
+            // pre-skip, the take is prefixed with pad zeros that the pre-skip discards, so the run allowance grows by the pad
+            // (R <= N + pad, spec v7 #30) and the encode is repeated; otherwise the first encode is final.
+            var (end, run) = LongestRun(layout, index, newSampleCount);
+            var exact = encode(new EncodeRequest(0, run));
+            CheckChannels(file, exact);
+            var pad = layout.FrontPad(index, exact.Lookahead);
+            if (pad > 0)
             {
-                run += layout.Starts[end + 1] - layout.Starts[end];
-                end++;
+                (end, run) = LongestRun(layout, index, newSampleCount + pad);
+                exact = encode(new EncodeRequest(pad, run));
+                CheckChannels(file, exact);
             }
 
-            if (end == index)
-            {
-                end = index + 1;
-                run = layout.Starts[end] - layout.Starts[index];
-            }
-
-            var exact = EncodeWithPad(file, layout, index, run, encode);
             var encodedSamples = exact.Packets.Sum(p => (long)OpusToc.GetSampleCount(p));
             if (encodedSamples != run)
                 throw new InvalidOperationException($"Exact encode returned {encodedSamples} samples, expected {run}");
@@ -84,6 +83,27 @@ public static class OpusSpliceEditor
         tail.AddRange(file.AudioPackets.Take(index));
         tail.AddRange(full.Packets);
         return new SpliceResult(file with { AudioPackets = tail, EndTrim = full.EndTrim }, atSample, snapped, layout.Starts[count] - layout.Starts[index]);
+    }
+
+    /// <summary>The longest run of whole original packets from <paramref name="index"/> totalling at most <paramref name="allowance"/> samples (at least one packet).</summary>
+    private static (int End, long Run) LongestRun(Layout layout, int index, long allowance)
+    {
+        var count = layout.Starts.Length - 1;
+        var end = index;
+        long run = 0;
+        while (end < count && run + (layout.Starts[end + 1] - layout.Starts[end]) <= allowance)
+        {
+            run += layout.Starts[end + 1] - layout.Starts[end];
+            end++;
+        }
+
+        if (end == index)
+        {
+            end = index + 1;
+            run = layout.Starts[end] - layout.Starts[index];
+        }
+
+        return (end, run);
     }
 
     private static EncodedAudio EncodeWithPad(OggOpusFile file, Layout layout, int index, long? exactSamples, Func<EncodeRequest, EncodedAudio> encode)

@@ -46,7 +46,7 @@ public sealed class AudioInsertComponent
         var encoder = new OpusPcmEncoder(_factory);
         var settings = new OpusEncodeSettings(channels, options.Bitrate);
         var result = OpusSpliceEditor.Insert(file, requested,
-            request => encoder.Encode(OpusPcmEncoder.PrependSilence(pcm, request.FrontPadSamples, channels), settings, request.ExactSamples));
+            request => encoder.Encode(pcm, settings, request.ExactSamples, request.FrontPadSamples));
         AudioCommandSupport.WriteOpusFile(options.File, result.File, request, cancellationToken, stamp);
 
         _output.WriteLine(

@@ -124,7 +124,9 @@
 
     <div class="info-box">
       <strong>Memory:</strong> a recording is held in memory until it is saved, at about 350 MB per hour of
-      mono audio (twice that for stereo). Very long recordings need that much free memory.
+      mono audio (twice that for stereo). Very long recordings need that much free memory. Peak memory stays
+      below twice the raw audio plus 200 MB: a 30 minute mono recording peaks at about 270 MB with
+      <code>--duration 1800s</code> and about 390 MB when stopped with <kbd>Ctrl+C</kbd>.
     </div>
 
     <div class="cmd-block">
@@ -192,6 +194,19 @@
       <span class="val">Warning: capture ended after 1.000s, before the requested 3.000s</span><br>
       <span class="val">Recorded './short.opus': 1.000s</span>
     </div>
+    <p>
+      If the capture source fails part-way (for example ffmpeg is killed or the device disappears) after audio
+      was captured, and the failure is not your <kbd>Ctrl+C</kbd>, the command prints a warning with ffmpeg's
+      error and continues with what was captured, in both live and <code>--duration</code> captures. Here ffmpeg
+      was killed 2.8 s into a 10 s recording:
+    </p>
+    <div class="cmd-block">
+      <span class="val">Warning: capture failed after 2.773s: ffmpeg capture failed (exit 137): no error output</span><br>
+      <span class="val">Recorded './memo.opus': 2.773s</span>
+    </div>
+    <p>
+      If the source fails before any audio was captured, the command exits with code <code>1</code> and the error.
+    </p>
   </section>
 
   <!-- INSERT -->
@@ -326,7 +341,8 @@
         file, where N is the length of the new audio. A 1 s insert adds 51 packets, which is 1.020 s.</li>
       <li><strong>Overwrite inside the file:</strong> the replaced span is the longest run of whole original packets,
         starting at the snapped boundary, whose total length is at most N (the length of the new audio), and at
-        least one packet. The first part of the new take, exactly as long as the replaced packets, is encoded into
+        least one packet. When the boundary lies inside the file's pre-skip (see the padding note above), the silence
+        that pads the take does not count against N, so a short take at the very start is never dropped. The first part of the new take, exactly as long as the replaced packets, is encoded into
         packets that fill them (20 ms frames first, then a shorter frame for any remainder), so the file keeps its
         length exactly, whatever the original packet size. Original audio resumes at or before the requested end.
         The rest of the new take is dropped, because it would otherwise overlap the original audio that resumes.

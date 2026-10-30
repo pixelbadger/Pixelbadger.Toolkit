@@ -25,13 +25,15 @@ public class AudioInputCollectorTests : IDisposable
         private readonly int _channels;
         private readonly long _totalSamples;
         private readonly Exception? _failure;
+        private readonly int _failAtRead;
         private long _served;
 
-        public FakeSource(int channels, long totalSamples = long.MaxValue, Exception? failure = null)
+        public FakeSource(int channels, long totalSamples = long.MaxValue, Exception? failure = null, int failAtRead = 3)
         {
             _channels = channels;
             _totalSamples = totalSamples;
             _failure = failure;
+            _failAtRead = failAtRead;
         }
 
         public bool Disposed { get; private set; }
@@ -43,7 +45,7 @@ public class AudioInputCollectorTests : IDisposable
         {
             cancellationToken.ThrowIfCancellationRequested();
             Reads++;
-            if (_failure is not null && Reads == 3)
+            if (_failure is not null && Reads == _failAtRead)
                 throw _failure;
             // Paced like a microphone so that stop requests are observed while capturing.
             await Task.Delay(2, cancellationToken);
@@ -83,7 +85,9 @@ public class AudioInputCollectorTests : IDisposable
         Func<string?>? ffmpeg = null,
         bool nonInteractive = false,
         (string Format, string? Device)? defaults = null,
-        List<FfmpegCaptureOptions>? seen = null) =>
+        List<FfmpegCaptureOptions>? seen = null,
+        int blockSamples = 1 << 17,
+        long maxPreallocatedSamples = 1L << 28) =>
         new(new FakeInput(enter ?? (() => false)), _output,
             o =>
             {
@@ -92,7 +96,9 @@ public class AudioInputCollectorTests : IDisposable
             },
             ffmpeg ?? (() => "/usr/bin/ffmpeg"),
             () => nonInteractive,
-            () => defaults ?? ("pulse", "default"));
+            () => defaults ?? ("pulse", "default"),
+            blockSamples,
+            maxPreallocatedSamples);
 
     private string Wav(int rate, int channels, short[] samples)
     {
@@ -263,16 +269,136 @@ public class AudioInputCollectorTests : IDisposable
     }
 
     [Fact]
-    public async Task CollectAsync_ShouldThrowCaptureError_WhenSourceFailsAndNoStopRequestedWithinTwoSeconds()
+    public async Task CollectAsync_ShouldWarnAndKeepCapturedAudio_WhenSourceFailsMidTakeWithDuration()
     {
         var failure = new AudioCaptureException("ffmpeg capture failed (exit 1): boom");
         var collector = Collector(new FakeSource(1, failure: failure));
         var watch = System.Diagnostics.Stopwatch.StartNew();
 
-        var act = () => collector.CollectAsync(new AudioInputRequest(1, TimeSpan.FromSeconds(5), null, null, null), CancellationToken.None);
+        var pcm = await collector.CollectAsync(new AudioInputRequest(1, TimeSpan.FromSeconds(5), null, null, null), CancellationToken.None);
 
-        (await act.Should().ThrowAsync<AudioCaptureException>()).WithMessage("ffmpeg capture failed (exit 1): boom");
+        pcm.Length.Should().Be(2 * 960, "the two reads before the failure were kept");
+        _output.ToString().Should().Be($"Warning: capture failed after 0.040s: ffmpeg capture failed (exit 1): boom{Environment.NewLine}");
         watch.Elapsed.Should().BeGreaterThanOrEqualTo(TimeSpan.FromSeconds(1.9), "the failure is only reported after the two-second stop window");
+    }
+
+    [Fact]
+    public async Task CollectAsync_ShouldWarnAndKeepCapturedAudio_WhenSourceFailsMidTakeInSaveMode()
+    {
+        var failure = new AudioCaptureException("ffmpeg capture failed (exit 1): boom");
+        var collector = Collector(new FakeSource(2, failure: failure, failAtRead: 4));
+
+        var pcm = await collector.CollectAsync(new AudioInputRequest(2, null, null, null, null), CancellationToken.None);
+
+        pcm.Length.Should().Be(3 * 960 * 2);
+        _output.ToString().Should().Be(
+            $"Recording... press Enter or Ctrl+C to stop{Environment.NewLine}" +
+            $"Warning: capture failed after 0.060s: ffmpeg capture failed (exit 1): boom{Environment.NewLine}");
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task CollectAsync_ShouldThrowCaptureError_WhenSourceFailsBeforeAnySampleWasCaptured(bool withDuration)
+    {
+        var failure = new AudioCaptureException("ffmpeg capture failed (exit 1): no such device");
+        var collector = Collector(new FakeSource(1, failure: failure, failAtRead: 1));
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+
+        var act = () => collector.CollectAsync(new AudioInputRequest(1, withDuration ? TimeSpan.FromSeconds(5) : null, null, null, null), CancellationToken.None);
+
+        (await act.Should().ThrowAsync<AudioCaptureException>()).WithMessage("ffmpeg capture failed (exit 1): no such device");
+        watch.Elapsed.Should().BeGreaterThanOrEqualTo(TimeSpan.FromSeconds(1.9), "the failure is only reported after the two-second stop window");
+        _output.ToString().Should().NotContain("Warning");
+    }
+
+    [Fact]
+    public async Task CollectAsync_ShouldNotWarnAboutFailure_WhenFailureIsTheUsersStop()
+    {
+        var source = new FakeSource(1, failure: new AudioCaptureException("ffmpeg capture failed (exit 255): no error output"));
+        using var cts = new CancellationTokenSource();
+        var collector = Collector(source);
+
+        var task = collector.CollectAsync(new AudioInputRequest(1, null, null, null, null), cts.Token);
+        while (source.Reads < 3) await Task.Delay(1);
+        cts.Cancel();
+        await task;
+
+        _output.ToString().Should().NotContain("Warning");
+    }
+
+    [Theory]
+    [InlineData(1, 5500)]
+    [InlineData(2, 5500)]
+    [InlineData(1, 4000)]
+    public async Task CollectAsync_ShouldKeepEverySampleInOrder_WhenNoDurationSpansSeveralBlocks(int channels, int total)
+    {
+        // 1000-sample blocks and 960-frame reads: a block boundary falls inside most reads, and the take spans 4-6 blocks.
+        var collector = Collector(new FakeSource(channels, totalSamples: total), blockSamples: 1000);
+
+        var pcm = await collector.CollectAsync(new AudioInputRequest(channels, null, null, null, null), CancellationToken.None);
+
+        pcm.Length.Should().Be(total - total % channels);
+        pcm.Select((v, i) => v == (short)(i % 1000 + 1)).Should().OnlyContain(ok => ok);
+    }
+
+    [Theory]
+    [InlineData(4799, true)]
+    [InlineData(4800, false)]
+    public async Task CollectAsync_ShouldKeepEverySampleInOrder_WhenDurationStraddlesPreallocationLimit(long limit, bool blockPath)
+    {
+        // 0.1 s mono = 4800 samples. A limit below it forces the block path, a limit at it the single array.
+        var collector = Collector(new FakeSource(1), blockSamples: 777, maxPreallocatedSamples: limit);
+
+        var pcm = await collector.CollectAsync(new AudioInputRequest(1, TimeSpan.FromSeconds(0.1), null, null, null), CancellationToken.None);
+
+        pcm.Length.Should().Be(4800, blockPath ? "the block path was used" : "the single-array path was used");
+        pcm.Select((v, i) => v == (short)(i % 1000 + 1)).Should().OnlyContain(ok => ok);
+    }
+
+    [Fact]
+    public void SampleBuffer_ShouldReturnSamplesInOrderAndReleaseBlocks_WhenLengthIsUnknown()
+    {
+        var buffer = new SampleBuffer(7, long.MaxValue, 1L << 28);
+        short next = 0;
+        foreach (var want in new[] { 5, 5, 5, 20, 3, 1, 7, 7, 14 })
+        {
+            var target = buffer.Next(want);
+            target.Length.Should().BeInRange(1, 7, "a read never crosses a block");
+            var written = Math.Min(target.Length, want);
+            for (var i = 0; i < written; i++) target.Span[i] = next++;
+            buffer.Commit(written);
+        }
+
+        buffer.Count.Should().Be(next);
+        buffer.RetainedBlocks.Should().BeGreaterThan(3);
+
+        var result = buffer.ToArray(next - 2);
+
+        result.Should().Equal(Enumerable.Range(0, next - 2).Select(i => (short)i));
+        buffer.RetainedBlocks.Should().Be(0, "blocks are dropped while they are consolidated");
+    }
+
+    [Theory]
+    [InlineData(100, 99, 7)]
+    [InlineData(100, 100, 100)]
+    [InlineData(long.MaxValue, 1L << 28, 7)]
+    public void SampleBuffer_ShouldUseSingleArrayOnlyUpToPreallocationLimit(long expected, long limit, int firstSpan)
+    {
+        var buffer = new SampleBuffer(7, expected, limit);
+
+        buffer.Next(50 + 50).Length.Should().Be(firstSpan);
+    }
+
+    [Fact]
+    public void SampleBuffer_ShouldRejectCommitBeyondRequestedSpace()
+    {
+        var buffer = new SampleBuffer(7, long.MaxValue, 1L << 28);
+        buffer.Next(3);
+
+        var act = () => buffer.Commit(4);
+
+        act.Should().Throw<InvalidOperationException>();
     }
 
     [Fact]

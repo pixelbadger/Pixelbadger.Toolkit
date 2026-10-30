@@ -570,6 +570,42 @@ public class OpusSpliceEditorTests : IDisposable
     }
 
     [Fact]
+    public void Overwrite_ShouldKeepShortTake_WhenPreSkipExceedsBoundaryStartAtZero()
+    {
+        // Regression (D27): the front pad used to count against the run allowance, so a 50 ms take at 0 with PreSkip 3840 was dropped.
+        var file = Record(2.0) with { HeadPacket = new OpusHead(1, 1, 3840, 48000, 0, 0).ToBytes() };
+        var requests = new List<EncodeRequest>();
+        var src = Src(0.05, 1000);
+
+        var result = OpusSpliceEditor.Overwrite(file, 0, r => { requests.Add(r); return src(r); }, 2400);
+
+        // allowance N + pad = 2400 + 3528 = 5928 -> six 960-sample packets (5760)
+        requests.Should().Equal(new EncodeRequest(0, 1920), new EncodeRequest(3528, 5760));
+        result.ReplacedSamples.Should().Be(5760);
+        result.File.DurationSamples.Should().Be(file.DurationSamples);
+        var (samples, err) = Decode(RoundTrip(result.File));
+        err.Should().BeEmpty();
+        samples.Length.Should().Be((int)file.DurationSamples);
+        AssertDominant(samples, 0.005, 0.045, 1000, 440);
+    }
+
+    [Fact]
+    public void Overwrite_ShouldKeepAllButOnePacketOfTake_WhenHalfSecondTakeAtZeroWithLargePreSkip()
+    {
+        var file = Record(2.0) with { HeadPacket = new OpusHead(1, 1, 3840, 48000, 0, 0).ToBytes() };
+
+        var result = Over(file, 0, 0.5, 880);
+
+        // allowance 24000 + 3528 = 27528 -> 28 packets = 26880; audible new audio = 26880 - 3840 = 23040 = 0.5 s minus one packet
+        result.ReplacedSamples.Should().Be(26880);
+        result.File.DurationSamples.Should().Be(file.DurationSamples);
+        var (samples, err) = Decode(RoundTrip(result.File));
+        err.Should().BeEmpty();
+        AssertDominant(samples, 0.005, 0.47, 880, 440);
+        AssertDominant(samples, 0.52, 0.9, 440, 880);
+    }
+
+    [Fact]
     public void Insert_ShouldAppendAndReportDuration_WhenSnapsToEndBoundaryWithLargeEndTrim()
     {
         var file = Record(1.0) with { EndTrim = 900 };
