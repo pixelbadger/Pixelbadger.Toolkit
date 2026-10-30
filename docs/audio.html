@@ -10,7 +10,7 @@
 
 <header>
   <h1>Audio <span class="badge">audio</span></h1>
-  <div class="subtitle">Record Ogg Opus audio, then insert or overwrite sections of an existing file by splicing packets</div>
+  <div class="subtitle">Record Ogg Opus audio, insert or overwrite sections of an existing file by splicing packets, and play MIDI files through a SoundFont synthesiser</div>
   <div class="meta">Pixelbadger Toolkit &mdash; <code>pbtk audio</code> &mdash; <a href="index.html" style="color:#60a5fa">&#8592; all topics</a></div>
 </header>
 
@@ -20,6 +20,7 @@
   <a href="#record">record</a>
   <a href="#insert">insert</a>
   <a href="#overwrite">overwrite</a>
+  <a href="#play-midi">play-midi</a>
   <a href="#how-edits-work">How edits work</a>
   <a href="#command-ref">Command Reference</a>
 </nav>
@@ -33,7 +34,9 @@
       The <code>audio</code> topic records audio to an Ogg Opus file and edits existing Ogg Opus files.
       <code>record</code> captures live audio from a microphone (through <code>ffmpeg</code>) or reads a WAV
       file, and writes a new <code>.opus</code> file. <code>insert</code> and <code>overwrite</code> put new
-      audio into an existing file at a given time, editing the file in place.
+      audio into an existing file at a given time, editing the file in place. <code>play-midi</code> plays a
+      Standard MIDI File live through the system audio output, synthesised with a SoundFont (<code>.sf2</code>)
+      file; it writes no file.
     </p>
     <p>
       Edits do not decode and re-encode the whole file. Existing audio packets are copied byte for byte, and
@@ -51,7 +54,8 @@
   <section id="requirements">
     <h2>Requirements</h2>
     <p>
-      <strong>libopus</strong> is required for every action. The toolkit loads the system library at run time
+      <strong>libopus</strong> is required for <code>record</code>, <code>insert</code> and <code>overwrite</code>.
+      <code>play-midi</code> does not need it. The toolkit loads the system library at run time
       and does not bundle it. If it cannot be found, the command prints the install guidance and exits with
       code <code>1</code>.
     </p>
@@ -65,8 +69,8 @@
     </table>
 
     <p>
-      <strong>ffmpeg</strong> is needed only for live capture, that is, when <code>--from-wav</code> is not
-      given. <code>--from-wav</code> works without ffmpeg. If ffmpeg is missing for a capture, the command exits
+      <strong>ffmpeg</strong> is needed for live capture, that is, when <code>--from-wav</code> is not
+      given, and for <code>play-midi</code> playback. <code>--from-wav</code> works without ffmpeg. If ffmpeg is missing for a capture, the command exits
       with code <code>1</code> and suggests installing it (<code>apt install ffmpeg</code> or
       <code>brew install ffmpeg</code>) or using <code>--from-wav</code>.
     </p>
@@ -317,6 +321,113 @@
     </div>
   </section>
 
+  <!-- PLAY-MIDI -->
+  <section id="play-midi">
+    <h2>play-midi</h2>
+    <p>
+      Plays a Standard MIDI File live through the system audio output. The notes are synthesised with a SoundFont
+      (<code>.sf2</code>) file, so the instruments you hear come from that file. Nothing is written to disk.
+    </p>
+    <p>
+      The synthesiser renders at 48 kHz stereo, with reverb and chorus on. Playback runs to the end of the MIDI
+      file, then continues until all notes have faded, for at most 3 seconds past the end. Press <kbd>Ctrl+C</kbd>
+      to stop early (see <a href="#play-midi-output">Output</a>).
+    </p>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk audio play-midi</span>
+      <span class="opt"> --file</span> <span class="val">./song.mid</span>
+      <span class="opt"> --soundfont</span> <span class="val">./GeneralUser.sf2</span>
+    </div>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk audio play-midi</span>
+      <span class="opt"> --file</span> <span class="val">./song.mid</span>
+      <span class="opt"> --soundfont</span> <span class="val">./GeneralUser.sf2</span>
+      <span class="opt"> --output-format</span> <span class="val">pulse</span>
+      <span class="opt"> --device</span> <span class="val">alsa_output.usb-headset</span>
+    </div>
+
+    <h3>Options</h3>
+    <table>
+      <thead><tr><th>Option</th><th>Required</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--file</code></td><td>Yes</td><td>&mdash;</td><td>MIDI file (<code>.mid</code>) to play. Standard MIDI Files, format 0 or 1.</td></tr>
+        <tr><td><code>--soundfont</code></td><td>Yes</td><td>&mdash;</td><td>SoundFont (<code>.sf2</code>) whose instruments synthesise the MIDI file. SoundFont 2 only.</td></tr>
+        <tr><td><code>--output-format</code></td><td>No</td><td>Platform default (see <a href="#midi-devices">Playback devices</a>)</td><td>ffmpeg output format used for playback. Passed to ffmpeg as given.</td></tr>
+        <tr><td><code>--device</code></td><td>No</td><td>Platform default (see <a href="#midi-devices">Playback devices</a>)</td><td>Output device passed to ffmpeg. Ignored by <code>sdl2</code>.</td></tr>
+      </tbody>
+    </table>
+
+    <h3 id="midi-devices">Playback devices</h3>
+    <table>
+      <thead><tr><th>Platform</th><th>Default <code>--output-format</code></th><th>Default <code>--device</code></th></tr></thead>
+      <tbody>
+        <tr><td>Linux</td><td><code>pulse</code></td><td>The system default output (sink)</td></tr>
+        <tr><td>macOS</td><td><code>audiotoolbox</code></td><td>Device index <code>0</code></td></tr>
+        <tr><td>Windows</td><td><code>sdl2</code></td><td>Ignored</td></tr>
+      </tbody>
+    </table>
+    <p>
+      On Linux, <code>--device</code> is a PulseAudio sink name. On macOS it is an <code>audiotoolbox</code> device
+      index. <code>--output-format</code> and <code>--device</code> mirror <code>--capture-format</code> and
+      <code>--device</code> on <code>record</code>, but for playback.
+    </p>
+
+    <h3>Requirements</h3>
+    <ul>
+      <li><strong>ffmpeg</strong> must be on <code>PATH</code>, with an output device for the platform.</li>
+      <li><strong>A SoundFont</strong> is not bundled. Supply your own <code>.sf2</code> file, for example GeneralUser GS,
+        FluidR3_GM or TimGM6mb. Only SoundFont 2 is supported; SF3 and DLS files are not.</li>
+      <li><strong>libopus</strong> is not needed.</li>
+    </ul>
+
+    <h3 id="play-midi-output">Output</h3>
+    <p>
+      In a terminal, the command shows a live view while it plays: a braille stereo oscilloscope (8 rows), a progress
+      bar with <code>m:ss / m:ss</code>, and the line <code>Playing '&lt;file&gt;' with '&lt;soundfont&gt;'</code>. When
+      playback finishes, the live view is removed and one line is printed:
+    </p>
+    <div class="cmd-block">
+      <span class="val">Played './song.mid' (1:05)</span>
+    </div>
+    <p>
+      When output is redirected, or the command runs over MCP, there is no live view. The command prints these plain
+      lines instead:
+    </p>
+    <div class="cmd-block">
+      <span class="val">Playing './song.mid' (1:05) with './GeneralUser.sf2'</span><br>
+      <span class="val">Played './song.mid' (1:05)</span>
+    </div>
+    <p>
+      On success the command exits with code <code>0</code>.
+    </p>
+
+    <h3>Stopping playback</h3>
+    <p>
+      <kbd>Ctrl+C</kbd> stops playback immediately. The ffmpeg process is stopped too, so none is left running. The
+      command prints <code>Stopped at m:ss</code> (the time reached) and exits with code <code>130</code>. Nothing is
+      written to disk.
+    </p>
+    <div class="cmd-block">
+      <span class="val">Stopped at 0:42</span>
+    </div>
+
+    <h3 id="midi-errors">Errors</h3>
+    <div class="warning-box">
+      <strong>Error exits:</strong> each error prints <code>Error: &lt;message&gt;</code> and exits with code
+      <code>1</code>. Nothing is played.
+      <ul style="margin-top:0.5rem">
+        <li><code>File '&lt;path&gt;' not found</code>: the <code>--file</code> MIDI file does not exist.</li>
+        <li><code>SoundFont '&lt;path&gt;' not found</code>: the <code>--soundfont</code> file does not exist.</li>
+        <li><code>Could not read MIDI file '&lt;path&gt;': &lt;reason&gt;</code>: the file is not a readable MIDI file.</li>
+        <li><code>Could not read SoundFont '&lt;path&gt;': &lt;reason&gt;</code>: the file is not a readable SoundFont 2 file.</li>
+        <li><code>ffmpeg was not found on PATH. Install ffmpeg (e.g. 'apt install ffmpeg' or 'brew install ffmpeg').</code></li>
+        <li><code>ffmpeg playback failed (exit &lt;N&gt;): &lt;first ffmpeg error line&gt;</code>: ffmpeg exited with an error during playback.</li>
+      </ul>
+    </div>
+  </section>
+
   <!-- HOW EDITS WORK -->
   <section id="how-edits-work">
     <h2>How edits work</h2>
@@ -439,6 +550,12 @@
           <td><code>--duration</code>, <code>--from-wav</code>, <code>--bitrate</code>, <code>--device</code>, <code>--capture-format</code></td>
           <td><code>Overwrote &lt;N&gt;s at &lt;S&gt;s (requested &lt;R&gt;s) in '&lt;path&gt;': &lt;D&gt;s</code></td>
         </tr>
+        <tr>
+          <td><code>audio play-midi</code></td>
+          <td><code>--file</code>, <code>--soundfont</code></td>
+          <td><code>--output-format</code>, <code>--device</code></td>
+          <td><code>Played '&lt;path&gt;' (&lt;m:ss&gt;)</code></td>
+        </tr>
       </tbody>
     </table>
 
@@ -474,7 +591,8 @@
       call that would capture live audio without <code>--duration</code> or <code>--from-wav</code> is refused
       with exit code <code>1</code>, because it would wait for a keypress that an MCP call cannot send. Pass
       <code>--duration</code> or <code>--from-wav</code> for MCP calls. Cancelling or timing out such a call aborts it:
-      nothing is written and the exit code is <code>130</code>.
+      nothing is written and the exit code is <code>130</code>. <code>play-midi</code> is also available over MCP.
+      It needs no keypress, and it prints the plain lines described in <a href="#play-midi">play-midi</a>.
     </p>
   </section>
 

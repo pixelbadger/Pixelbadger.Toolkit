@@ -103,6 +103,7 @@ The project is .NET 10, and uses Microsoft's System.CommandLine library for buil
   - `pbtk audio record --out-file ./memo.opus --from-wav ./take.wav`
   - `pbtk audio insert --file ./memo.opus --at 1:05.5 --duration 3s`
   - `pbtk audio overwrite --file ./memo.opus --at 12 --from-wav ./fix.wav`
+  - `pbtk audio play-midi --file ./song.mid --soundfont ./GeneralUser.sf2`
   - `pbtk mcp serve`
   - `pbtk mcp serve --profile text-tools --port 5200`
   - `pbtk mcp save --name text-tools --include strings interpreters/brainfuck --port 5200`
@@ -310,7 +311,7 @@ Available topics and actions:
 - **markov**: train, complete
 - **demoscene**: showcase
 - **gpt**: train, complete
-- **audio**: record, insert, overwrite
+- **audio**: record, insert, overwrite, play-midi
 - **mcp**: serve, save, delete, list
 - **config**: mirrors every topic/group/action; sets, shows (bare) and unsets (--unset) per-user option defaults
 
@@ -319,6 +320,7 @@ Available topics and actions:
 - Microsoft.AspNetCore.App (framework reference)
 - Microsoft.Extensions.Hosting
 - SixLabors.ImageSharp (for steganography)
+- MeltySynth (SoundFont MIDI synthesiser, used by `audio play-midi`)
 - System.CommandLine (beta)
 - OpenAI (for LLM integration)
 - Anthropic (official Claude SDK)
@@ -327,8 +329,8 @@ Available topics and actions:
 - Microsoft.Extensions.AI.OpenAI (for OpenAI integration)
 - Dapper (config store data access)
 - ModelContextProtocol.AspNetCore (MCP server over stateless HTTP)
-- libopus (system library, loaded at run time through P/Invoke; `apt install libopus0`, `brew install opus`, or `opus.dll` on PATH). Required by `audio`
-- ffmpeg (system tool, on PATH; used by `audio` for live capture only, not needed with `--from-wav`)
+- libopus (system library, loaded at run time through P/Invoke; `apt install libopus0`, `brew install opus`, or `opus.dll` on PATH). Required by `audio` record, insert and overwrite (not `audio play-midi`)
+- ffmpeg (system tool, on PATH; used by `audio` for live capture and by `audio play-midi` for playback; capture is not needed with `--from-wav`)
 
 ## Environment Variables
 
