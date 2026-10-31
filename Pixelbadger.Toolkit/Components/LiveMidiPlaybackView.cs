@@ -22,6 +22,7 @@ public sealed class LiveMidiPlaybackView : IMidiPlaybackView
     private readonly object _gate = new();
     private readonly float[] _left = new float[WindowFrames];
     private readonly float[] _right = new float[WindowFrames];
+    private readonly ScopeAutoGain _gain = new();
     private int _count;
     private TimeSpan _elapsed;
     private MidiPlaybackInfo? _info;
@@ -58,6 +59,7 @@ public sealed class LiveMidiPlaybackView : IMidiPlaybackView
                 left.Slice(n - WindowFrames, WindowFrames).CopyTo(_left);
                 right.Slice(n - WindowFrames, WindowFrames).CopyTo(_right);
                 _count = WindowFrames;
+                ObserveGain(n);
                 return;
             }
 
@@ -67,7 +69,44 @@ public sealed class LiveMidiPlaybackView : IMidiPlaybackView
             left[..n].CopyTo(_left.AsSpan(keep));
             right[..n].CopyTo(_right.AsSpan(keep));
             _count = keep + n;
+            ObserveGain(n);
         }
+    }
+
+    // Caller holds _gate.
+    private void ObserveGain(int frames) =>
+        _gain.Observe(ScopeAutoGain.Peak(_left.AsSpan(0, _count), _right.AsSpan(0, _count)), frames);
+
+    /// <summary>The frame the live view would draw for the current window, with auto-gain applied, for tests.</summary>
+    internal OscilloscopeFrame CurrentFrame(int width, int height) => RenderFrame(width, height).Frame;
+
+    /// <summary>The current display gain, for tests.</summary>
+    internal float CurrentGain
+    {
+        get { lock (_gate) return _gain.Gain; }
+    }
+
+    private (OscilloscopeFrame Frame, TimeSpan Elapsed) RenderFrame(int width, int height)
+    {
+        float[] left;
+        float[] right;
+        TimeSpan elapsed;
+        float gain;
+        lock (_gate)
+        {
+            left = _left.AsSpan(0, _count).ToArray();
+            right = _right.AsSpan(0, _count).ToArray();
+            elapsed = _elapsed;
+            gain = _gain.Gain;
+        }
+
+        if (gain != 1f)
+        {
+            left = ScopeAutoGain.Apply(left, gain);
+            right = ScopeAutoGain.Apply(right, gain);
+        }
+
+        return (OscilloscopeRenderer.Render(left, right, width, height), elapsed);
     }
 
     /// <summary>Copy of the retained scope window (oldest first), for tests.</summary>
@@ -135,19 +174,9 @@ public sealed class LiveMidiPlaybackView : IMidiPlaybackView
 
     private IRenderable Build()
     {
-        float[] left;
-        float[] right;
-        TimeSpan elapsed;
-        lock (_gate)
-        {
-            left = _left.AsSpan(0, _count).ToArray();
-            right = _right.AsSpan(0, _count).ToArray();
-            elapsed = _elapsed;
-        }
-
         var info = _info!;
         var scopeWidth = Math.Max(10, _console.Profile.Width - 4);
-        var frame = OscilloscopeRenderer.Render(left, right, scopeWidth, ScopeHeight);
+        var (frame, elapsed) = RenderFrame(scopeWidth, ScopeHeight);
 
         var scope = new Rows(Enumerable.Range(0, frame.Height).Select(r => (IRenderable)new Markup(ScopeRow(frame, r))));
         var panel = new Panel(scope)
