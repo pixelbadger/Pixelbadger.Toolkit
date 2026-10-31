@@ -14,11 +14,12 @@ public static class AudioCommand
 
     public static Command Create()
     {
-        var command = new Command("audio", "Record Ogg Opus audio, and insert or overwrite sections of an existing file by packet splicing");
+        var command = new Command("audio", "Record Ogg Opus audio, insert or overwrite sections of an existing file by packet splicing, and play MIDI files with a SoundFont");
 
         command.Add(CreateRecordCommand());
         command.Add(CreateInsertCommand());
         command.Add(CreateOverwriteCommand());
+        command.Add(CreatePlayMidiCommand());
 
         return command;
     }
@@ -209,6 +210,44 @@ public static class AudioCommand
                 parseResult.GetValue(deviceOption),
                 parseResult.GetValue(captureFormatOption)), cancellationToken);
         }));
+
+        return command;
+    }
+
+    private static Command CreatePlayMidiCommand()
+    {
+        var command = new Command("play-midi", "Play a MIDI file live through the system audio output using a SoundFont (SF2) synthesiser");
+
+        var fileOption = new Option<string>("--file") { Description = "MIDI file (.mid) to play", Required = true };
+        var soundFontOption = new Option<string>("--soundfont") { Description = "SoundFont (.sf2) whose instruments synthesise the MIDI file", Required = true };
+        var outputFormatOption = new Option<string?>("--output-format") { Description = "ffmpeg output format used for playback (default: pulse on Linux, audiotoolbox on macOS, sdl2 on Windows)" };
+        var deviceOption = new Option<string?>("--device") { Description = "Output device passed to ffmpeg (default: the system default output; pulse sink name on Linux, audiotoolbox device index on macOS; ignored by sdl2)" };
+
+        command.Add(fileOption);
+        command.Add(soundFontOption);
+        command.Add(outputFormatOption);
+        command.Add(deviceOption);
+
+        // The component handles Ctrl+C itself (prints "Stopped at m:ss", returns 130), so this does not use RunDetachedAsync.
+        command.SetAction(async (parseResult, cancellationToken) =>
+        {
+            try
+            {
+                var component = new MidiPlayComponent(
+                    new MeltySynthSourceFactory(),
+                    new FfmpegPlaybackSinkFactory(AudioSeams.FfmpegLocator),
+                    MidiPlaybackViewFactory.Create(ToolkitConsole.Out));
+                return await component.RunAsync(new MidiPlayOptions(
+                    parseResult.GetValue(fileOption)!,
+                    parseResult.GetValue(soundFontOption)!,
+                    parseResult.GetValue(outputFormatOption),
+                    parseResult.GetValue(deviceOption)), cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                return WriteError(ex);
+            }
+        });
 
         return command;
     }

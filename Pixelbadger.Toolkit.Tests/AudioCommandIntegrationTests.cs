@@ -474,11 +474,114 @@ public class AudioCommandIntegrationTests : IDisposable
         }
     }
 
+    private static async Task WaitUntilProcessGoneAsync(int pid)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (DateTime.UtcNow < deadline)
+        {
+            try
+            {
+                using var p = Process.GetProcessById(pid);
+                if (p.HasExited) return;
+            }
+            catch (ArgumentException)
+            {
+                return;
+            }
+
+            await Task.Delay(50);
+        }
+
+        throw new Xunit.Sdk.XunitException($"ffmpeg process {pid} must not outlive the tool");
+    }
+
     /// <summary>Sends SIGINT; false when the process was already gone.</summary>
     private static bool Signal(int pid)
     {
         using var kill = Process.Start(new ProcessStartInfo("kill", $"-INT {pid}") { UseShellExecute = false, RedirectStandardError = true })!;
         kill.WaitForExit();
         return kill.ExitCode == 0;
+    }
+
+    [Fact]
+    public async Task PlayMidi_ShouldPrintPlainLinesAndWriteAudio_WhenOutputFormatIsS16leFile()
+    {
+        var mid = MidiTestAssets.WriteMidi(_dir, "song.mid", (60, 0.0, 0.5));
+        var sf2 = MidiTestAssets.WriteSoundFont(_dir, "bank.sf2", Waveform.Sine);
+        var target = Path_("out.s16le");
+
+        var r = await Pbtk("audio", "play-midi", "--file", mid, "--soundfont", sf2, "--output-format", "s16le", "--device", target);
+
+        r.ExitCode.Should().Be(0, r.Err);
+        r.Out.Should().Be($"Playing '{mid}' (0:00) with '{sf2}'{Environment.NewLine}Played '{mid}' (0:00){Environment.NewLine}");
+        var bytes = await File.ReadAllBytesAsync(target);
+        // 0.5 s MIDI: frames are 4 bytes of stereo s16le; the release tail adds at most 3 s.
+        var frames = bytes.Length / 4;
+        frames.Should().BeGreaterThan(48000 / 2).And.BeLessThanOrEqualTo(48000 / 2 + 3 * 48000);
+        var peak = 0;
+        for (var i = 0; i + 1 < bytes.Length; i += 2)
+            peak = Math.Max(peak, Math.Abs((int)BitConverter.ToInt16(bytes, i)));
+        peak.Should().BeGreaterThan(1000, "the rendered note must be clearly audible, not noise");
+    }
+
+    // A fake ffmpeg that never reads stdin gives a deterministic, real-time-independent pacing target: the pipe
+    // fills after 64 KiB (about 0.35 s of audio), so a 20 s song cannot finish and the write is blocked when SIGINT arrives.
+    [Fact]
+    public async Task PlayMidi_ShouldExitWith130AndKillFfmpeg_WhenInterruptedMidPlayback()
+    {
+        if (OperatingSystem.IsWindows()) return;
+
+        var mid = MidiTestAssets.WriteMidi(_dir, "long.mid", (60, 0.0, 20.0));
+        var sf2 = MidiTestAssets.WriteSoundFont(_dir, "bank.sf2", Waveform.Sine);
+        var bin = Path_("bin");
+        Directory.CreateDirectory(bin);
+        var pidFile = Path_("ffmpeg.pid");
+        var fake = Path.Combine(bin, "ffmpeg");
+        await File.WriteAllTextAsync(fake, $"#!/bin/sh\necho $$ > '{pidFile}'\nexec sleep 60\n");
+        File.SetUnixFileMode(fake, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+
+        var startInfo = new ProcessStartInfo("dotnet")
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false
+        };
+        startInfo.ArgumentList.Add(Path.Combine(AppContext.BaseDirectory, "Pixelbadger.Toolkit.dll"));
+        foreach (var arg in new[] { "audio", "play-midi", "--file", mid, "--soundfont", sf2 })
+            startInfo.ArgumentList.Add(arg);
+        startInfo.Environment["TERM"] = "xterm";
+        startInfo.Environment["NO_COLOR"] = "1";
+        startInfo.Environment["XDG_CONFIG_HOME"] = _dir;
+        startInfo.Environment["PATH"] = bin + Path.PathSeparator + Environment.GetEnvironmentVariable("PATH");
+
+        using var process = Process.Start(startInfo)!;
+        var stdout = process.StandardOutput.ReadToEndAsync();
+        var stderr = process.StandardError.ReadToEndAsync();
+        try
+        {
+            var deadline = DateTime.UtcNow.AddSeconds(30);
+            while (!File.Exists(pidFile) || new FileInfo(pidFile).Length == 0)
+            {
+                DateTime.UtcNow.Should().BeBefore(deadline, "the fake ffmpeg should have been started");
+                await Task.Delay(50);
+            }
+
+            var ffmpegPid = int.Parse((await File.ReadAllTextAsync(pidFile)).Trim());
+            await Task.Delay(500);
+
+            using (var kill = Process.Start("kill", ["-INT", process.Id.ToString()])!)
+                await kill.WaitForExitAsync();
+            // 5 s is a hang guard only; promptness (AC4) is covered by the cancellation-ordering unit tests.
+            var exited = process.WaitForExit(TimeSpan.FromSeconds(5));
+
+            exited.Should().BeTrue("the tool must stop after SIGINT");
+            process.ExitCode.Should().Be(130, await stderr);
+            (await stdout).Should().Contain("Stopped at ");
+            await WaitUntilProcessGoneAsync(ffmpegPid);
+        }
+        finally
+        {
+            if (!process.HasExited) process.Kill(true);
+        }
     }
 }
