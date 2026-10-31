@@ -216,4 +216,34 @@ public class LiveMidiPlaybackViewTests
 
         Plain(output.ToString()).Should().Contain("Played 's.mid' (0:04)");
     }
+
+    private const string LongPath = "/some long directory/with spaces/and [brackets] inside/a very long song file name.mid";
+
+    [Fact]
+    public void Finish_ShouldPrintPlayedLineUnwrapped_WhenConsoleIsNarrow()
+    {
+        var (console, output) = NewConsole();
+        console.Profile.Width = 40;
+        var view = new LiveMidiPlaybackView(console, TimeSpan.FromMilliseconds(5));
+        view.Start(new MidiPlaybackInfo(LongPath, "b.sf2", TimeSpan.FromSeconds(4)));
+        view.Update(Sine(960), Sine(960), TimeSpan.FromSeconds(1));
+
+        view.Finish(TimeSpan.FromSeconds(4));
+
+        LongPath.Length.Should().BeGreaterThan(60);
+        Plain(output.ToString()).Should().Contain($"Played '{LongPath}' (0:04){Environment.NewLine}");
+    }
+
+    [Fact]
+    public void Stop_ShouldPrintStoppedLineUnwrapped_WhenConsoleIsNarrow()
+    {
+        var (console, output) = NewConsole();
+        console.Profile.Width = 10;
+        var view = new LiveMidiPlaybackView(console, TimeSpan.FromMilliseconds(5));
+        view.Start(new MidiPlaybackInfo(LongPath, "b.sf2", TimeSpan.FromSeconds(4)));
+
+        view.Stop(TimeSpan.FromSeconds(2));
+
+        Plain(output.ToString()).Should().Contain($"Stopped at 0:02{Environment.NewLine}");
+    }
 }

@@ -109,7 +109,13 @@ public sealed class LiveMidiPlaybackView : IMidiPlaybackView
         return _info is not null;
     }
 
-    private void Print(string line) => _console.Write(new Text(line + Environment.NewLine));
+    // Raw writer: Spectre renderables word-wrap at console width and interpret markup; the terminal should soft-wrap this line instead.
+    private void Print(string line)
+    {
+        var writer = _console.Profile.Out.Writer;
+        writer.Write(line + Environment.NewLine);
+        writer.Flush();
+    }
 
     private void RunLive(CancellationToken token)
     {
