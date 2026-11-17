@@ -35,7 +35,8 @@ internal static class ToolkitProcess
     public static Process StartWithConfigHome(string? workingDirectory, string configHome, params string[] args) =>
         StartWithConfigHome(workingDirectory, configHome, false, args);
 
-    private static Process StartWithConfigHome(string? workingDirectory, string configHome, bool redirectStandardInput, string[] args)
+    private static Process StartWithConfigHome(string? workingDirectory, string configHome, bool redirectStandardInput, string[] args,
+        IReadOnlyDictionary<string, string>? environment = null)
     {
         var startInfo = new ProcessStartInfo("dotnet")
         {
@@ -48,6 +49,9 @@ internal static class ToolkitProcess
         startInfo.Environment["NO_COLOR"] = "1"; // plain text so assertions never see ANSI escapes
         startInfo.Environment["XDG_CONFIG_HOME"] = configHome;
         startInfo.Environment["APPDATA"] = configHome;
+        if (environment is not null)
+            foreach (var (key, value) in environment)
+                startInfo.Environment[key] = value;
 
         if (workingDirectory is not null)
             startInfo.WorkingDirectory = workingDirectory;
@@ -94,13 +98,31 @@ internal static class ToolkitProcess
         string configHome,
         params string[] args) => RunCoreAsync(workingDirectory, configHome, null, args);
 
+    /// <summary>Runs the toolkit to completion with extra environment variables (for example HOME and USERPROFILE).</summary>
+    public static async Task<(int ExitCode, string StandardOutput, string StandardError)> RunWithEnvironmentAsync(
+        IReadOnlyDictionary<string, string> environment,
+        params string[] args)
+    {
+        var configHome = Path.Combine(Path.GetTempPath(), "pbtk-config-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(configHome);
+        try
+        {
+            return await RunCoreAsync(null, configHome, null, args, environment);
+        }
+        finally
+        {
+            DeleteQuietly(configHome);
+        }
+    }
+
     private static async Task<(int ExitCode, string StandardOutput, string StandardError)> RunCoreAsync(
         string? workingDirectory,
         string configHome,
         string? standardInput,
-        params string[] args)
+        string[] args,
+        IReadOnlyDictionary<string, string>? environment = null)
     {
-        using var process = StartWithConfigHome(workingDirectory, configHome, standardInput is not null, args);
+        using var process = StartWithConfigHome(workingDirectory, configHome, standardInput is not null, args, environment);
         if (standardInput is not null)
         {
             await process.StandardInput.BaseStream.WriteAsync(new System.Text.UTF8Encoding(false).GetBytes(standardInput));
