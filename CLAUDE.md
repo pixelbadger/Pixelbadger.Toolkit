@@ -99,6 +99,14 @@ The project is .NET 10, and uses Microsoft's System.CommandLine library for buil
   - `pbtk gpt train --source corpus.txt --out ./.gpt --loss-graph ./loss.html`
   - `pbtk gpt train --source corpus.txt --out ./.gpt --validation-split 0.1 --eval-interval 50`
   - `pbtk gpt complete --model ./.gpt --prompt "ROMEO:" --max-tokens 200`
+  - `pbtk rag ingest --file ./notes.txt`
+  - `pbtk rag ingest --file ./notes-v2.txt --id 3f2a9c1e5b7d4e8fa0b1c2d3e4f5a6b7 --title "Meeting notes"`
+  - `pbtk rag ingest --file ./book.txt --index library --chunk-size 1500 --chunk-overlap 200`
+  - `pbtk rag list --page 2 --page-size 20`
+  - `pbtk rag get --id 3f2a9c1e5b7d4e8fa0b1c2d3e4f5a6b7 --format json`
+  - `pbtk rag search --query '"quick brown" AND fox~' --page-size 5`
+  - `pbtk rag search --query "title:notes AND budget" --index-path ./my-index --format json`
+  - `pbtk rag delete --id 3f2a9c1e5b7d4e8fa0b1c2d3e4f5a6b7`
   - `pbtk audio record --out-file ./memo.opus --duration 10s`
   - `pbtk audio record --out-file ./memo.opus --from-wav ./take.wav`
   - `pbtk audio insert --file ./memo.opus --at 1:05.5 --duration 3s`
@@ -312,6 +320,7 @@ Available topics and actions:
 - **demoscene**: showcase
 - **gpt**: train, complete
 - **audio**: record, insert, overwrite, play-midi
+- **rag**: ingest, list, get, search, delete
 - **mcp**: serve, save, delete, list
 - **config**: mirrors every topic/group/action; sets, shows (bare) and unsets (--unset) per-user option defaults
 
@@ -331,6 +340,7 @@ Available topics and actions:
 - ModelContextProtocol.AspNetCore (MCP server over stateless HTTP)
 - libopus (system library, loaded at run time through P/Invoke; `apt install libopus0`, `brew install opus`, or `opus.dll` on PATH). Required by `audio` record, insert and overwrite (not `audio play-midi`)
 - ffmpeg (system tool, on PATH; used by `audio` for live capture and by `audio play-midi` for playback; capture is not needed with `--from-wav`)
+- Lucene.Net, Lucene.Net.QueryParser, Lucene.Net.Analysis.Common (4.8.0-beta00018; used by the rag topic)
 
 ## Environment Variables
 
