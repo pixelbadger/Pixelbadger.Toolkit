@@ -55,6 +55,7 @@ public class McpCommandTests : IDisposable
         serve.Options.Single(o => o.Name == "--profile").HasImmutableDefault().Should().BeFalse();
         serve.Options.Single(o => o.Name == "--host").HasImmutableDefault().Should().BeTrue();
         serve.Options.Single(o => o.Name == "--port").HasImmutableDefault().Should().BeTrue();
+        serve.Options.Single(o => o.Name == "--stdio").HasImmutableDefault().Should().BeTrue();
         foreach (var name in new[] { "save", "delete" })
             McpCommand.Create(_store).Subcommands.Single(c => c.Name == name).Options
                 .Where(o => o.Name is "--name" or "--include" or "--host" or "--port")

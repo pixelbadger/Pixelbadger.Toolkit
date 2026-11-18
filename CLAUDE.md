@@ -114,6 +114,7 @@ The project is .NET 10, and uses Microsoft's System.CommandLine library for buil
   - `pbtk audio play-midi --file ./song.mid --soundfont ./GeneralUser.sf2`
   - `pbtk mcp serve`
   - `pbtk mcp serve --profile text-tools --port 5200`
+  - `pbtk mcp serve --stdio`
   - `pbtk mcp save --name text-tools --include strings interpreters/brainfuck --port 5200`
   - `pbtk mcp list`
   - `pbtk mcp delete --name text-tools`
