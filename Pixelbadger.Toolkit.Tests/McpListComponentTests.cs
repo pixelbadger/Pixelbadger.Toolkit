@@ -61,7 +61,7 @@ public class McpListComponentTests : IDisposable
         var (code, output, _) = await RunAsync("mcp", "list");
 
         code.Should().Be(0);
-        Lines(output).Should().Equal("default (built-in)", "  include: interpreters", "  host: (default)", "  port: (default)");
+        Lines(output).Should().Equal("default (built-in)", "  include: interpreters, rag", "  host: (default)", "  port: (default)");
     }
 
     [Fact]
@@ -75,7 +75,7 @@ public class McpListComponentTests : IDisposable
         Lines(output).Should().Equal(
             "alpha", "  include: crypto", "  host: (default)", "  port: (default)",
             "",
-            "default (built-in)", "  include: interpreters", "  host: (default)", "  port: (default)",
+            "default (built-in)", "  include: interpreters, rag", "  host: (default)", "  port: (default)",
             "",
             "zeta", "  include: strings/reverse, interpreters/ook", "  host: localhost", "  port: 7000");
     }

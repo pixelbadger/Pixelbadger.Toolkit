@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pixelbadger Toolkit — RAG</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header>
+  <h1>RAG <span class="badge">rag</span></h1>
+  <div class="subtitle">Lucene text search over chunked plain-text documents — ingest, list, get, search and delete</div>
+  <div class="meta">Pixelbadger Toolkit &mdash; <code>pbtk rag</code> &mdash; <a href="index.html" style="color:#60a5fa">&#8592; all topics</a></div>
+</header>
+
+<nav>
+  <a href="#ingest">ingest</a>
+  <a href="#list">list</a>
+  <a href="#get">get</a>
+  <a href="#search">search</a>
+  <a href="#delete">delete</a>
+  <a href="#index-location">Index location</a>
+  <a href="#output-formats">Output formats</a>
+  <a href="#chunking">Chunking</a>
+  <a href="#search-behaviour">Search behaviour</a>
+  <a href="#mcp-tools">MCP tools</a>
+  <a href="#command-ref">Command Reference</a>
+</nav>
+
+<div class="content">
+
+  <p>
+    The <code>rag</code> topic stores plain-text files in a local Lucene.NET index. Each file is
+    recorded as a header document with a stable 32-character ID, and its text is split into chunks
+    that are indexed for full-text search. Use <code>ingest</code> to add or replace a file,
+    <code>list</code> and <code>get</code> to read the index back, <code>search</code> to find
+    chunks by plain-text terms, and <code>delete</code> to remove a document and its chunks.
+  </p>
+
+  <div class="info-box">
+    Only plain text is supported (UTF-8, optionally with a byte-order mark). PDF, HTML and Word
+    files are not supported. Each <code>ingest</code> call takes exactly one <code>--file</code>;
+    directories and glob patterns are not accepted.
+  </div>
+
+  <!-- INGEST -->
+  <section id="ingest">
+    <h2>ingest</h2>
+    <p>
+      Reads a plain-text file, splits it into chunks, and writes a header document and its chunks
+      to the index in a single commit. Without <code>--id</code>, ingest always creates a new
+      document with a new ID, even if the same file has been ingested before. On success, the ID
+      is printed.
+    </p>
+    <p>
+      With <code>--id</code> set to an existing document ID, ingest <em>updates</em> that document:
+      all of its old chunks are removed and replaced with the new content. The ID and
+      <code>created_utc</code> are kept, <code>updated_utc</code> is set to the current time, and the
+      path, hash and chunks are replaced. The title is kept unless <code>--title</code> is given. If the update fails before the commit, the old
+      version stays intact. An unknown <code>--id</code> is an error.
+    </p>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk rag ingest</span>
+      <span class="opt"> --file</span> <span class="val">./notes.txt</span>
+    </div>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk rag ingest</span>
+      <span class="opt"> --file</span> <span class="val">./notes-v2.txt</span>
+      <span class="opt"> --id</span> <span class="val">3f2a9c1e5b7d4e8fa0b1c2d3e4f5a6b7</span>
+      <span class="opt"> --title</span> <span class="val">"Meeting notes"</span>
+    </div>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk rag ingest</span>
+      <span class="opt"> --file</span> <span class="val">./book.txt</span>
+      <span class="opt"> --index</span> <span class="val">library</span>
+      <span class="opt"> --chunk-size</span> <span class="val">1500</span>
+      <span class="opt"> --chunk-overlap</span> <span class="val">200</span>
+    </div>
+
+    <table>
+      <thead><tr><th>Option</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--file</code></td><td>path</td><td>required</td><td>Plain-text file to ingest. Must exist, be 50 MB or smaller, and contain no U+0000 characters and some non-whitespace text.</td></tr>
+        <tr><td><code>--id</code></td><td>ID</td><td>new ID</td><td>Existing document ID to update, as 32 hex characters (case-insensitive; stored in lowercase). A malformed or unknown ID is an error. Not configurable with <code>pbtk config</code>.</td></tr>
+        <tr><td><code>--title</code></td><td>string</td><td>the file name</td><td>Title of the document. When updating with <code>--id</code>, the existing title is kept unless this is given. Not configurable with <code>pbtk config</code>.</td></tr>
+        <tr><td><code>--chunk-size</code></td><td>integer</td><td><code>1000</code></td><td>Maximum length of a chunk in characters, including its overlap. Range 100&ndash;100000.</td></tr>
+        <tr><td><code>--chunk-overlap</code></td><td>integer</td><td><code>0</code></td><td>Characters of preceding text repeated at the start of each chunk after the first. Range 0 to <code>--chunk-size</code> / 2.</td></tr>
+        <tr><td><code>--index</code></td><td>name</td><td><code>default</code></td><td>Name of the index. See <a href="#index-location">Index location</a>.</td></tr>
+        <tr><td><code>--index-path</code></td><td>path</td><td>&mdash;</td><td>Directory of the index. Overrides <code>--index</code> when given.</td></tr>
+        <tr><td><code>--format</code></td><td><code>text</code> or <code>json</code></td><td><code>text</code></td><td>Output format. See <a href="#output-formats">Output formats</a>.</td></tr>
+      </tbody>
+    </table>
+
+    <div class="info-box">
+      <strong>Creating versus updating:</strong> ingesting the same file twice without <code>--id</code>
+      creates two documents with different IDs. Pass the ID printed by the first ingest to replace
+      its content instead.
+    </div>
+
+    <div class="info-box">
+      <strong>Writer lock:</strong> ingest and delete wait up to 10 seconds for the index's write
+      lock. If another writer still holds it, the command exits with an error and the index is unchanged.
+    </div>
+  </section>
+
+  <!-- LIST -->
+  <section id="list">
+    <h2>list</h2>
+    <p>
+      Lists header documents, sorted by <code>createdUtc</code> ascending and then by ID. The output
+      reports the total number of documents, the page, the page size and the total number of pages.
+      A page past the end returns no documents and still exits with 0. A missing index is listed as empty.
+    </p>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk rag list</span>
+      <span class="opt"> --page</span> <span class="val">2</span>
+      <span class="opt"> --page-size</span> <span class="val">20</span>
+    </div>
+
+    <table>
+      <thead><tr><th>Option</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--page</code></td><td>integer</td><td><code>1</code></td><td>Page number, 1 or greater.</td></tr>
+        <tr><td><code>--page-size</code></td><td>integer</td><td><code>20</code></td><td>Documents per page. Range 1&ndash;100.</td></tr>
+        <tr><td><code>--index</code></td><td>name</td><td><code>default</code></td><td>Name of the index. See <a href="#index-location">Index location</a>.</td></tr>
+        <tr><td><code>--index-path</code></td><td>path</td><td>&mdash;</td><td>Directory of the index. Overrides <code>--index</code> when given.</td></tr>
+        <tr><td><code>--format</code></td><td><code>text</code> or <code>json</code></td><td><code>text</code></td><td>Output format.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- GET -->
+  <section id="get">
+    <h2>get</h2>
+    <p>
+      Shows one document: its header fields followed by its chunks, ordered by chunk index. By default
+      all chunks are returned; <code>--from-chunk</code> and <code>--to-chunk</code> select an inclusive,
+      0-based range, which is read from the index without loading the other chunks. The header, including
+      <code>chunkCount</code>, is always returned. A <code>--to-chunk</code> beyond the last chunk is clamped
+      to it; a <code>--from-chunk</code> beyond the last chunk returns the header with an empty chunk list.
+      An unknown ID is an error, as is a negative bound or a <code>--from-chunk</code> greater than <code>--to-chunk</code>.
+    </p>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk rag get</span>
+      <span class="opt"> --id</span> <span class="val">3f2a9c1e5b7d4e8fa0b1c2d3e4f5a6b7</span>
+      <span class="opt"> --format</span> <span class="val">json</span>
+    </div>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk rag get</span>
+      <span class="opt"> --id</span> <span class="val">3f2a9c1e5b7d4e8fa0b1c2d3e4f5a6b7</span>
+      <span class="opt"> --from-chunk</span> <span class="val">3</span>
+      <span class="opt"> --to-chunk</span> <span class="val">5</span>
+    </div>
+
+    <table>
+      <thead><tr><th>Option</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--id</code></td><td>ID</td><td>required</td><td>Document ID, as 32 hex characters (case-insensitive).</td></tr>
+        <tr><td><code>--from-chunk</code></td><td>integer</td><td><code>0</code></td><td>First chunk to return, 0-based and inclusive. Must be 0 or greater. Not configurable with <code>pbtk config</code>.</td></tr>
+        <tr><td><code>--to-chunk</code></td><td>integer</td><td>last chunk</td><td>Last chunk to return, 0-based and inclusive. Must be 0 or greater; clamped to the last chunk. Not configurable with <code>pbtk config</code>.</td></tr>
+        <tr><td><code>--index</code></td><td>name</td><td><code>default</code></td><td>Name of the index. See <a href="#index-location">Index location</a>.</td></tr>
+        <tr><td><code>--index-path</code></td><td>path</td><td>&mdash;</td><td>Directory of the index. Overrides <code>--index</code> when given.</td></tr>
+        <tr><td><code>--format</code></td><td><code>text</code> or <code>json</code></td><td><code>text</code></td><td>Output format.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- SEARCH -->
+  <section id="search">
+    <h2>search</h2>
+    <p>
+      Searches the chunks of all documents for plain-text terms. The query is ordinary text: no
+      character is query syntax, so nothing can fail to parse. It is analysed like the indexed text
+      (see <a href="#search-behaviour">Search behaviour</a>), and a chunk matches when it contains
+      <em>any</em> of the resulting terms in its text or its document's title. Results contain chunks
+      only, ranked by BM25, highest score first. Each result also carries its position in the document
+      (<code>chunk 4/7</code> in text output) and the document's size. A query with no searchable terms
+      (empty, only punctuation, or only stop words) exits 1 with <code>Query has no searchable terms.</code>,
+      and one with more than 200 distinct terms exits 1 with <code>Query has too many terms (max 200).</code>
+    </p>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk rag search</span>
+      <span class="opt"> --query</span> <span class="val">"what's the default for --port?"</span>
+      <span class="opt"> --page-size</span> <span class="val">5</span>
+    </div>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk rag search</span>
+      <span class="opt"> --query</span> <span class="val">"meeting budget"</span>
+      <span class="opt"> --index-path</span> <span class="val">./my-index</span>
+      <span class="opt"> --format</span> <span class="val">json</span>
+    </div>
+
+    <table>
+      <thead><tr><th>Option</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--query</code></td><td>text</td><td>required</td><td>Plain text to search for. Quote it in the shell so that spaces and punctuation are passed through.</td></tr>
+        <tr><td><code>--page</code></td><td>integer</td><td><code>1</code></td><td>Page number, 1 or greater.</td></tr>
+        <tr><td><code>--page-size</code></td><td>integer</td><td><code>10</code></td><td>Results per page. Range 1&ndash;100.</td></tr>
+        <tr><td><code>--index</code></td><td>name</td><td><code>default</code></td><td>Name of the index. See <a href="#index-location">Index location</a>.</td></tr>
+        <tr><td><code>--index-path</code></td><td>path</td><td>&mdash;</td><td>Directory of the index. Overrides <code>--index</code> when given.</td></tr>
+        <tr><td><code>--format</code></td><td><code>text</code> or <code>json</code></td><td><code>text</code></td><td>Output format.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- DELETE -->
+  <section id="delete">
+    <h2>delete</h2>
+    <p>
+      Removes a document's header and all of its chunks in one commit. An unknown ID is an error and
+      leaves the index unchanged. Deleted space is reclaimed when Lucene merges segments.
+    </p>
+
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">pbtk rag delete</span>
+      <span class="opt"> --id</span> <span class="val">3f2a9c1e5b7d4e8fa0b1c2d3e4f5a6b7</span>
+    </div>
+
+    <table>
+      <thead><tr><th>Option</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--id</code></td><td>ID</td><td>required</td><td>Document ID, as 32 hex characters (case-insensitive).</td></tr>
+        <tr><td><code>--index</code></td><td>name</td><td><code>default</code></td><td>Name of the index. See <a href="#index-location">Index location</a>.</td></tr>
+        <tr><td><code>--index-path</code></td><td>path</td><td>&mdash;</td><td>Directory of the index. Overrides <code>--index</code> when given.</td></tr>
+        <tr><td><code>--format</code></td><td><code>text</code> or <code>json</code></td><td><code>text</code></td><td>Output format.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- INDEX LOCATION -->
+  <section id="index-location">
+    <h2>Index location</h2>
+    <p>
+      By default, an index named <code>default</code> is stored in <code>~/.pbtk/rag/default</code>.
+      <code>--index &lt;name&gt;</code> selects <code>~/.pbtk/rag/&lt;name&gt;</code>. Names must
+      start with a letter or digit, may contain letters, digits, dots, underscores and hyphens, and
+      are at most 64 characters long. An invalid name is an error.
+    </p>
+    <p>
+      <code>--index-path &lt;dir&gt;</code> stores the index in the given directory instead, and wins
+      over <code>--index</code> when both are given. An empty or unresolvable path is an error
+      (<code>Invalid index path '&lt;path&gt;'.</code>). If no <code>--index-path</code> is given and the home
+      directory cannot be determined, the command fails with
+      <code>Cannot determine the home directory; use --index-path.</code>
+    </p>
+    <p>
+      <code>ingest</code> and <code>delete</code> create the index directory if needed. Read actions
+      (<code>list</code>, <code>get</code> and <code>search</code>) never create it. On a missing or
+      empty index, <code>list</code> and <code>search</code> return no results, and <code>get</code>
+      reports that the document was not found.
+    </p>
+
+    <div class="info-box">
+      The index is a Lucene 4.8 index. Only one writer can change an index at a time. Readers never
+      wait for writers. Index locks are local to one machine, so an index on a network filesystem
+      shared between machines is not coordinated.
+    </div>
+  </section>
+
+  <!-- OUTPUT FORMATS -->
+  <section id="output-formats">
+    <h2>Output formats</h2>
+    <p>
+      <code>--format text</code> (the default) prints human-readable output. Its layout is not a
+      stable format, so use <code>--format json</code> when a program reads the output. Each JSON
+      call prints one object with camelCase field names. Errors are always plain text on stderr with
+      exit code 1, whatever <code>--format</code> is.
+    </p>
+
+    <h3>ingest</h3>
+<pre>{"id":"...","action":"created","title":"...","sourcePath":"...","chunkCount":0,"charCount":0}</pre>
+    <p><code>action</code> is <code>created</code> or <code>updated</code>.</p>
+
+    <h3>list</h3>
+<pre>{"index":"...","page":1,"pageSize":20,"total":0,"totalPages":0,
+ "documents":[{"id":"...","title":"...","fileName":"...","sourcePath":"...","createdUtc":"...",
+               "updatedUtc":"...","chunkCount":0,"charCount":0,"sha256":"..."}]}</pre>
+
+    <h3>get</h3>
+<pre>{"id":"...","title":"...","fileName":"...","sourcePath":"...","createdUtc":"...",
+ "updatedUtc":"...","chunkCount":0,"charCount":0,"sha256":"...",
+ "fromChunk":0,"toChunk":0,
+ "chunks":[{"index":0,"start":0,"end":0,"content":"..."}]}</pre>
+
+    <p><code>fromChunk</code> and <code>toChunk</code> are the range actually returned, after clamping; both are <code>null</code> when no chunks are returned.</p>
+
+    <h3>search</h3>
+<pre>{"query":"...","page":1,"pageSize":10,"total":0,"totalPages":0,
+ "results":[{"id":"...","title":"...","chunkIndex":0,"chunkCount":0,"score":0.0,"start":0,"end":0,"charCount":0,"content":"..."}]}</pre>
+
+    <h3>delete</h3>
+<pre>{"id":"...","deleted":true}</pre>
+
+    <p>
+      Timestamps use ISO-8601 round-trip format. <code>sha256</code> is the hash of the file bytes.
+      In search results, <code>chunkCount</code> and <code>charCount</code> describe the owning document. <code>start</code> and <code>end</code> are character offsets into the normalized text of the
+      document, as described in <a href="#chunking">Chunking</a>.
+    </p>
+  </section>
+
+  <!-- CHUNKING -->
+  <section id="chunking">
+    <h2>Chunking</h2>
+    <p>
+      Before chunking, <code>ingest</code> normalizes the text: line endings become <code>\n</code>,
+      runs of blank lines collapse into a single blank line, and leading and trailing whitespace is
+      removed. Paragraphs are separated by blank lines.
+    </p>
+    <ul>
+      <li>Whole paragraphs are packed greedily into chunks of at most <code>--chunk-size</code> characters.</li>
+      <li>A paragraph longer than <code>--chunk-size</code> is split at sentence ends first, then at spaces. A single word longer than the space left for text (<code>--chunk-size</code> minus <code>--chunk-overlap</code>) is split at that limit.</li>
+      <li>With <code>--chunk-overlap</code> above 0, each chunk after the first starts with up to that many characters of the preceding text, beginning at a word boundary. The overlap counts toward the chunk size, so no chunk, overlap included, is longer than <code>--chunk-size</code>.</li>
+    </ul>
+    <p>
+      Without overlap, the chunks cover all of the document's non-whitespace text exactly once and in
+      order. Each chunk's <code>start</code> and <code>end</code> give its position in the normalized text.
+    </p>
+
+    <div class="info-box">
+      <strong>File limits:</strong> the file must exist and be 50 MB or smaller. It is decoded as UTF-8,
+      and a byte-order mark is honoured. A file containing a NUL character is rejected as not a plain
+      text file, and a file with no non-whitespace text is rejected as containing no text. All of these
+      are errors that leave the index unchanged.
+    </div>
+  </section>
+
+  <!-- SEARCH BEHAVIOUR -->
+  <section id="search-behaviour">
+    <h2>Search behaviour</h2>
+    <p>
+      Chunk text and document titles are analysed identically when indexed and when searched:
+      the text is split into words, possessives (<code>badger's</code>) lose the <code>'s</code>, words are
+      lower-cased, stop words are dropped, and the rest are reduced to their English stem with the Porter
+      stemmer. So <code>numbers</code> matches <code>number</code> and <code>line-number</code>, and
+      <code>steganography?</code> finds the same chunks as <code>steganography</code>.
+    </p>
+    <ul>
+      <li><strong>Any term matches.</strong> Each distinct term is optional; chunks matching more terms, and rarer terms, score higher under BM25 (k1 1.2, b 0.75).</li>
+      <li><strong>Title matches count.</strong> A term found only in a document's title matches every chunk of that document.</li>
+      <li><strong>Chunks only.</strong> Header documents are never returned.</li>
+      <li><strong>Negations are kept.</strong> <code>no</code>, <code>nor</code> and <code>not</code> are searchable words.</li>
+    </ul>
+    <p>The stop words are the NLTK English list without the negations <code>no</code>, <code>nor</code> and <code>not</code>:</p>
+    <pre>i, me, my, myself, we, our, ours, ourselves, you, you're, you've, you'll, you'd, your, yours, yourself, yourselves, he, him, his, himself, she, she's, her, hers, herself, it, it's, its, itself, they, them, their, theirs, themselves, what, which, who, whom, this, that, that'll, these, those, am, is, are, was, were, be, been, being, have, has, had, having, do, does, did, doing, a, an, the, and, but, if, or, because, as, until, while, of, at, by, for, with, about, against, between, into, through, during, before, after, above, below, to, from, up, down, in, out, on, off, over, under, again, further, then, once, here, there, when, where, why, how, all, any, both, each, few, more, most, other, some, such, only, own, same, so, than, too, very, s, t, can, will, just, don, don't, should, should've, now, d, ll, m, o, re, ve, y, ain, aren, aren't, couldn, couldn't, didn, didn't, doesn, doesn't, hadn, hadn't, hasn, hasn't, haven, haven't, isn, isn't, ma, mightn, mightn't, mustn, mustn't, needn, needn't, shan, shan't, shouldn, shouldn't, wasn, wasn't, weren, weren't, won, won't, wouldn, wouldn't</pre>
+
+    <div class="info-box">
+      <strong>Index version:</strong> every commit records <code>rag_schema=2</code>. An index built by an
+      earlier pbtk version lacks it, and every action then exits 1 with
+      <code>Index '&lt;path&gt;' was built by an older pbtk version; delete it and re-ingest.</code>
+    </div>
+  </section>
+
+  <!-- MCP TOOLS -->
+  <section id="mcp-tools">
+    <h2>MCP tools</h2>
+    <p>
+      All five actions are exposed as MCP tools:
+      <code>rag_ingest</code>, <code>rag_list</code>, <code>rag_get</code>, <code>rag_search</code>
+      and <code>rag_delete</code>. Their options match the command line. See
+      <a href="mcp.html">mcp</a> for how to serve and save profiles.
+    </p>
+  </section>
+
+  <!-- COMMAND REFERENCE -->
+  <section id="command-ref">
+    <h2>Command Reference</h2>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Command</th>
+          <th>Required options</th>
+          <th>Optional options</th>
+          <th>Output</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>rag ingest</code></td>
+          <td><code>--file</code></td>
+          <td><code>--id</code>, <code>--title</code>, <code>--chunk-size</code>, <code>--chunk-overlap</code>, <code>--index</code>, <code>--index-path</code>, <code>--format</code></td>
+          <td>New or updated document ID, or JSON summary</td>
+        </tr>
+        <tr>
+          <td><code>rag list</code></td>
+          <td>&mdash;</td>
+          <td><code>--page</code>, <code>--page-size</code>, <code>--index</code>, <code>--index-path</code>, <code>--format</code></td>
+          <td>Page of documents with totals</td>
+        </tr>
+        <tr>
+          <td><code>rag get</code></td>
+          <td><code>--id</code></td>
+          <td><code>--from-chunk</code>, <code>--to-chunk</code>, <code>--index</code>, <code>--index-path</code>, <code>--format</code></td>
+          <td>Document header and chunks</td>
+        </tr>
+        <tr>
+          <td><code>rag search</code></td>
+          <td><code>--query</code></td>
+          <td><code>--page</code>, <code>--page-size</code>, <code>--index</code>, <code>--index-path</code>, <code>--format</code></td>
+          <td>Page of matching chunks</td>
+        </tr>
+        <tr>
+          <td><code>rag delete</code></td>
+          <td><code>--id</code></td>
+          <td><code>--index</code>, <code>--index-path</code>, <code>--format</code></td>
+          <td>Confirmation of deletion</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+</div>
+
+<footer>
+  Pixelbadger Toolkit &mdash; RAG Documentation
+</footer>
+
+</body>
+</html>

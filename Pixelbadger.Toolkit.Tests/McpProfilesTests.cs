@@ -6,11 +6,11 @@ namespace Pixelbadger.Toolkit.Tests;
 public class McpProfilesTests
 {
     [Fact]
-    public void BuiltInDefault_ShouldBeInterpretersTopic_WhenRead()
+    public void BuiltInDefault_ShouldBeInterpretersAndRagTopics_WhenRead()
     {
         var p = McpProfiles.BuiltInDefault;
         p.Name.Should().Be("default");
-        p.Include.Should().Equal("interpreters");
+        p.Include.Should().Equal("interpreters", "rag");
         p.Host.Should().BeNull();
         p.Port.Should().BeNull();
         McpProfiles.DefaultName.Should().Be("default");

@@ -56,7 +56,7 @@
     <h2>serve</h2>
     <p>
       Serves a profile at <code>/mcp</code>. Without <code>--profile</code> it serves the <code>default</code> profile,
-      which is the whole <code>interpreters</code> topic unless you save a profile named <code>default</code>. The server
+      which is the whole <code>interpreters</code> and <code>rag</code> topics unless you save a profile named <code>default</code>. The server
       prints its URL and tool list at startup, then runs until it is stopped.
     </p>
 
@@ -64,7 +64,7 @@
       <span class="prompt">$ </span><span class="cmd">pbtk mcp serve</span>
     </div>
     <pre style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:1rem;overflow-x:auto;font-size:0.85rem;line-height:1.6;color:#e2e8f0;">Serving MCP profile 'default' on http://127.0.0.1:5100/mcp
-Tools: interpreters_brainfuck, interpreters_ook, interpreters_bf-to-ook</pre>
+Tools: interpreters_brainfuck, interpreters_ook, interpreters_bf-to-ook, rag_ingest, rag_list, rag_get, rag_search, rag_delete</pre>
 
     <p>To serve a saved profile on another port:</p>
     <div class="cmd-block">
@@ -171,7 +171,7 @@ Tools: interpreters_brainfuck, interpreters_ook, interpreters_bf-to-ook</pre>
       <span class="prompt">$ </span><span class="cmd">pbtk mcp list</span>
     </div>
     <pre style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:1rem;overflow-x:auto;font-size:0.85rem;line-height:1.6;color:#e2e8f0;">default (built-in)
-  include: interpreters
+  include: interpreters, rag
   host: (default)
   port: (default)
 
@@ -198,8 +198,9 @@ text-tools
 
     <h3>The built-in default</h3>
     <p>
-      With no saved <code>default</code> profile, the built-in profile is <code>interpreters</code>, which exposes
-      <code>interpreters_brainfuck</code>, <code>interpreters_ook</code> and <code>interpreters_bf-to-ook</code>.
+      With no saved <code>default</code> profile, the built-in profile is <code>interpreters</code> plus <code>rag</code>, which exposes
+      <code>interpreters_brainfuck</code>, <code>interpreters_ook</code>, <code>interpreters_bf-to-ook</code>, <code>rag_ingest</code>,
+      <code>rag_list</code>, <code>rag_get</code>, <code>rag_search</code> and <code>rag_delete</code>.
     </p>
 
     <h3>Overriding the default</h3>

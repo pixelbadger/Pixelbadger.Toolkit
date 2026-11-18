@@ -25,6 +25,7 @@ public static class ToolkitCommandTree
         root.Add(DemosceneCommand.Create());
         root.Add(GptCommand.Create());
         root.Add(AudioCommand.Create());
+        root.Add(RagCommand.Create());
         root.Add(McpCommand.Create(store));
         // Further topics are registered above this line, before the config topic.
 

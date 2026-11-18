@@ -15,7 +15,7 @@ public static class McpProfiles
     private static readonly Regex NamePattern = new("^[a-z0-9-]+$", RegexOptions.Compiled);
 
     /// <summary>The profile used when none is named and none is saved as "default".</summary>
-    public static McpProfile BuiltInDefault => new(DefaultName, ["interpreters"], null, null);
+    public static McpProfile BuiltInDefault => new(DefaultName, ["interpreters", "rag"], null, null);
 
     public static bool IsValidName(string? name) =>
         name is not null && NamePattern.IsMatch(name) && !name.EndsWith('\n');
