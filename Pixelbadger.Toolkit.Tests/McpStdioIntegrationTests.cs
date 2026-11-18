@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using FluentAssertions;
 
 namespace Pixelbadger.Toolkit.Tests;
@@ -86,6 +87,34 @@ public class McpStdioIntegrationTests : IDisposable
         call.GetProperty("content")[0].GetProperty("text").GetString().Should().Be("Hello World!");
         stderr.Should().Contain("Serving MCP profile 'default' over stdio");
         stderr.Should().MatchRegex(@"tool interpreters_brainfuck exit 0 \d+ms");
+    }
+
+    [Fact]
+    public async Task Serve_ShouldAnswerSlowCallsBeforeExit_WhenStdinClosesImmediatelyAfterRequests()
+    {
+        // ~255^3 loop iterations: runs well past the old 300 ms EOF grace period.
+        var file = Path.Combine(_dir, "slow.bf");
+        await File.WriteAllTextAsync(file, "-[>-[>-[>+<-]<-]<-]>>>.");
+        var requests = new object[]
+        {
+            new { jsonrpc = "2.0", id = 1, method = "initialize", @params = new { protocolVersion = "2025-06-18", capabilities = new { }, clientInfo = new { name = "t", version = "1" } } },
+            new { jsonrpc = "2.0", method = "notifications/initialized" },
+            new { jsonrpc = "2.0", id = 2, method = "tools/call", @params = new { name = "interpreters_brainfuck", arguments = new { file } } },
+            new { jsonrpc = "2.0", id = 3, method = "tools/call", @params = new { name = "interpreters_brainfuck", arguments = new { file } } },
+            new { jsonrpc = "2.0", id = 4, method = "tools/call", @params = new { name = "interpreters_brainfuck", arguments = new { file } } }
+        };
+        var input = string.Concat(requests.Select(r => JsonSerializer.Serialize(r) + "\n"));
+
+        var watch = Stopwatch.StartNew();
+        var (code, stdout, stderr) = await RunAsync(input, "mcp", "serve", "--stdio");
+        watch.Stop();
+
+        code.Should().Be(0);
+        var messages = stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(l => JsonDocument.Parse(l).RootElement).ToList();
+        var answered = messages.Where(m => m.TryGetProperty("id", out _)).Select(m => m.GetProperty("id").GetInt32()).Order().ToList();
+        answered.Should().Equal(1, 2, 3, 4);
+        Regex.Matches(stderr, @"tool interpreters_brainfuck exit 0 (\d+)ms").Select(m => long.Parse(m.Groups[1].Value))
+            .Should().HaveCount(3).And.OnlyContain(ms => ms > 400, "each call must outlast the former 300 ms grace");
     }
 
     [Theory]
