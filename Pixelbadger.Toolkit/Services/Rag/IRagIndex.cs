@@ -8,5 +8,7 @@ public interface IRagIndex
     RagPage<RagDocumentHeader> List(int page, int pageSize);
     RagPage<RagSearchHit> Search(string query, int page, int pageSize);
     void Upsert(RagDocument document, CancellationToken ct = default);
+    /// <summary>Replaces an existing document under the write lock, keeping its CreatedUtc. Returns the stored header, or null when the ID is not in the index.</summary>
+    RagDocumentHeader? Replace(RagDocument document, CancellationToken ct = default);
     bool Delete(string id, CancellationToken ct = default);
 }

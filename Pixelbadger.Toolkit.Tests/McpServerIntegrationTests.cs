@@ -122,11 +122,11 @@ public class McpServerIntegrationTests : IDisposable
         response.Headers.Contains("Mcp-Session-Id").Should().BeFalse();
         body.GetProperty("result").GetProperty("serverInfo").GetProperty("name").GetString().Should().Be("pbtk");
         server.Stdout.Should().Contain($"Serving MCP profile 'default' on http://127.0.0.1:{server.Port}/mcp");
-        server.Stdout.Should().Contain("Tools: interpreters_brainfuck, interpreters_ook, interpreters_bf-to-ook");
+        server.Stdout.Should().Contain("Tools: interpreters_brainfuck, interpreters_ook, interpreters_bf-to-ook, rag_ingest, rag_list, rag_get, rag_search, rag_delete");
     }
 
     [Fact]
-    public async Task Serve_ShouldListExactlyDefaultProfileTools_WhenToolsListRequested()
+    public async Task Serve_ShouldListInterpretersAndFiveRagTools_WhenBareServeHasNoSavedDefault()
     {
         using var server = await StartAsync();
 
@@ -134,8 +134,11 @@ public class McpServerIntegrationTests : IDisposable
 
         var tools = body.GetProperty("result").GetProperty("tools").EnumerateArray().ToList();
         tools.Select(t => t.GetProperty("name").GetString()).Should()
-            .Equal("interpreters_brainfuck", "interpreters_ook", "interpreters_bf-to-ook");
+            .Equal("interpreters_brainfuck", "interpreters_ook", "interpreters_bf-to-ook", "rag_ingest", "rag_list", "rag_get", "rag_search", "rag_delete");
         tools[0].GetProperty("inputSchema").GetProperty("required")[0].GetString().Should().Be("file");
+        var ingest = tools.Single(t => t.GetProperty("name").GetString() == "rag_ingest").GetProperty("inputSchema");
+        ingest.GetProperty("required")[0].GetString().Should().Be("file");
+        ingest.GetProperty("properties").GetProperty("chunk-size").GetProperty("type").GetString().Should().Be("integer");
     }
 
     [Fact]

@@ -49,16 +49,24 @@ public sealed class RagIngestComponent(IRagIndex index, ITextChunker chunker, Ti
         }
         else
         {
-            var existing = index.GetHeader(id);
-            if (existing is null) return RagOutputRenderer.WriteError($"Document '{id}' not found.");
-            created = existing.CreatedUtc;
+            if (index.GetHeader(id) is null) return RagOutputRenderer.WriteError($"Document '{id}' not found.");
             action = "updated";
         }
 
         var fileName = Path.GetFileName(info.FullName);
         var header = new RagDocumentHeader(id, options.Title ?? fileName, fileName, Path.GetFullPath(options.File), created, now,
             chunking.Chunks.Count, chunking.NormalizedText.Length, sha256, options.ChunkSize, options.ChunkOverlap);
-        index.Upsert(new RagDocument(header, chunking.Chunks), cancellationToken);
+        var document = new RagDocument(header, chunking.Chunks);
+        if (action == "updated")
+        {
+            var stored = index.Replace(document, cancellationToken);
+            if (stored is null) return RagOutputRenderer.WriteError($"Document '{id}' not found.");
+            header = stored;
+        }
+        else
+        {
+            index.Upsert(document, cancellationToken);
+        }
         RagOutputRenderer.RenderIngest(options.Format, action, header);
         return 0;
     });

@@ -231,7 +231,10 @@
     </p>
     <p>
       <code>--index-path &lt;dir&gt;</code> stores the index in the given directory instead, and wins
-      over <code>--index</code> when both are given.
+      over <code>--index</code> when both are given. An empty or unresolvable path is an error
+      (<code>Invalid index path '&lt;path&gt;'.</code>). If no <code>--index-path</code> is given and the home
+      directory cannot be determined, the command fails with
+      <code>Cannot determine the home directory; use --index-path.</code>
     </p>
     <p>
       <code>ingest</code> and <code>delete</code> create the index directory if needed. Read actions
@@ -295,7 +298,7 @@
     </p>
     <ul>
       <li>Whole paragraphs are packed greedily into chunks of at most <code>--chunk-size</code> characters.</li>
-      <li>A paragraph longer than <code>--chunk-size</code> is split at sentence ends first, then at spaces. A single word longer than the chunk size is split at the character limit.</li>
+      <li>A paragraph longer than <code>--chunk-size</code> is split at sentence ends first, then at spaces. A single word longer than the space left for text (<code>--chunk-size</code> minus <code>--chunk-overlap</code>) is split at that limit.</li>
       <li>With <code>--chunk-overlap</code> above 0, each chunk after the first starts with up to that many characters of the preceding text, beginning at a word boundary. The overlap counts toward the chunk size, so no chunk, overlap included, is longer than <code>--chunk-size</code>.</li>
     </ul>
     <p>

@@ -38,7 +38,7 @@ public class McpServeComponentTests : IDisposable
         settings!.ProfileName.Should().Be("default");
         settings.Host.Should().Be("127.0.0.1");
         settings.Port.Should().Be(5100);
-        settings.Tools.Select(t => t.Name).Should().Equal("interpreters_brainfuck", "interpreters_ook", "interpreters_bf-to-ook");
+        settings.Tools.Select(t => t.Name).Should().Equal("interpreters_brainfuck", "interpreters_ook", "interpreters_bf-to-ook", "rag_ingest", "rag_list", "rag_get", "rag_search", "rag_delete");
     }
 
     [Theory]
@@ -76,7 +76,7 @@ public class McpServeComponentTests : IDisposable
         code.Should().Be(0);
         output.ToString().Replace("\r\n", "\n").Should().Be(
             "Serving MCP profile 'default' on http://[::1]:5111/mcp\n" +
-            "Tools: interpreters_brainfuck, interpreters_ook, interpreters_bf-to-ook\n");
+            "Tools: interpreters_brainfuck, interpreters_ook, interpreters_bf-to-ook, rag_ingest, rag_list, rag_get, rag_search, rag_delete\n");
         error.ToString().Should().BeEmpty();
     }
 

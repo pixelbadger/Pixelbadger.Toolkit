@@ -12,7 +12,7 @@ public class RagIndexLocatorTests
     public void Resolve_ShouldUseDefaultName_WhenNothingGiven()
     {
         RagIndexLocator.Resolve(null, null, _home).Should().Be(Path.Combine(_home, ".pbtk", "rag", "default"));
-        RagIndexLocator.Resolve("", "", _home).Should().Be(Path.Combine(_home, ".pbtk", "rag", "default"));
+        RagIndexLocator.Resolve("", null, _home).Should().Be(Path.Combine(_home, ".pbtk", "rag", "default"));
     }
 
     [Fact]
@@ -62,5 +62,42 @@ public class RagIndexLocatorTests
         RagIndexLocator.Resolve(new string('a', 64), null, _home).Should().EndWith(new string('a', 64));
         var act = () => RagIndexLocator.Resolve(new string('a', 65), null, _home);
         act.Should().Throw<ArgumentException>();
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("\t")]
+    public void Resolve_ShouldThrowPathException_WhenIndexPathEmptyOrWhitespace(string path)
+    {
+        var act = () => RagIndexLocator.Resolve("foo", path, _home);
+        act.Should().Throw<RagIndexPathException>().WithMessage($"Invalid index path '{path}'.");
+    }
+
+    [Fact]
+    public void Resolve_ShouldThrowPathException_WhenPathCannotBeResolved()
+    {
+        var act = () => RagIndexLocator.Resolve(null, "bad\0path", _home);
+        act.Should().Throw<RagIndexPathException>().WithMessage("Invalid index path 'bad\0path'.");
+    }
+
+    [Fact]
+    public void Resolve_ShouldThrowPathException_WhenHomeDirectoryEmpty()
+    {
+        var act = () => RagIndexLocator.Resolve("foo", null, "");
+        act.Should().Throw<RagIndexPathException>().WithMessage("Cannot determine the home directory; use --index-path.");
+    }
+
+    [Fact]
+    public void Resolve_ShouldNotRequireHome_WhenIndexPathGiven()
+    {
+        RagIndexLocator.Resolve(null, "x/idx", "").Should().Be(Path.GetFullPath("x/idx"));
+    }
+
+    [Fact]
+    public void Resolve_ShouldThrowNameExceptionNotPathException_WhenNameInvalid()
+    {
+        var act = () => RagIndexLocator.Resolve("a/b", null, _home);
+        act.Should().Throw<ArgumentException>().Which.Should().NotBeOfType<RagIndexPathException>();
     }
 }

@@ -81,6 +81,34 @@ public class RagCommandTests : IDisposable
         result.Err.Should().Be($"Error: Invalid index name '{name}'.{Environment.NewLine}");
     }
 
+    [Theory]
+    [InlineData("   ")]
+    [InlineData("")]
+    public async Task Run_ShouldExit1WithPathMessage_WhenIndexPathBlank(string path)
+    {
+        var result = await Run("rag", "list", "--index-path", path);
+
+        result.Code.Should().Be(1);
+        result.Err.Should().Be($"Error: Invalid index path '{path}'.{Environment.NewLine}");
+    }
+
+    [Fact]
+    public async Task Run_ShouldExit1WithPathMessage_WhenIndexPathCannotBeResolved()
+    {
+        var result = await Run("rag", "get", "--id", new string('a', 32), "--index-path", "bad\0path");
+
+        result.Code.Should().Be(1);
+        result.Err.Should().Contain("Invalid index path 'bad").And.NotContain("Invalid index name");
+    }
+
+    [Fact]
+    public async Task Run_ShouldNotReportPathError_WhenIndexPathAbsent()
+    {
+        var result = await Run("rag", "list", "--index", "bad name");
+
+        result.Err.Should().Contain("Invalid index name 'bad name'.").And.NotContain("Invalid index path");
+    }
+
     [Fact]
     public async Task Run_ShouldPreferIndexPathOverInvalidIndexName_WhenBothGiven()
     {

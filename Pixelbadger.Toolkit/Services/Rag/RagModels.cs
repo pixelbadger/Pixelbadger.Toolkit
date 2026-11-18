@@ -24,3 +24,10 @@ public sealed class RagIndexLockedException : Exception
 {
     public RagIndexLockedException(string message) : base(message) { }
 }
+
+/// <summary>The index path is unusable, or no home directory exists to place a named index in.</summary>
+public sealed class RagIndexPathException : Exception
+{
+    public RagIndexPathException(string message) : base(message) { }
+    public RagIndexPathException(string message, Exception inner) : base(message, inner) { }
+}

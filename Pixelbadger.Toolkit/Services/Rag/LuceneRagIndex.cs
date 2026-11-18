@@ -142,28 +142,32 @@ public sealed class LuceneRagIndex : IRagIndex
     public void Upsert(RagDocument document, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(document);
-        using var dir = FSDirectory.Open(IndexPath);
-        using var analyzer = CreateAnalyzer();
-        var writer = OpenWriter(dir, analyzer, ct);
-        try
+        WithWriter<object?>(ct, writer =>
         {
-            var id = document.Header.Id;
-            writer.DeleteDocuments(new Term("doc_id", id));
-            writer.AddDocument(BuildHeaderDocument(document.Header));
-            foreach (var chunk in document.Chunks)
+            ReplaceDocuments(writer, document, document.Header, ct);
+            return (true, null);
+        });
+    }
+
+    public RagDocumentHeader? Replace(RagDocument document, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        if (!IndexExists()) return null;
+        return WithWriter<RagDocumentHeader?>(ct, writer =>
+        {
+            // Checked under the write lock so a concurrent delete cannot be undone by this update.
+            RagDocumentHeader existing;
+            using (var reader = DirectoryReader.Open(writer, true))
             {
-                ct.ThrowIfCancellationRequested();
-                writer.AddDocument(BuildChunkDocument(document.Header, chunk));
+                var searcher = new IndexSearcher(reader);
+                var hit = FindHeader(searcher, document.Header.Id);
+                if (hit is null) return (false, null);
+                existing = ToHeader(searcher.Doc(hit.Value));
             }
-            ct.ThrowIfCancellationRequested();
-            writer.Commit();
-        }
-        catch
-        {
-            writer.Rollback();
-            throw;
-        }
-        writer.Dispose();
+            var stored = document.Header with { CreatedUtc = existing.CreatedUtc };
+            ReplaceDocuments(writer, document, stored, ct);
+            return (true, stored);
+        });
     }
 
     public bool Delete(string id, CancellationToken ct = default)
@@ -171,33 +175,81 @@ public sealed class LuceneRagIndex : IRagIndex
         ArgumentNullException.ThrowIfNull(id);
         if (!IndexExists()) return false;
 
-        using var dir = FSDirectory.Open(IndexPath);
-        using var analyzer = CreateAnalyzer();
-        var writer = OpenWriter(dir, analyzer, ct);
-        try
+        return WithWriter(ct, writer =>
         {
             // Checked under the write lock so concurrent writers cannot race the existence test.
             using (var reader = DirectoryReader.Open(writer, true))
             {
                 var searcher = new IndexSearcher(reader);
-                if (FindHeader(searcher, id) is null)
-                {
-                    writer.Rollback();
-                    return false;
-                }
+                if (FindHeader(searcher, id) is null) return (false, false);
             }
             writer.DeleteDocuments(new Term("doc_id", id));
             ct.ThrowIfCancellationRequested();
+            return (true, true);
+        });
+    }
+
+    private static void ReplaceDocuments(IndexWriter writer, RagDocument document, RagDocumentHeader header, CancellationToken ct)
+    {
+        writer.DeleteDocuments(new Term("doc_id", header.Id));
+        writer.AddDocument(BuildHeaderDocument(header));
+        foreach (var chunk in document.Chunks)
+        {
+            ct.ThrowIfCancellationRequested();
+            writer.AddDocument(BuildChunkDocument(header, chunk));
+        }
+        ct.ThrowIfCancellationRequested();
+    }
+
+    /// <summary>
+    /// Opens the writer under the write lock, runs <paramref name="work"/> and commits when it asks to. The writer is
+    /// closed on every path: a failure before the commit, or while closing, rolls back so the lock is never left held.
+    /// </summary>
+    private T WithWriter<T>(CancellationToken ct, Func<IndexWriter, (bool Commit, T Result)> work)
+    {
+        using var dir = FSDirectory.Open(IndexPath);
+        using var analyzer = CreateAnalyzer();
+        var writer = OpenWriter(dir, analyzer, ct);
+        T result;
+        try
+        {
+            var outcome = work(writer);
+            if (!outcome.Commit)
+            {
+                writer.Rollback();
+                return outcome.Result;
+            }
+            FaultHook?.Invoke("beforeCommit");
             writer.Commit();
+            result = outcome.Result;
         }
         catch
         {
-            writer.Rollback();
+            SafeRollback(writer);
             throw;
         }
-        writer.Dispose();
-        return true;
+
+        try
+        {
+            FaultHook?.Invoke("beforeClose");
+            writer.Dispose();
+        }
+        catch
+        {
+            SafeRollback(writer);
+            throw;
+        }
+        return result;
     }
+
+    private static void SafeRollback(IndexWriter writer)
+    {
+        try { writer.Rollback(); }
+        catch { /* the original failure is the one to surface */ }
+    }
+
+    /// <summary>Test seam: invoked with "beforeCommit" and "beforeClose" while a writer session runs.</summary>
+    internal Action<string>? FaultHook { get; set; }
 
     // ---- infrastructure ----
 

@@ -107,7 +107,7 @@ public class LuceneRagIndexTests : IDisposable
     }
 
     [Fact]
-    public void Upsert_ShouldThrowAndLeaveIndexUnchanged_WhenCancelled()
+    public void Upsert_ShouldThrowAndLeaveIndexUnchanged_WhenCancelledBeforeWriterOpens()
     {
         var original = Add("persistent text");
         using var cts = new CancellationTokenSource();
@@ -115,6 +115,136 @@ public class LuceneRagIndexTests : IDisposable
         var act = () => _index.Upsert(MakeDoc("other", id: original.Header.Id), cts.Token);
         act.Should().Throw<OperationCanceledException>();
         _index.Get(original.Header.Id)!.Chunks.Should().Equal(original.Chunks);
+    }
+
+    private sealed class CancellingChunks(IReadOnlyList<TextChunk> inner, CancellationTokenSource cts, int cancelAtIndex) : IReadOnlyList<TextChunk>
+    {
+        public int Count => inner.Count;
+        public TextChunk this[int index] => inner[index];
+        public IEnumerator<TextChunk> GetEnumerator()
+        {
+            for (var i = 0; i < inner.Count; i++)
+            {
+                if (i == cancelAtIndex) cts.Cancel();
+                yield return inner[i];
+            }
+        }
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+    }
+
+    [Fact]
+    public void Upsert_ShouldRollBackAndReleaseLock_WhenCancelledAfterDeleteAndFirstChunkAdded()
+    {
+        var original = Add("old persistent text about badgers " + new string('q', 300) + "\n\n" + new string('r', 300));
+        var replacement = MakeDoc(string.Join("\n\n", Enumerable.Range(0, 6).Select(i => $"fresh{i} " + new string('n', 80))), id: original.Header.Id);
+        replacement.Chunks.Count.Should().BeGreaterThan(2);
+        using var cts = new CancellationTokenSource();
+        var cancelling = new RagDocument(replacement.Header, new CancellingChunks(replacement.Chunks, cts, 1));
+
+        var act = () => _index.Upsert(cancelling, cts.Token);
+
+        act.Should().Throw<OperationCanceledException>();
+        var got = _index.Get(original.Header.Id)!;
+        got.Header.Should().Be(original.Header);
+        got.Chunks.Should().Equal(original.Chunks);
+        _index.Search("badgers", 1, 10).Total.Should().Be(1);
+        _index.Search("fresh0", 1, 10).Total.Should().Be(0);
+        _index.List(1, 10).Total.Should().Be(1);
+        _index.Upsert(MakeDoc("later write"));
+        _index.List(1, 10).Total.Should().Be(2);
+    }
+
+    [Fact]
+    public void Upsert_ShouldSurfaceFailureAndReleaseLock_WhenCommitFails()
+    {
+        var original = Add("persistent text");
+        var thrown = false;
+        _index.FaultHook = stage =>
+        {
+            if (stage != "beforeCommit" || thrown) return;
+            thrown = true;
+            throw new IOException("injected commit failure");
+        };
+
+        var act = () => _index.Upsert(MakeDoc("replacement", id: original.Header.Id));
+
+        act.Should().Throw<IOException>().WithMessage("injected commit failure");
+        _index.Get(original.Header.Id)!.Chunks.Should().Equal(original.Chunks);
+        _index.Upsert(MakeDoc("next"));
+        _index.List(1, 10).Total.Should().Be(2);
+    }
+
+    [Fact]
+    public void Upsert_ShouldSurfaceFailureAndReleaseLock_WhenWriterCloseFails()
+    {
+        var thrown = false;
+        _index.FaultHook = stage =>
+        {
+            if (stage != "beforeClose" || thrown) return;
+            thrown = true;
+            throw new IOException("injected close failure");
+        };
+
+        var act = () => _index.Upsert(MakeDoc("first"));
+
+        act.Should().Throw<IOException>().WithMessage("injected close failure");
+        _index.Upsert(MakeDoc("second"));
+        _index.List(1, 10).Total.Should().BeGreaterThanOrEqualTo(1);
+    }
+
+    [Fact]
+    public void Delete_ShouldSurfaceFailureAndReleaseLock_WhenWriterCloseFails()
+    {
+        var doc = Add("to delete");
+        var thrown = false;
+        _index.FaultHook = stage =>
+        {
+            if (stage != "beforeClose" || thrown) return;
+            thrown = true;
+            throw new IOException("injected close failure");
+        };
+
+        var act = () => _index.Delete(doc.Header.Id);
+
+        act.Should().Throw<IOException>();
+        _index.Upsert(MakeDoc("after"));
+        _index.List(1, 10).Total.Should().BeGreaterThanOrEqualTo(1);
+    }
+
+    [Fact]
+    public void Replace_ShouldReturnNullAndLeaveIndexUnchanged_WhenIdMissing()
+    {
+        var other = Add("bystander");
+
+        _index.Replace(MakeDoc("ghost", id: RagIds.NewId())).Should().BeNull();
+
+        _index.List(1, 10).Total.Should().Be(1);
+        _index.Get(other.Header.Id)!.Chunks.Should().Equal(other.Chunks);
+        _index.Upsert(MakeDoc("lock free"));
+    }
+
+    [Fact]
+    public void Replace_ShouldNotCreateIndexDirectory_WhenIndexMissing()
+    {
+        _index.Replace(MakeDoc("ghost")).Should().BeNull();
+
+        Directory.Exists(_path).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Replace_ShouldKeepStoredCreatedUtc_WhenIncomingHeaderCarriesAnotherValue()
+    {
+        var original = MakeDoc("old words " + new string('o', 150), title: "Old", created: T0, updated: T0);
+        _index.Upsert(original);
+        var incoming = MakeDoc("brand new words", id: original.Header.Id, title: "New", created: T0.AddDays(30), updated: T0.AddDays(31));
+
+        var stored = _index.Replace(incoming);
+
+        stored.Should().Be(incoming.Header with { CreatedUtc = T0 });
+        _index.GetHeader(original.Header.Id).Should().Be(stored);
+        _index.Get(original.Header.Id)!.Chunks.Should().Equal(incoming.Chunks);
+        _index.Search("old", 1, 10).Total.Should().Be(0);
+        _index.List(1, 10).Total.Should().Be(1);
     }
 
     [Fact]
@@ -331,11 +461,13 @@ public class LuceneRagIndexTests : IDisposable
     [Fact]
     public void Search_ShouldOrderByScoreDescending_WhenHitsDiffer()
     {
-        Add("lucene");
+        var best = Add("lucene");
         Add("lucene lucene lucene and filler words around here to dilute the field norms a lot more");
         Add("something with lucene appearing once among many many other tokens in this chunk of text");
-        var scores = _index.Search("lucene", 1, 10).Items.Select(h => h.Score).ToList();
-        scores.Should().HaveCount(3).And.BeInDescendingOrder();
+        var items = _index.Search("lucene", 1, 10).Items;
+        items.Select(h => h.Score).Should().HaveCount(3).And.BeInDescendingOrder();
+        items[0].Id.Should().Be(best.Header.Id);
+        items[0].Score.Should().BeGreaterThan(items[1].Score);
     }
 
     [Theory]
@@ -386,7 +518,7 @@ public class LuceneRagIndexTests : IDisposable
     }
 
     [Fact]
-    public void Upsert_ShouldSucceed_WhenLockReleasedWithinTimeout()
+    public async Task Upsert_ShouldSucceed_WhenLockReleasedWithinTimeout()
     {
         Add("seed");
         var longIndex = new LuceneRagIndex(_path, TimeSpan.FromSeconds(10));
@@ -401,7 +533,7 @@ public class LuceneRagIndexTests : IDisposable
             dir.Dispose();
         });
         longIndex.Upsert(MakeDoc("after release"));
-        releaser.Wait();
+        await releaser;
         longIndex.List(1, 10).Total.Should().Be(2);
     }
 
@@ -418,6 +550,23 @@ public class LuceneRagIndexTests : IDisposable
         var act = () => longIndex.Upsert(MakeDoc("x"), cts.Token);
         act.Should().Throw<OperationCanceledException>();
         sw.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public async Task Upsert_ShouldStoreBothDocuments_WhenTwoInstancesWriteConcurrently()
+    {
+        var a = new LuceneRagIndex(_path, TimeSpan.FromSeconds(5));
+        var b = new LuceneRagIndex(_path, TimeSpan.FromSeconds(5));
+        string Text(string tag) => string.Join("\n\n", Enumerable.Range(0, 8).Select(i => $"{tag}{i} " + new string('w', 70)));
+        var docA = MakeDoc(Text("alpha"), title: "A");
+        var docB = MakeDoc(Text("beta"), title: "B");
+        docA.Chunks.Count.Should().BeGreaterThan(2);
+
+        await Task.WhenAll(Task.Run(() => a.Upsert(docA)), Task.Run(() => b.Upsert(docB)));
+
+        _index.List(1, 10).Items.Select(h => h.Id).Should().BeEquivalentTo([docA.Header.Id, docB.Header.Id]);
+        _index.Get(docA.Header.Id)!.Chunks.Should().Equal(docA.Chunks);
+        _index.Get(docB.Header.Id)!.Chunks.Should().Equal(docB.Chunks);
     }
 
     [Fact]

@@ -40,6 +40,10 @@ public static class RagCommand
         {
             path = RagIndexLocator.Resolve(name, parseResult.GetValue(common.IndexPath));
         }
+        catch (RagIndexPathException ex)
+        {
+            return RagOutputRenderer.WriteError(ex.Message);
+        }
         catch (ArgumentException)
         {
             return RagOutputRenderer.WriteError($"Invalid index name '{name}'.");

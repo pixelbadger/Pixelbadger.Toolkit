@@ -85,6 +85,6 @@ public class McpDeleteComponentTests : IDisposable
         overridden.Should().NotContain("(built-in)").And.Contain("include: strings/reverse");
         code.Should().Be(0);
         Lines(output).Should().Equal("Deleted MCP profile 'default'", "Built-in default profile restored.");
-        Lines(restored).Should().Equal("default (built-in)", "  include: interpreters", "  host: (default)", "  port: (default)");
+        Lines(restored).Should().Equal("default (built-in)", "  include: interpreters, rag", "  host: (default)", "  port: (default)");
     }
 }
