@@ -10,7 +10,7 @@
 
 <header>
   <h1>MCP <span class="badge">mcp</span></h1>
-  <div class="subtitle">Serve a profile of toolkit commands as MCP tools over stateless HTTP, executed in-process</div>
+  <div class="subtitle">Serve a profile of toolkit commands as MCP tools over stateless HTTP or stdio, executed in-process</div>
   <div class="meta">Pixelbadger Toolkit &mdash; <code>pbtk mcp</code> &mdash; <a href="index.html" style="color:#60a5fa">&#8592; all topics</a></div>
 </header>
 
@@ -33,7 +33,7 @@
   <section id="overview">
     <h2>Overview</h2>
     <p>
-      The <code>mcp</code> topic serves a profile of toolkit commands as MCP tools over stateless HTTP. Each command in
+      The <code>mcp</code> topic serves a profile of toolkit commands as MCP tools over stateless HTTP or, with <code>--stdio</code>, over stdin and stdout. Each command in
       the profile becomes one tool. A tool call runs the command in the server process and returns its output as the
       tool result. A profile is a named list of topics, groups or actions, saved per user.
     </p>
@@ -84,6 +84,7 @@ Tools: interpreters_brainfuck, interpreters_ook, interpreters_bf-to-ook, rag_ing
         <tr><td><code>--profile</code></td><td>No</td><td>Profile to serve. Default: the <code>default</code> profile (the built-in one unless overridden)</td></tr>
         <tr><td><code>--host</code></td><td>No</td><td>Host to bind. Overrides the profile's host. Default <code>127.0.0.1</code></td></tr>
         <tr><td><code>--port</code></td><td>No</td><td>Port to bind. Overrides the profile's port. Default <code>5100</code></td></tr>
+        <tr><td><code>--stdio</code></td><td>No</td><td>Serve over stdin/stdout (newline-delimited JSON-RPC) instead of HTTP. Cannot be combined with <code>--host</code>, <code>--port</code> or <code>--allow-remote</code>; a saved profile's host and port are ignored</td></tr>
         <tr><td><code>--allow-remote</code></td><td>No</td><td>Required to bind a non-loopback host. Without it the server refuses to start</td></tr>
       </tbody>
     </table>
@@ -387,9 +388,18 @@ exit code: 1</pre>
     <div class="cmd-block">
       <span class="prompt">$ </span><span class="cmd">claude mcp add --transport http pbtk http://127.0.0.1:5100/mcp</span>
     </div>
+    <h3>stdio transport</h3>
+    <p>
+      With <code>--stdio</code> the server needs no long-running HTTP process: the client launches it and talks
+      newline-delimited JSON-RPC over its stdin and stdout. Only protocol messages go to stdout; the startup lines and
+      per-call log go to stderr. The server exits with code 0 when the client closes stdin.
+    </p>
+    <div class="cmd-block">
+      <span class="prompt">$ </span><span class="cmd">claude mcp add pbtk -- pbtk mcp serve --stdio</span>
+    </div>
     <div class="info-box">
       <code>pbtk config mcp serve --profile &lt;name&gt;</code> sets the profile that <code>serve</code> uses when you do not
-      pass <code>--profile</code>. <code>--host</code> and <code>--port</code> cannot be configured, and neither can the
+      pass <code>--profile</code>. <code>--host</code>, <code>--port</code> and <code>--stdio</code> cannot be configured, and neither can the
       options of <code>save</code> and <code>delete</code>.
     </div>
   </section>

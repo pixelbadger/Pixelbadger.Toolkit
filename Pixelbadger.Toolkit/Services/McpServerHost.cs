@@ -4,12 +4,13 @@ using System.Reflection;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Protocol;
 
 namespace Pixelbadger.Toolkit.Services;
 
-public sealed record McpServerSettings(string ProfileName, string Host, int Port, IReadOnlyList<McpToolDefinition> Tools);
+public sealed record McpServerSettings(string ProfileName, string Host, int Port, IReadOnlyList<McpToolDefinition> Tools, bool Stdio = false);
 
 public interface IMcpServerHost
 {
@@ -44,6 +45,12 @@ public sealed class McpServerHost(IMcpToolExecutor executor, TextWriter? callLog
 
     public async Task RunAsync(McpServerSettings settings, Action onStarted, CancellationToken cancellationToken)
     {
+        if (settings.Stdio)
+        {
+            await RunStdioAsync(settings, onStarted, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
         await using var app = Build(settings);
         await app.StartAsync(cancellationToken).ConfigureAwait(false);
         try
@@ -60,11 +67,40 @@ public sealed class McpServerHost(IMcpToolExecutor executor, TextWriter? callLog
         }
     }
 
-    internal WebApplication Build(McpServerSettings settings)
+    /// <summary>Serves over newline-delimited JSON-RPC on stdin/stdout; returns when stdin reaches EOF or cancellation is requested.</summary>
+    private async Task RunStdioAsync(McpServerSettings settings, Action onStarted, CancellationToken cancellationToken)
     {
-        var builder = WebApplication.CreateBuilder(new WebApplicationOptions { Args = [] });
+        var tracker = new JsonRpcExchangeTracker();
+        var builder = Host.CreateEmptyApplicationBuilder(new HostApplicationBuilderSettings { Args = [] });
         builder.Logging.ClearProviders();
+        ConfigureMcp(builder.Services.AddMcpServer(o => o.ServerInfo = ServerInfo()), settings).WithStreamServerTransport(
+            new DrainingInputStream(Console.OpenStandardInput(), tracker, McpToolExecutor.DefaultTimeout + TimeSpan.FromSeconds(5)),
+            new ResponseCountingOutputStream(Console.OpenStandardOutput(), tracker));
 
+        using var host = builder.Build();
+        await host.StartAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            onStarted();
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            try { await host.WaitForShutdownAsync(linked.Token).ConfigureAwait(false); }
+            catch (OperationCanceledException) { }
+        }
+        finally
+        {
+            using var grace = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            try { await host.StopAsync(grace.Token).ConfigureAwait(false); } catch (OperationCanceledException) { }
+        }
+    }
+
+    private static Implementation ServerInfo() => new()
+    {
+        Name = "pbtk",
+        Version = typeof(McpServerHost).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0.0.0"
+    };
+
+    private IMcpServerBuilder ConfigureMcp(IMcpServerBuilder mcp, McpServerSettings settings)
+    {
         var tools = settings.Tools.ToDictionary(t => t.Name, StringComparer.Ordinal);
         var listed = settings.Tools.Select(t => new Tool
         {
@@ -73,16 +109,21 @@ public sealed class McpServerHost(IMcpToolExecutor executor, TextWriter? callLog
             InputSchema = t.InputSchema
         }).ToList();
 
-        var version = typeof(McpServerHost).Assembly
-            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0.0.0";
-
-        builder.Services
-            .AddMcpServer(o => o.ServerInfo = new Implementation { Name = "pbtk", Version = version })
-            .WithHttpTransport(o => o.Stateless = true)
+        return mcp
             .WithListToolsHandler((_, _) => ValueTask.FromResult(new ListToolsResult { Tools = listed }))
             .WithCallToolHandler((request, ct) => new ValueTask<CallToolResult>(HandleCallAsync(
                 tools, request.Params?.Name ?? string.Empty,
                 request.Params?.Arguments is { } a ? (IReadOnlyDictionary<string, System.Text.Json.JsonElement>)a : null, ct)));
+    }
+
+    internal WebApplication Build(McpServerSettings settings)
+    {
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions { Args = [] });
+        builder.Logging.ClearProviders();
+
+        ConfigureMcp(builder.Services
+            .AddMcpServer(o => o.ServerInfo = ServerInfo())
+            .WithHttpTransport(o => o.Stateless = true), settings);
 
         var app = builder.Build();
         app.Urls.Add($"http://{McpHostRules.UrlHost(settings.Host)}:{settings.Port}");

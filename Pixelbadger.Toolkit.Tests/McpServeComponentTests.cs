@@ -81,6 +81,62 @@ public class McpServeComponentTests : IDisposable
     }
 
     [Theory]
+    [InlineData("127.0.0.1", null, false)]
+    [InlineData(null, 5200, false)]
+    [InlineData(null, null, true)]
+    public async Task RunAsync_ShouldFailWithoutRunningHost_WhenStdioCombinedWithNetworkOptions(string? host, int? port, bool allowRemote)
+    {
+        var output = new StringWriter();
+        var error = new StringWriter();
+        ToolkitConsole.InstallRouting();
+
+        int code;
+        using (ToolkitConsole.Capture(ToolkitConsole.CreateCaptureConsole(output), output, error))
+            code = await Component().RunAsync(null, host, port, CancellationToken.None, allowRemote, stdio: true);
+
+        code.Should().Be(1);
+        error.ToString().Replace("\r\n", "\n").Should().Be("Error: --stdio cannot be combined with --host, --port or --allow-remote.\n");
+        output.ToString().Should().BeEmpty();
+        _host.Verify(h => h.RunAsync(It.IsAny<McpServerSettings>(), It.IsAny<Action>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task RunAsync_ShouldPassStdioToHostAndWriteStartupLinesToStderr_WhenStdioSet()
+    {
+        McpServerSettings? settings = null;
+        _host.Setup(h => h.RunAsync(It.IsAny<McpServerSettings>(), It.IsAny<Action>(), It.IsAny<CancellationToken>()))
+            .Callback<McpServerSettings, Action, CancellationToken>((s, started, _) => { settings = s; started(); }).Returns(Task.CompletedTask);
+        _profiles.Setup(p => p.Get("p")).Returns(new McpProfile("p", ["interpreters/ook"], "0.0.0.0", 9));
+        var output = new StringWriter();
+        var error = new StringWriter();
+        ToolkitConsole.InstallRouting();
+        var originalOut = Console.Out;
+
+        int code;
+        using (ToolkitConsole.Capture(ToolkitConsole.CreateCaptureConsole(output), output, error))
+            code = await Component().RunAsync("p", null, null, CancellationToken.None, stdio: true);
+
+        code.Should().Be(0);
+        Console.Out.Should().BeSameAs(originalOut);
+        settings!.Stdio.Should().BeTrue();
+        output.ToString().Should().BeEmpty();
+        error.ToString().Replace("\r\n", "\n").Should().Be(
+            "Serving MCP profile 'p' over stdio\nTools: interpreters_ook\n");
+    }
+
+    [Fact]
+    public async Task RunAsync_ShouldNotSetStdio_WhenFlagOmitted()
+    {
+        McpServerSettings? settings = null;
+        _host.Setup(h => h.RunAsync(It.IsAny<McpServerSettings>(), It.IsAny<Action>(), It.IsAny<CancellationToken>()))
+            .Callback<McpServerSettings, Action, CancellationToken>((s, _, _) => settings = s).Returns(Task.CompletedTask);
+
+        await Component().RunAsync(null, null, null, CancellationToken.None);
+
+        settings!.Stdio.Should().BeFalse();
+    }
+
+    [Theory]
     [InlineData("0.0.0.0")]
     [InlineData("192.168.1.5")]
     public async Task RunAsync_ShouldFail_WhenHostIsNotLoopbackAndAllowRemoteNotSet(string host)

@@ -23,20 +23,22 @@ public static class McpCommand
 
     private static Command CreateServe(IConfigStore store, IMcpProfileStore profiles, Func<RootCommand> tree)
     {
-        var command = new Command("serve", "Serves a profile of toolkit commands as MCP tools over stateless HTTP");
+        var command = new Command("serve", "Serves a profile of toolkit commands as MCP tools over stateless HTTP, or over stdio with --stdio");
         var profileOption = new Option<string?>("--profile") { Description = "Profile to serve (default: the 'default' profile)" };
         var hostOption = new Option<string?>("--host") { Description = "Host to bind (overrides the profile; default 127.0.0.1)" }.WithImmutableDefault();
         var portOption = new Option<int?>("--port") { Description = "Port to bind (overrides the profile; default 5100)" }.WithImmutableDefault();
         var allowRemoteOption = new Option<bool>("--allow-remote") { Description = "Allow binding a non-loopback host (the server has no authentication)" }.WithImmutableDefault();
+        var stdioOption = new Option<bool>("--stdio") { Description = "Serve over stdin/stdout (newline-delimited JSON-RPC) instead of HTTP; logs go to stderr" }.WithImmutableDefault();
         command.Add(profileOption);
         command.Add(hostOption);
         command.Add(portOption);
         command.Add(allowRemoteOption);
+        command.Add(stdioOption);
 
         command.SetAction((parseResult, ct) =>
         {
             var component = new McpServeComponent(profiles, tree, new McpServerHost(new McpToolExecutor(store)));
-            return component.RunAsync(parseResult.GetValue(profileOption), parseResult.GetValue(hostOption), parseResult.GetValue(portOption), ct, parseResult.GetValue(allowRemoteOption));
+            return component.RunAsync(parseResult.GetValue(profileOption), parseResult.GetValue(hostOption), parseResult.GetValue(portOption), ct, parseResult.GetValue(allowRemoteOption), parseResult.GetValue(stdioOption));
         });
         return command;
     }

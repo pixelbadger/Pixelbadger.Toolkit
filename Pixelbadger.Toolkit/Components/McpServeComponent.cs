@@ -9,8 +9,11 @@ public sealed class McpServeComponent(IMcpProfileStore store, Func<RootCommand> 
     public const string DefaultHost = "127.0.0.1";
     public const int DefaultPort = 5100;
 
-    public async Task<int> RunAsync(string? profileName, string? host, int? port, CancellationToken cancellationToken, bool allowRemote = false)
+    public async Task<int> RunAsync(string? profileName, string? host, int? port, CancellationToken cancellationToken, bool allowRemote = false, bool stdio = false)
     {
+        if (stdio && (host is not null || port is not null || allowRemote))
+            return Fail("--stdio cannot be combined with --host, --port or --allow-remote.");
+
         McpProfile? profile;
         try
         {
@@ -27,8 +30,11 @@ public sealed class McpServeComponent(IMcpProfileStore store, Func<RootCommand> 
 
         var effectiveHost = host ?? profile.Host ?? DefaultHost;
         var effectivePort = port ?? profile.Port ?? DefaultPort;
-        if (McpProfileValidation.ValidatePort(effectivePort) is { } portError) return Fail(portError);
-        if (effectiveHost.Length == 0) return Fail("Host must not be empty.");
+        if (!stdio)
+        {
+            if (McpProfileValidation.ValidatePort(effectivePort) is { } portError) return Fail(portError);
+            if (effectiveHost.Length == 0) return Fail("Host must not be empty.");
+        }
 
         var root = treeFactory();
         var resolution = McpEntryResolver.ResolveAll(root, profile.Include);
@@ -47,22 +53,28 @@ public sealed class McpServeComponent(IMcpProfileStore store, Func<RootCommand> 
             return Fail(ex.Message);
         }
 
-        if (!McpHostRules.IsLoopback(effectiveHost))
+        if (!stdio && !McpHostRules.IsLoopback(effectiveHost))
         {
             if (!allowRemote)
                 return Fail($"Refusing to bind non-loopback address {effectiveHost}: the MCP server has no authentication and exposes file-reading and file-writing commands. Pass --allow-remote to proceed.");
             ToolkitConsole.Error.WriteLine($"Warning: binding to non-loopback address {effectiveHost}; the MCP server has no authentication.");
         }
 
+        // Over stdio the protocol owns the real stdout: stray process-level writes go to stderr for the serve's lifetime.
+        var originalOut = Console.Out;
+        if (stdio) Console.SetOut(Console.Error);
         ToolkitConsole.InstallRouting();
-        var settings = new McpServerSettings(profile.Name, effectiveHost, effectivePort, tools);
+        var settings = new McpServerSettings(profile.Name, effectiveHost, effectivePort, tools, stdio);
         try
         {
             await serverHost.RunAsync(settings, () =>
             {
-                ToolkitConsole.Out.WriteLine($"Serving MCP profile '{profile.Name}' on http://{McpHostRules.UrlHost(effectiveHost)}:{effectivePort}/mcp");
-                ToolkitConsole.Out.WriteLine($"Tools: {string.Join(", ", tools.Select(t => t.Name))}");
-                ToolkitConsole.Out.Flush();
+                var banner = stdio ? ToolkitConsole.Error : ToolkitConsole.Out;
+                banner.WriteLine(stdio
+                    ? $"Serving MCP profile '{profile.Name}' over stdio"
+                    : $"Serving MCP profile '{profile.Name}' on http://{McpHostRules.UrlHost(effectiveHost)}:{effectivePort}/mcp");
+                banner.WriteLine($"Tools: {string.Join(", ", tools.Select(t => t.Name))}");
+                banner.Flush();
             }, cancellationToken);
         }
         catch (OperationCanceledException)
@@ -71,6 +83,10 @@ public sealed class McpServeComponent(IMcpProfileStore store, Func<RootCommand> 
         catch (Exception ex)
         {
             return Fail(ex.Message);
+        }
+        finally
+        {
+            if (stdio) Console.SetOut(originalOut);
         }
         return 0;
     }
