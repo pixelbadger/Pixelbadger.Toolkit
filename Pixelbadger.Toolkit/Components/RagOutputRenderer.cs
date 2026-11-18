@@ -27,9 +27,9 @@ public static class RagOutputRenderer
     public sealed record ChunkJson(int Index, int Start, int End, string Content);
 
     public sealed record GetJson(string Id, string Title, string FileName, string SourcePath, string CreatedUtc, string UpdatedUtc,
-        int ChunkCount, int CharCount, string Sha256, IReadOnlyList<ChunkJson> Chunks);
+        int ChunkCount, int CharCount, string Sha256, int? FromChunk, int? ToChunk, IReadOnlyList<ChunkJson> Chunks);
 
-    public sealed record ResultJson(string Id, string Title, int ChunkIndex, float Score, int Start, int End, string Content);
+    public sealed record ResultJson(string Id, string Title, int ChunkIndex, int ChunkCount, float Score, int Start, int End, int CharCount, string Content);
 
     public sealed record SearchJson(string Query, int Page, int PageSize, int Total, int TotalPages, IReadOnlyList<ResultJson> Results);
 
@@ -94,6 +94,7 @@ public static class RagOutputRenderer
         {
             var d = ToJson(h);
             WriteJson(new GetJson(d.Id, d.Title, d.FileName, d.SourcePath, d.CreatedUtc, d.UpdatedUtc, d.ChunkCount, d.CharCount, d.Sha256,
+                document.Chunks.Count == 0 ? null : document.Chunks[0].Index, document.Chunks.Count == 0 ? null : document.Chunks[^1].Index,
                 document.Chunks.Select(c => new ChunkJson(c.Index, c.Start, c.End, c.Content)).ToList()));
             return;
         }
@@ -118,7 +119,7 @@ public static class RagOutputRenderer
         if (format == RagOutputFormat.json)
         {
             WriteJson(new SearchJson(query, page.Page, page.PageSize, page.Total, page.TotalPages,
-                page.Items.Select(r => new ResultJson(r.Id, r.Title, r.ChunkIndex, r.Score, r.Start, r.End, r.Content)).ToList()));
+                page.Items.Select(r => new ResultJson(r.Id, r.Title, r.ChunkIndex, r.ChunkCount, r.Score, r.Start, r.End, r.CharCount, r.Content)).ToList()));
             return;
         }
         if (page.Total == 0)
@@ -130,7 +131,7 @@ public static class RagOutputRenderer
         foreach (var r in page.Items)
         {
             rank++;
-            Line($"{rank}. {E(r.Id)} #{r.ChunkIndex} (score {r.Score.ToString("0.000", CultureInfo.InvariantCulture)}) {E(r.Title)}");
+            Line($"{rank}. {E(r.Id)} chunk {r.ChunkIndex + 1}/{r.ChunkCount} (score {r.Score.ToString("0.000", CultureInfo.InvariantCulture)}) {E(r.Title)}");
             Line(E(r.Content));
         }
         Line($"Page {page.Page} of {page.TotalPages} ({page.Total} results)");

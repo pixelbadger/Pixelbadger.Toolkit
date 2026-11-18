@@ -74,9 +74,8 @@ public class LuceneRagIndexTests : IDisposable
         _index.Upsert(replacement);
 
         _index.List(1, 10).Total.Should().Be(2);
-        _index.Search($"doc_id:{old.Header.Id} AND content:oldterm", 1, 10).Total.Should().Be(0);
-        _index.Search($"doc_id:{old.Header.Id} AND content:newterm", 1, 10).Total.Should().Be(1);
-        _index.Search($"doc_id:{old.Header.Id}", 1, 10).Total.Should().Be(1);
+        _index.Search("oldterm", 1, 10).Total.Should().Be(0);
+        _index.Search("newterm", 1, 10).Items.Select(h => h.Id).Should().Equal(old.Header.Id);
         var got = _index.Get(old.Header.Id)!;
         got.Header.Title.Should().Be("New");
         got.Header.CreatedUtc.Should().Be(T0);
@@ -216,7 +215,7 @@ public class LuceneRagIndexTests : IDisposable
     {
         var other = Add("bystander");
 
-        _index.Replace(MakeDoc("ghost", id: RagIds.NewId())).Should().BeNull();
+        _index.Replace(MakeDoc("ghost", id: RagIds.NewId()), false).Should().BeNull();
 
         _index.List(1, 10).Total.Should().Be(1);
         _index.Get(other.Header.Id)!.Chunks.Should().Equal(other.Chunks);
@@ -226,9 +225,35 @@ public class LuceneRagIndexTests : IDisposable
     [Fact]
     public void Replace_ShouldNotCreateIndexDirectory_WhenIndexMissing()
     {
-        _index.Replace(MakeDoc("ghost")).Should().BeNull();
+        _index.Replace(MakeDoc("ghost"), false).Should().BeNull();
 
         Directory.Exists(_path).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Replace_ShouldKeepStoredTitleOnHeaderAndChunks_WhenKeepTitleSet()
+    {
+        var original = MakeDoc("old words", title: "Kept Title", created: T0);
+        _index.Upsert(original);
+        var incoming = MakeDoc("brand new words", id: original.Header.Id, title: "file.txt", created: T0.AddDays(1));
+
+        var stored = _index.Replace(incoming, true);
+
+        stored!.Title.Should().Be("Kept Title");
+        _index.GetHeader(original.Header.Id)!.Title.Should().Be("Kept Title");
+        _index.Search("kept", 1, 10).Items.Should().ContainSingle().Which.Title.Should().Be("Kept Title");
+    }
+
+    [Fact]
+    public void Replace_ShouldReplaceTitle_WhenKeepTitleNotSet()
+    {
+        var original = MakeDoc("old words", title: "Old Title", created: T0);
+        _index.Upsert(original);
+
+        _index.Replace(MakeDoc("new words", id: original.Header.Id, title: "Brand New"), false)!.Title.Should().Be("Brand New");
+
+        _index.Search("brand", 1, 10).Total.Should().Be(1);
+        _index.Search("old", 1, 10).Total.Should().Be(0);
     }
 
     [Fact]
@@ -238,7 +263,7 @@ public class LuceneRagIndexTests : IDisposable
         _index.Upsert(original);
         var incoming = MakeDoc("brand new words", id: original.Header.Id, title: "New", created: T0.AddDays(30), updated: T0.AddDays(31));
 
-        var stored = _index.Replace(incoming);
+        var stored = _index.Replace(incoming, false);
 
         stored.Should().Be(incoming.Header with { CreatedUtc = T0 });
         _index.GetHeader(original.Header.Id).Should().Be(stored);
@@ -258,7 +283,8 @@ public class LuceneRagIndexTests : IDisposable
 
         _index.GetHeader(a.Header.Id).Should().BeNull();
         _index.Get(a.Header.Id).Should().BeNull();
-        _index.Search($"doc_id:{a.Header.Id}", 1, 10).Total.Should().Be(0);
+        _index.Search("alpha", 1, 10).Total.Should().Be(0);
+        _index.Search("beta", 1, 10).Total.Should().Be(1);
         _index.List(1, 10).Total.Should().Be(1);
         _index.Get(b.Header.Id).Should().NotBeNull();
     }
@@ -386,58 +412,126 @@ public class LuceneRagIndexTests : IDisposable
     }
 
     [Fact]
-    public void Search_ShouldMatchPhrase_WhenQuoted()
-    {
-        var (a, _, _) = SeedSearch();
-        _index.Search("\"quick brown fox\"", 1, 10).Items.Select(h => h.Id).Should().Equal(a.Header.Id);
-        _index.Search("\"brown quick\"", 1, 10).Total.Should().Be(0);
-    }
-
-    [Fact]
-    public void Search_ShouldHonourBooleanOperators_WhenUsed()
+    public void Search_ShouldRankChunksMatchingAnyTerm_WhenSeveralTermsGiven()
     {
         var (a, b, c) = SeedSearch();
-        _index.Search("quick AND brown", 1, 10).Total.Should().Be(2);
-        _index.Search("fox AND bear", 1, 10).Total.Should().Be(0);
-        _index.Search("fox OR lucene", 1, 10).Items.Select(h => h.Id).Should().BeEquivalentTo(new[] { a.Header.Id, c.Header.Id });
-        _index.Search("brown AND NOT fox", 1, 10).Items.Select(h => h.Id).Should().Equal(b.Header.Id);
+        var r = _index.Search("fox lucene", 1, 10);
+        r.Items.Select(h => h.Id).Should().BeEquivalentTo(new[] { a.Header.Id, c.Header.Id });
+        _index.Search("quick brown", 1, 10).Items.Select(h => h.Id).Should().BeEquivalentTo(new[] { a.Header.Id, b.Header.Id });
+        _index.Search("fox bear", 1, 10).Total.Should().Be(2);
     }
 
     [Fact]
-    public void Search_ShouldMatchExactly_WhenDocIdFieldQueried()
-    {
-        var (a, _, _) = SeedSearch();
-        var r = _index.Search($"doc_id:{a.Header.Id}", 1, 10);
-        r.Total.Should().Be(a.Chunks.Count);
-        r.Items.Should().OnlyContain(h => h.Id == a.Header.Id);
-        _index.Search($"doc_id:{a.Header.Id.ToUpperInvariant()}", 1, 10).Total.Should().Be(0);
-    }
-
-    [Fact]
-    public void Search_ShouldMatchTitleField_WhenTitleQueried()
+    public void Search_ShouldMatchTitleOnly_WhenTermOnlyInTitle()
     {
         var (_, b, _) = SeedSearch();
-        _index.Search("title:bears", 1, 10).Items.Select(h => h.Id).Should().Equal(b.Header.Id);
-        _index.Search("title:guide AND quick", 1, 10).Total.Should().Be(1);
+        _index.Search("bears", 1, 10).Items.Select(h => h.Id).Should().Equal(b.Header.Id);
     }
 
     [Fact]
-    public void Search_ShouldSupportWildcardsAndFuzzy_WhenUsed()
+    public void Search_ShouldReturnSameHits_WhenTrailingPunctuationAdded()
     {
-        var (a, _, c) = SeedSearch();
-        _index.Search("womb*", 1, 10).Items.Select(h => h.Id).Should().Equal(a.Header.Id);
-        _index.Search("luc?ne", 1, 10).Items.Select(h => h.Id).Should().Equal(c.Header.Id);
-        _index.Search("wombat~", 1, 10).Items.Select(h => h.Id).Should().Equal(a.Header.Id);
+        SeedSearch();
+        var plain = _index.Search("wombats", 1, 10).Items.Select(h => (h.Id, h.ChunkIndex)).ToList();
+        plain.Should().HaveCount(1);
+        _index.Search("wombats?", 1, 10).Items.Select(h => (h.Id, h.ChunkIndex)).Should().Equal(plain);
+    }
+
+    [Fact]
+    public void Search_ShouldStemTerms_WhenPluralOrHyphenated()
+    {
+        var a = Add("Use the line-number option.");
+        var b = Add("There is one number here.");
+        Add("Nothing relevant.");
+        _index.Search("numbers", 1, 10).Items.Select(h => h.Id).Should().BeEquivalentTo(new[] { a.Header.Id, b.Header.Id });
+    }
+
+    [Theory]
+    [InlineData("what's the default for --port?")]
+    [InlineData("mcp: serve/save")]
+    [InlineData("C++ (and [brackets])?")]
+    [InlineData("foo AND")]
+    [InlineData("\"unbalanced")]
+    [InlineData("(a OR b")]
+    [InlineData("*leading")]
+    [InlineData("[a TO z")]
+    [InlineData("title:")]
+    [InlineData("doc_id:abc AND")]
+    public void Search_ShouldNotThrow_WhenQueryHasSyntaxCharacters(string query)
+    {
+        Add("some text about ports");
+        var act = () => _index.Search(query, 1, 10);
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void Search_ShouldTreatFieldPrefixAsPlainTerms_WhenQueryLooksLikeFieldSyntax()
+    {
+        var a = Add("body text only", title: "Plain");
+        _index.Search($"doc_id:{a.Header.Id}", 1, 10).Total.Should().Be(0);
+        _index.Search("kind:header", 1, 10).Total.Should().Be(0);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("?!.,")]
+    [InlineData("how do I")]
+    [InlineData("the of and")]
+    public void Search_ShouldThrowNoSearchableTerms_WhenNothingSurvivesAnalysis(string query)
+    {
+        Add("some text");
+        var act = () => _index.Search(query, 1, 10);
+        act.Should().Throw<RagQueryException>().WithMessage("Query has no searchable terms.");
+    }
+
+    [Fact]
+    public void Search_ShouldThrowNoSearchableTerms_WhenIndexMissing()
+    {
+        var act = () => _index.Search("how do I", 1, 10);
+        act.Should().Throw<RagQueryException>().WithMessage("Query has no searchable terms.");
+        Directory.Exists(_path).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Search_ShouldThrowTooManyTerms_WhenMoreThan200DistinctTerms()
+    {
+        Add("some text");
+        var many = string.Join(" ", Enumerable.Range(0, 201).Select(i => "term" + i));
+        var act = () => _index.Search(many, 1, 10);
+        act.Should().Throw<RagQueryException>().WithMessage("Query has too many terms (max 200).");
+        _index.Search(string.Join(" ", Enumerable.Range(0, 200).Select(i => "term" + i)), 1, 10).Total.Should().Be(0);
+    }
+
+    [Fact]
+    public void Search_ShouldCountDistinctTermsOnly_WhenTermsRepeat()
+    {
+        Add("some text");
+        var repeated = string.Join(" ", Enumerable.Repeat("text", 500));
+        _index.Search(repeated, 1, 10).Total.Should().Be(1);
     }
 
     [Fact]
     public void Search_ShouldReturnOnlyChunks_WhenQueryMatchesHeaderFields()
     {
         var a = Add("body text only", title: "uniquetitleword");
-        _index.Search("kind:header", 1, 10).Total.Should().Be(0);
-        _index.Search("file_name:file.txt", 1, 10).Total.Should().Be(0);
-        _index.Search("title:uniquetitleword", 1, 10).Items.Should().OnlyContain(h => h.Id == a.Header.Id && h.Content == "body text only");
-        _index.Search("title:uniquetitleword", 1, 10).Total.Should().Be(a.Chunks.Count);
+        _index.Search("header", 1, 10).Total.Should().Be(0);
+        _index.Search("file", 1, 10).Total.Should().Be(0);
+        _index.Search("uniquetitleword", 1, 10).Items.Should().OnlyContain(h => h.Id == a.Header.Id && h.Content == "body text only");
+        _index.Search("uniquetitleword", 1, 10).Total.Should().Be(a.Chunks.Count);
+    }
+
+    [Fact]
+    public void Search_ShouldCarryDocumentChunkAndCharCounts_WhenHitFound()
+    {
+        var text = string.Join("\n\n", Enumerable.Range(0, 6).Select(i => $"para{i} " + new string('z', 60)));
+        var doc = MakeDoc(text);
+        _index.Upsert(doc);
+        var hit = _index.Search("para4", 1, 10).Items.Single();
+        hit.ChunkCount.Should().Be(doc.Header.ChunkCount);
+        hit.CharCount.Should().Be(doc.Header.CharCount);
+        hit.ChunkCount.Should().BeGreaterThan(1);
+        doc.Chunks[hit.ChunkIndex].Content.Should().Be(hit.Content);
     }
 
     [Fact]
@@ -468,28 +562,6 @@ public class LuceneRagIndexTests : IDisposable
         items.Select(h => h.Score).Should().HaveCount(3).And.BeInDescendingOrder();
         items[0].Id.Should().Be(best.Header.Id);
         items[0].Score.Should().BeGreaterThan(items[1].Score);
-    }
-
-    [Theory]
-    [InlineData("\"unterminated")]
-    [InlineData("foo AND")]
-    [InlineData("(a OR b")]
-    [InlineData("*leading")]
-    [InlineData("[a TO")]
-    [InlineData("title:")]
-    public void Search_ShouldThrowRagQueryException_WhenQueryInvalid(string query)
-    {
-        Add("some text");
-        var act = () => _index.Search(query, 1, 10);
-        act.Should().Throw<RagQueryException>().WithMessage("Invalid query: *");
-    }
-
-    [Fact]
-    public void Search_ShouldThrowRagQueryException_WhenQueryInvalidAndIndexMissing()
-    {
-        var act = () => _index.Search("(a OR", 1, 10);
-        act.Should().Throw<RagQueryException>().WithMessage("Invalid query: *");
-        Directory.Exists(_path).Should().BeFalse();
     }
 
     [Fact]

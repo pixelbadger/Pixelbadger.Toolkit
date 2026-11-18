@@ -49,12 +49,12 @@ public class RagOutputRendererTests
     [Fact]
     public void RenderSearch_ShouldWriteExactJson_WhenOneHit()
     {
-        var page = new RagPage<RagSearchHit>(1, 10, 1, [new RagSearchHit("id1", "Ti", 3, 1.5f, 4, 9, "cont <&>")]);
+        var page = new RagPage<RagSearchHit>(1, 10, 1, [new RagSearchHit("id1", "Ti", 3, 7, 1.5f, 4, 9, 123, "cont <&>")]);
 
         var (_, output, _) = Capture(() => { RagOutputRenderer.RenderSearch(RagOutputFormat.json, "q", page); return 0; });
 
         output.Trim().Should().Be(
-            "{\"query\":\"q\",\"page\":1,\"pageSize\":10,\"total\":1,\"totalPages\":1,\"results\":[{\"id\":\"id1\",\"title\":\"Ti\",\"chunkIndex\":3,\"score\":1.5,\"start\":4,\"end\":9,\"content\":\"cont <&>\"}]}");
+            "{\"query\":\"q\",\"page\":1,\"pageSize\":10,\"total\":1,\"totalPages\":1,\"results\":[{\"id\":\"id1\",\"title\":\"Ti\",\"chunkIndex\":3,\"chunkCount\":7,\"score\":1.5,\"start\":4,\"end\":9,\"charCount\":123,\"content\":\"cont <&>\"}]}");
     }
 
     [Fact]
@@ -76,5 +76,36 @@ public class RagOutputRendererTests
         var (_, output, _) = Capture(() => { RagOutputRenderer.RenderGet(RagOutputFormat.text, doc); return 0; });
 
         output.Should().Contain("--- chunk 0 [0-5] ---").And.Contain("[b]hi").And.Contain("--- chunk 1 [5-9] ---").And.Contain("SHA-256: sha");
+    }
+
+    [Fact]
+    public void RenderSearch_ShouldShowOneBasedPositionOfDocument_WhenText()
+    {
+        var page = new RagPage<RagSearchHit>(1, 10, 1, [new RagSearchHit("id1", "Ti", 3, 7, 1.5f, 4, 9, 123, "cont")]);
+
+        var (_, output, _) = Capture(() => { RagOutputRenderer.RenderSearch(RagOutputFormat.text, "q", page); return 0; });
+
+        output.Should().Contain("1. id1 chunk 4/7 (score 1.500) Ti");
+    }
+
+    [Fact]
+    public void RenderGet_ShouldWriteEffectiveRangeBeforeChunks_WhenJson()
+    {
+        var doc = new RagDocument(Header(), [new TextChunk(1, 5, 9, "more"), new TextChunk(2, 9, 12, "end")]);
+
+        var (_, output, _) = Capture(() => { RagOutputRenderer.RenderGet(RagOutputFormat.json, doc); return 0; });
+
+        output.Trim().Should().Be(
+            "{\"id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"title\":\"T\",\"fileName\":\"f.txt\",\"sourcePath\":\"/p/f.txt\",\"createdUtc\":\"2026-01-01T00:00:00.0000000Z\",\"updatedUtc\":\"2026-01-01T00:00:00.0000000Z\",\"chunkCount\":2,\"charCount\":10,\"sha256\":\"sha\",\"fromChunk\":1,\"toChunk\":2,\"chunks\":[{\"index\":1,\"start\":5,\"end\":9,\"content\":\"more\"},{\"index\":2,\"start\":9,\"end\":12,\"content\":\"end\"}]}");
+    }
+
+    [Fact]
+    public void RenderGet_ShouldWriteNullRange_WhenNoChunksReturned()
+    {
+        var doc = new RagDocument(Header(), []);
+
+        var (_, output, _) = Capture(() => { RagOutputRenderer.RenderGet(RagOutputFormat.json, doc); return 0; });
+
+        output.Trim().Should().EndWith("\"sha256\":\"sha\",\"fromChunk\":null,\"toChunk\":null,\"chunks\":[]}");
     }
 }

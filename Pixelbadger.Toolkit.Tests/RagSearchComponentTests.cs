@@ -42,9 +42,11 @@ public class RagSearchComponentTests : IDisposable
         root.GetProperty("query").GetString().Should().Be("quick");
         root.GetProperty("total").GetInt32().Should().Be(1);
         var hit = root.GetProperty("results")[0];
-        hit.EnumerateObject().Select(p => p.Name).Should().Equal("id", "title", "chunkIndex", "score", "start", "end", "content");
+        hit.EnumerateObject().Select(p => p.Name).Should().Equal("id", "title", "chunkIndex", "chunkCount", "score", "start", "end", "charCount", "content");
         hit.GetProperty("id").GetString().Should().Be(id);
         hit.GetProperty("title").GetString().Should().Be("Doc");
+        hit.GetProperty("chunkCount").GetInt32().Should().Be(1);
+        hit.GetProperty("charCount").GetInt32().Should().Be("the quick brown fox".Length);
         hit.GetProperty("content").GetString().Should().Be("the quick brown fox");
         hit.GetProperty("score").GetSingle().Should().BeGreaterThan(0);
     }
@@ -56,7 +58,7 @@ public class RagSearchComponentTests : IDisposable
 
         var (_, output, _) = Run("quick", format: RagOutputFormat.text);
 
-        output.Should().MatchRegex($@"1\. {id} #0 \(score \d\.\d{{3}}\) Doc");
+        output.Should().MatchRegex($@"1\. {id} chunk 1/1 \(score \d\.\d{{3}}\) Doc");
         output.Should().Contain("the quick brown fox").And.Contain("Page 1 of 1 (1 results)");
     }
 
@@ -100,26 +102,63 @@ public class RagSearchComponentTests : IDisposable
     }
 
     [Fact]
-    public void Run_ShouldFailWithInvalidQuery_WhenQueryCannotParse()
+    public void Run_ShouldFailWithNoSearchableTerms_WhenQueryIsOnlyStopWords()
     {
         Seed("T", "alpha");
 
-        var (code, _, err) = Run("title:(");
+        var (code, output, err) = Run("how do I");
 
         code.Should().Be(1);
-        err.Should().StartWith("Error: Invalid query:");
+        output.Should().BeEmpty();
+        err.Should().Be($"Error: Query has no searchable terms.{Environment.NewLine}");
+    }
+
+    [Theory]
+    [InlineData("what's the default for --port?")]
+    [InlineData("mcp: serve/save")]
+    [InlineData("C++ (and [brackets])?")]
+    [InlineData("foo AND")]
+    [InlineData("\"unbalanced")]
+    public void Run_ShouldExit0_WhenQueryHasSpecialCharacters(string query)
+    {
+        Seed("T", "alpha");
+
+        Run(query).Code.Should().Be(0);
+    }
+
+    [Fact]
+    public void Run_ShouldFindSameChunks_WhenQuestionMarkAppended()
+    {
+        Seed("T", "notes on steganography in images\n\nunrelated");
+
+        var plain = JsonDocument.Parse(Run("steganography").Out).RootElement.GetProperty("results");
+        var marked = JsonDocument.Parse(Run("steganography?").Out).RootElement.GetProperty("results");
+
+        plain.GetArrayLength().Should().Be(1);
+        marked.GetRawText().Should().Be(plain.GetRawText());
+    }
+
+    [Fact]
+    public void Run_ShouldFailWithTooManyTerms_WhenOver200DistinctTerms()
+    {
+        Seed("T", "alpha");
+
+        var (code, _, err) = Run(string.Join(" ", Enumerable.Range(0, 201).Select(i => "t" + i)));
+
+        code.Should().Be(1);
+        err.Should().Be($"Error: Query has too many terms (max 200).{Environment.NewLine}");
     }
 
     [Fact]
     public void Run_ShouldMapQueryExceptionMessage_WhenIndexThrows()
     {
         var mock = new Mock<IRagIndex>();
-        mock.Setup(i => i.Search("q", 1, 10)).Throws(new RagQueryException("Invalid query: boom"));
+        mock.Setup(i => i.Search("q", 1, 10)).Throws(new RagQueryException("Query has no searchable terms."));
 
         var (code, _, err) = Capture(() => new RagSearchComponent(mock.Object).Run(new RagSearchOptions("q", 1, 10, RagOutputFormat.text)));
 
         code.Should().Be(1);
-        err.Should().Be($"Error: Invalid query: boom{Environment.NewLine}");
+        err.Should().Be($"Error: Query has no searchable terms.{Environment.NewLine}");
     }
 
     [Theory]

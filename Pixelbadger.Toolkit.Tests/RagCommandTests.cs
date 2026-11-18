@@ -169,13 +169,23 @@ public class RagCommandTests : IDisposable
     }
 
     [Fact]
-    public async Task Run_ShouldExit1WithInvalidQuery_WhenQuerySyntaxBroken()
+    public async Task Run_ShouldExit0_WhenQueryLooksLikeBrokenSyntax()
     {
         await Run("rag", "ingest", "--file", Write("a.txt", "x y"), "--index-path", IndexPath);
 
         var result = await Run("rag", "search", "--query", "title:(", "--index-path", IndexPath);
 
+        result.Code.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Run_ShouldExit1WithNoSearchableTerms_WhenQueryIsStopWordsOnly()
+    {
+        await Run("rag", "ingest", "--file", Write("a.txt", "x y"), "--index-path", IndexPath);
+
+        var result = await Run("rag", "search", "--query", "how do I", "--index-path", IndexPath);
+
         result.Code.Should().Be(1);
-        result.Err.Should().Contain("Error: Invalid query");
+        result.Err.Should().Contain("Error: Query has no searchable terms.");
     }
 }

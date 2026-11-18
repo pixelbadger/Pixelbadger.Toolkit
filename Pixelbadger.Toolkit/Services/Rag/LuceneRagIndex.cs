@@ -2,10 +2,8 @@ using System.Globalization;
 using Lucene.Net.Analysis;
 using Lucene.Net.Analysis.Core;
 using Lucene.Net.Analysis.Miscellaneous;
-using Lucene.Net.Analysis.Standard;
 using Lucene.Net.Documents;
 using Lucene.Net.Index;
-using Lucene.Net.QueryParsers.Classic;
 using Lucene.Net.Search;
 using Lucene.Net.Search.Similarities;
 using Lucene.Net.Store;
@@ -21,6 +19,10 @@ public sealed class LuceneRagIndex : IRagIndex
     private const string Chunk = "chunk";
     private static readonly TimeSpan DefaultLockTimeout = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan LockPollInterval = TimeSpan.FromMilliseconds(100);
+
+    public const int MaxQueryTerms = 200;
+    public const string SchemaKey = "rag_schema";
+    public const string SchemaValue = "2";
 
     private readonly TimeSpan _lockTimeout;
 
@@ -42,7 +44,7 @@ public sealed class LuceneRagIndex : IRagIndex
         });
     }
 
-    public RagDocument? Get(string id)
+    public RagDocument? Get(string id, int? fromChunk = null, int? toChunk = null)
     {
         return WithSearcher<RagDocument?>(null, searcher =>
         {
@@ -50,12 +52,17 @@ public sealed class LuceneRagIndex : IRagIndex
             if (hit is null) return null;
             var header = ToHeader(searcher.Doc(hit.Value));
 
+            var from = Math.Max(0, fromChunk ?? 0);
+            var to = Math.Min(toChunk ?? int.MaxValue, header.ChunkCount - 1);
+            if (header.ChunkCount == 0 || from > to) return new RagDocument(header, Array.Empty<TextChunk>());
+
             var query = new BooleanQuery
             {
                 { new TermQuery(new Term("doc_id", header.Id)), Occur.MUST },
                 { new TermQuery(new Term("kind", Chunk)), Occur.MUST },
+                { NumericRangeQuery.NewInt32Range("chunk_index", from, to, true, true), Occur.MUST },
             };
-            var top = searcher.Search(query, Math.Max(1, header.ChunkCount));
+            var top = searcher.Search(query, to - from + 1);
             var chunks = top.ScoreDocs
                 .Select(sd => ToChunk(searcher.Doc(sd.Doc)))
                 .OrderBy(c => c.Index)
@@ -88,51 +95,41 @@ public sealed class LuceneRagIndex : IRagIndex
         ArgumentNullException.ThrowIfNull(query);
         ValidatePaging(page, pageSize);
 
-        Query parsed;
-        try
-        {
-            var parser = new QueryParser(Version, "content", CreateAnalyzer()) { AllowLeadingWildcard = false };
-            parsed = parser.Parse(query);
-        }
-        catch (ParseException ex)
-        {
-            throw new RagQueryException($"Invalid query: {FirstLine(ex.Message)}", ex);
-        }
-        catch (BooleanQuery.TooManyClausesException ex)
-        {
-            throw new RagQueryException("Invalid query: too many clauses.", ex);
-        }
-        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or FormatException)
-        {
-            throw new RagQueryException($"Invalid query: {FirstLine(ex.Message)}", ex);
-        }
+        var terms = RagTextAnalyzer.Tokenize(query).Distinct(StringComparer.Ordinal).ToList();
+        if (terms.Count == 0) throw new RagQueryException("Query has no searchable terms.");
+        if (terms.Count > MaxQueryTerms) throw new RagQueryException($"Query has too many terms (max {MaxQueryTerms}).");
 
         var empty = new RagPage<RagSearchHit>(page, pageSize, 0, Array.Empty<RagSearchHit>());
         return WithSearcher(empty, searcher =>
         {
+            var anyTerm = new BooleanQuery();
+            foreach (var term in terms)
+            {
+                anyTerm.Add(new TermQuery(new Term("content", term)), Occur.SHOULD);
+                anyTerm.Add(new TermQuery(new Term("title", term)), Occur.SHOULD);
+            }
             var combined = new BooleanQuery
             {
-                { parsed, Occur.MUST },
+                { anyTerm, Occur.MUST },
                 { new TermQuery(new Term("kind", Chunk)), Occur.MUST },
             };
-            TopDocs top;
-            try
-            {
-                top = searcher.Search(combined, SafeWindow(page, pageSize));
-            }
-            catch (BooleanQuery.TooManyClausesException ex)
-            {
-                throw new RagQueryException("Invalid query: too many clauses.", ex);
-            }
+            var top = searcher.Search(combined, SafeWindow(page, pageSize));
 
+            var headers = new Dictionary<string, RagDocumentHeader?>(StringComparer.Ordinal);
             var hits = top.ScoreDocs
                 .Skip((page - 1) * pageSize)
                 .Select(sd =>
                 {
                     var d = searcher.Doc(sd.Doc);
+                    var id = d.Get("doc_id");
+                    if (!headers.TryGetValue(id, out var header))
+                    {
+                        var h = FindHeader(searcher, id);
+                        headers[id] = header = h is null ? null : ToHeader(searcher.Doc(h.Value));
+                    }
                     return new RagSearchHit(
-                        d.Get("doc_id"), d.Get("title") ?? string.Empty, GetInt(d, "chunk_index"), sd.Score,
-                        GetInt(d, "start"), GetInt(d, "end"), d.Get("content") ?? string.Empty);
+                        id, d.Get("title") ?? string.Empty, GetInt(d, "chunk_index"), header?.ChunkCount ?? 0, sd.Score,
+                        GetInt(d, "start"), GetInt(d, "end"), header?.CharCount ?? 0, d.Get("content") ?? string.Empty);
                 })
                 .ToList();
             return new RagPage<RagSearchHit>(page, pageSize, top.TotalHits, hits);
@@ -149,7 +146,7 @@ public sealed class LuceneRagIndex : IRagIndex
         });
     }
 
-    public RagDocumentHeader? Replace(RagDocument document, CancellationToken ct = default)
+    public RagDocumentHeader? Replace(RagDocument document, bool keepTitle, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(document);
         if (!IndexExists()) return null;
@@ -165,6 +162,7 @@ public sealed class LuceneRagIndex : IRagIndex
                 existing = ToHeader(searcher.Doc(hit.Value));
             }
             var stored = document.Header with { CreatedUtc = existing.CreatedUtc };
+            if (keepTitle) stored = stored with { Title = existing.Title };
             ReplaceDocuments(writer, document, stored, ct);
             return (true, stored);
         });
@@ -213,6 +211,7 @@ public sealed class LuceneRagIndex : IRagIndex
         T result;
         try
         {
+            CheckSchema(dir);
             var outcome = work(writer);
             if (!outcome.Commit)
             {
@@ -220,6 +219,7 @@ public sealed class LuceneRagIndex : IRagIndex
                 return outcome.Result;
             }
             FaultHook?.Invoke("beforeCommit");
+            writer.SetCommitData(new Dictionary<string, string> { [SchemaKey] = SchemaValue });
             writer.Commit();
             result = outcome.Result;
         }
@@ -253,11 +253,25 @@ public sealed class LuceneRagIndex : IRagIndex
 
     // ---- infrastructure ----
 
+    private void CheckSchema(Lucene.Net.Store.Directory dir)
+    {
+        if (!DirectoryReader.IndexExists(dir)) return;
+        using var reader = DirectoryReader.Open(dir);
+        CheckSchema(reader);
+    }
+
+    private void CheckSchema(DirectoryReader reader)
+    {
+        if (reader.MaxDoc == 0) return;
+        if (reader.IndexCommit.UserData.TryGetValue(SchemaKey, out var value) && value == SchemaValue) return;
+        throw new RagIndexSchemaException($"Index '{IndexPath}' was built by an older pbtk version; delete it and re-ingest.");
+    }
+
     private static Analyzer CreateAnalyzer()
     {
         var keyword = new KeywordAnalyzer();
         return new PerFieldAnalyzerWrapper(
-            new StandardAnalyzer(Version),
+            new RagTextAnalyzer(),
             new Dictionary<string, Analyzer>
             {
                 ["doc_id"] = keyword,
@@ -307,6 +321,7 @@ public sealed class LuceneRagIndex : IRagIndex
         if (!IndexExists()) return whenMissing;
         using var dir = FSDirectory.Open(IndexPath);
         using var reader = DirectoryReader.Open(dir);
+        CheckSchema(reader);
         var searcher = new IndexSearcher(reader) { Similarity = new BM25Similarity() };
         return body(searcher);
     }
@@ -321,12 +336,6 @@ public sealed class LuceneRagIndex : IRagIndex
     {
         var window = (long)page * pageSize;
         return (int)Math.Min(window, int.MaxValue - 1);
-    }
-
-    private static string FirstLine(string message)
-    {
-        var line = message.Split('\n', 2)[0].Trim();
-        return line.TrimEnd('.') + ".";
     }
 
     private static int? FindHeader(IndexSearcher searcher, string id)
@@ -370,7 +379,7 @@ public sealed class LuceneRagIndex : IRagIndex
         {
             new StringField("kind", Chunk, Field.Store.YES),
             new StringField("doc_id", h.Id, Field.Store.YES),
-            new StoredField("chunk_index", c.Index),
+            new Int32Field("chunk_index", c.Index, Field.Store.YES),
             new TextField("content", c.Content, Field.Store.YES),
             new TextField("title", h.Title, Field.Store.YES),
             new StoredField("start", c.Start),

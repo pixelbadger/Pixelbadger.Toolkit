@@ -59,7 +59,7 @@ public sealed class RagIngestComponent(IRagIndex index, ITextChunker chunker, Ti
         var document = new RagDocument(header, chunking.Chunks);
         if (action == "updated")
         {
-            var stored = index.Replace(document, cancellationToken);
+            var stored = index.Replace(document, options.Title is null, cancellationToken);
             if (stored is null) return RagOutputRenderer.WriteError($"Document '{id}' not found.");
             header = stored;
         }

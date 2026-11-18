@@ -64,8 +64,10 @@ public class RagCommandIntegrationTests : IDisposable
         var after = JsonDocument.Parse((await Run("get", "--id", id, "--index-path", Index, "--format", "json")).StandardOutput).RootElement;
         after.GetProperty("createdUtc").GetString().Should().Be(before.GetProperty("createdUtc").GetString());
         DateTimeOffset.Parse(after.GetProperty("updatedUtc").GetString()!).Should().BeAfter(DateTimeOffset.Parse(before.GetProperty("updatedUtc").GetString()!));
-        (await Run("search", "--query", $"doc_id:{id} AND oldterm", "--index-path", Index, "--format", "json")).StandardOutput.Should().Contain("\"total\":0");
-        (await Run("search", "--query", $"doc_id:{id} AND newterm", "--index-path", Index, "--format", "json")).StandardOutput.Should().Contain("\"total\":1");
+        (await Run("search", "--query", "oldterm", "--index-path", Index, "--format", "json")).StandardOutput.Should().Contain("\"total\":0");
+        var found = await Run("search", "--query", "newterm", "--index-path", Index, "--format", "json");
+        found.StandardOutput.Should().Contain("\"total\":1").And.Contain(id);
+        after.GetProperty("title").GetString().Should().Be("First");
         var list = JsonDocument.Parse((await Run("list", "--index-path", Index, "--format", "json")).StandardOutput).RootElement;
         list.GetProperty("total").GetInt32().Should().Be(1);
     }
@@ -113,7 +115,7 @@ public class RagCommandIntegrationTests : IDisposable
     }
 
     [Fact]
-    public async Task Search_ShouldSupportQuerySyntaxAndReturnOnlyChunks_WhenIndexed()
+    public async Task Search_ShouldTreatQueryAsPlainTermsAndReturnOnlyChunks_WhenIndexed()
     {
         var id = await IngestAsync(Write("a.txt", "The quick brown fox jumps over the lazy dog"), "--title", "Animals");
         await IngestAsync(Write("b.txt", "Completely different words"), "--title", "Other");
@@ -126,18 +128,17 @@ public class RagCommandIntegrationTests : IDisposable
         }
 
         (await Total("fox")).Should().Be(1);
-        (await Total("\"brown fox\"")).Should().Be(1);
-        (await Total("fox AND dog")).Should().Be(1);
-        (await Total("fox OR different")).Should().Be(2);
-        (await Total("fox NOT dog")).Should().Be(0);
-        (await Total($"doc_id:{id}")).Should().Be(1);
-        (await Total("title:animals")).Should().Be(1);
-        (await Total("qui*")).Should().Be(1);
-        (await Total("quikc~")).Should().Be(1);
+        (await Total("fox?")).Should().Be(1);
+        (await Total("what's the \"brown fox\"?")).Should().Be(1);
+        (await Total("fox dog")).Should().Be(1);
+        (await Total("fox different")).Should().Be(2);
+        (await Total("animals")).Should().Be(1);
         (await Total("kind:header")).Should().Be(0);
-        var bad = await Run("search", "--query", "title:(", "--index-path", Index);
-        bad.ExitCode.Should().Be(1);
-        bad.StandardError.Should().Contain("Invalid query");
+        (await Total("title:(")).Should().Be(0);
+        var none = await Run("search", "--query", "how do I", "--index-path", Index);
+        none.ExitCode.Should().Be(1);
+        none.StandardError.Should().Contain("Query has no searchable terms.");
+        id.Should().HaveLength(32);
     }
 
     [Fact]
@@ -148,7 +149,7 @@ public class RagCommandIntegrationTests : IDisposable
         (await Run("delete", "--id", id, "--index-path", Index)).ExitCode.Should().Be(0);
 
         (await Run("get", "--id", id, "--index-path", Index)).ExitCode.Should().Be(1);
-        (await Run("search", "--query", $"doc_id:{id}", "--index-path", Index, "--format", "json")).StandardOutput.Should().Contain("\"total\":0");
+        (await Run("search", "--query", "removable", "--index-path", Index, "--format", "json")).StandardOutput.Should().Contain("\"total\":0");
         var again = await Run("delete", "--id", id, "--index-path", Index);
         again.ExitCode.Should().Be(1);
         again.StandardError.Should().Contain($"Document '{id}' not found.");
@@ -157,12 +158,12 @@ public class RagCommandIntegrationTests : IDisposable
     [Fact]
     public async Task Text_ShouldPrintMarkupLiterally_WhenFileContainsMarkup()
     {
-        await IngestAsync(Write("m.txt", "before [red]x[/] after"));
+        await IngestAsync(Write("m.txt", "markup [red]x[/] after"));
 
-        var r = await Run("search", "--query", "before", "--index-path", Index);
+        var r = await Run("search", "--query", "markup", "--index-path", Index);
 
         r.ExitCode.Should().Be(0);
-        r.StandardOutput.Should().Contain("before [red]x[/] after");
+        r.StandardOutput.Should().Contain("markup [red]x[/] after");
     }
 
     [Fact]

@@ -104,8 +104,49 @@ public class RagIngestComponentTests : IDisposable
         updated.UpdatedUtc.Should().Be(_time.Now).And.NotBe(original.UpdatedUtc);
         updated.Title.Should().Be("New");
         updated.FileName.Should().Be("b.txt");
-        _index.Search($"doc_id:{original.Id} AND oldterm", 1, 10).Total.Should().Be(0);
-        _index.Search($"doc_id:{original.Id} AND newterm", 1, 10).Total.Should().Be(1);
+        _index.Search("oldterm", 1, 10).Total.Should().Be(0);
+        _index.Search("newterm", 1, 10).Items.Select(h => h.Id).Should().Equal(original.Id);
+    }
+
+    [Fact]
+    public void Run_ShouldKeepExistingTitle_WhenUpdatingWithoutTitle()
+    {
+        Run(Write("a.txt", "alpha text"), title: "Original Title");
+        var original = _index.List(1, 10).Items.Single();
+
+        var (code, _, _) = Run(Write("b.txt", "beta text"), id: original.Id);
+
+        code.Should().Be(0);
+        _index.GetHeader(original.Id)!.Title.Should().Be("Original Title");
+        _index.Search("beta", 1, 10).Items.Single().Title.Should().Be("Original Title");
+    }
+
+    [Fact]
+    public void Run_ShouldReplaceTitle_WhenUpdatingWithTitle()
+    {
+        Run(Write("a.txt", "alpha text"), title: "Original Title");
+        var original = _index.List(1, 10).Items.Single();
+
+        Run(Write("b.txt", "beta text"), id: original.Id, title: "Fresh");
+
+        _index.GetHeader(original.Id)!.Title.Should().Be("Fresh");
+    }
+
+    [Fact]
+    public void Run_ShouldAskReplaceToKeepTitle_WhenUpdatingWithoutTitle()
+    {
+        var id = RagIds.NewId();
+        var existing = new RagDocumentHeader(id, "t", "f.txt", "/f.txt", _time.Now, _time.Now, 1, 1, "x", 1000, 0);
+        var mock = new Mock<IRagIndex>();
+        mock.Setup(i => i.GetHeader(id)).Returns(existing);
+        mock.Setup(i => i.Replace(It.IsAny<RagDocument>(), It.IsAny<bool>(), It.IsAny<CancellationToken>())).Returns(existing);
+        var component = new RagIngestComponent(mock.Object, new ParagraphTextChunker(), _time);
+
+        Capture(() => component.Run(new RagIngestOptions(Write("a.txt", "some text"), id, null, 1000, 0, RagOutputFormat.text)));
+        Capture(() => component.Run(new RagIngestOptions(Write("a.txt", "some text"), id, "T", 1000, 0, RagOutputFormat.text)));
+
+        mock.Verify(i => i.Replace(It.IsAny<RagDocument>(), true, It.IsAny<CancellationToken>()), Times.Once);
+        mock.Verify(i => i.Replace(It.IsAny<RagDocument>(), false, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Theory]
@@ -301,7 +342,7 @@ public class RagIngestComponentTests : IDisposable
         var existing = new RagDocumentHeader(id, "t", "f.txt", "/f.txt", _time.Now, _time.Now, 1, 1, "x", 1000, 0);
         var mock = new Mock<IRagIndex>();
         mock.Setup(i => i.GetHeader(id)).Returns(existing);
-        mock.Setup(i => i.Replace(It.IsAny<RagDocument>(), It.IsAny<CancellationToken>())).Returns((RagDocumentHeader?)null);
+        mock.Setup(i => i.Replace(It.IsAny<RagDocument>(), It.IsAny<bool>(), It.IsAny<CancellationToken>())).Returns((RagDocumentHeader?)null);
         var component = new RagIngestComponent(mock.Object, new ParagraphTextChunker(), _time);
 
         var (code, output, error) = Capture(() => component.Run(new RagIngestOptions(Write("a.txt", "some text"), id, null, 1000, 0, RagOutputFormat.text)));
@@ -309,7 +350,7 @@ public class RagIngestComponentTests : IDisposable
         code.Should().Be(1);
         error.Should().Contain($"Document '{id}' not found.");
         output.Should().BeEmpty();
-        mock.Verify(i => i.Replace(It.IsAny<RagDocument>(), It.IsAny<CancellationToken>()), Times.Once);
+        mock.Verify(i => i.Replace(It.IsAny<RagDocument>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Once);
         mock.Verify(i => i.Upsert(It.IsAny<RagDocument>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -321,8 +362,8 @@ public class RagIngestComponentTests : IDisposable
         var existing = new RagDocumentHeader(id, "t", "f.txt", "/f.txt", storedCreated, storedCreated, 1, 1, "x", 1000, 0);
         var mock = new Mock<IRagIndex>();
         mock.Setup(i => i.GetHeader(id)).Returns(existing);
-        mock.Setup(i => i.Replace(It.IsAny<RagDocument>(), It.IsAny<CancellationToken>()))
-            .Returns((RagDocument d, CancellationToken _) => d.Header with { CreatedUtc = storedCreated, Title = "from-replace" });
+        mock.Setup(i => i.Replace(It.IsAny<RagDocument>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
+            .Returns((RagDocument d, bool _, CancellationToken _) => d.Header with { CreatedUtc = storedCreated, Title = "from-replace" });
         var component = new RagIngestComponent(mock.Object, new ParagraphTextChunker(), _time);
 
         var (code, output, _) = Capture(() => component.Run(new RagIngestOptions(Write("a.txt", "some text"), id, null, 1000, 0, RagOutputFormat.json)));

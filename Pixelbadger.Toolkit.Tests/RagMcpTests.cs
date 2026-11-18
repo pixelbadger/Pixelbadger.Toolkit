@@ -27,7 +27,7 @@ public class RagMcpTests : IDisposable
         {
             ["ingest"] = ["file", "id", "title", "chunk-size", "chunk-overlap", "index", "index-path", "format"],
             ["list"] = ["page", "page-size", "index", "index-path", "format"],
-            ["get"] = ["id", "index", "index-path", "format"],
+            ["get"] = ["id", "from-chunk", "to-chunk", "index", "index-path", "format"],
             ["search"] = ["query", "page", "page-size", "index", "index-path", "format"],
             ["delete"] = ["id", "index", "index-path", "format"],
         };
@@ -71,6 +71,7 @@ public class RagMcpTests : IDisposable
         tree.Find("rag", "list")!.Options.Keys.Should().BeEquivalentTo("page", "page-size", "index", "index-path", "format");
         tree.Find("rag", "search")!.Options.Keys.Should().BeEquivalentTo("page", "page-size", "index", "index-path", "format");
         tree.Find("rag", "get")!.Options.Keys.Should().BeEquivalentTo("index", "index-path", "format");
+        tree.Find("rag", "get")!.Options.Keys.Should().NotContain(["from-chunk", "to-chunk"]);
         tree.Find("rag", "delete")!.Options.Keys.Should().BeEquivalentTo("index", "index-path", "format");
     }
 

@@ -64,7 +64,7 @@ public static class RagCommand
         var command = new Command("ingest", "Chunk a plain-text file and add it to the index, or replace an existing document with --id");
         var file = new Option<string>("--file") { Description = "Plain-text file to ingest (UTF-8, up to 50 MB)", Required = true };
         var id = new Option<string?>("--id") { Description = "Replace the document with this ID (32 hex characters), keeping the ID" }.WithImmutableDefault();
-        var title = new Option<string?>("--title") { Description = "Document title (default: the file name)" }.WithImmutableDefault();
+        var title = new Option<string?>("--title") { Description = "Document title (default: the file name; an update keeps the existing title)" }.WithImmutableDefault();
         var chunkSize = new Option<int>("--chunk-size") { Description = "Maximum characters per chunk (100 to 100000)", DefaultValueFactory = _ => 1000 };
         var chunkOverlap = new Option<int>("--chunk-overlap") { Description = "Characters of preceding text repeated at the start of each chunk (0 to half of --chunk-size)", DefaultValueFactory = _ => 0 };
         command.Add(file);
@@ -97,20 +97,25 @@ public static class RagCommand
 
     private static Command CreateGet()
     {
-        var command = new Command("get", "Show a document's details and all of its chunks");
+        var command = new Command("get", "Show a document's details and its chunks (all, or a range with --from-chunk and --to-chunk)");
         var id = new Option<string>("--id") { Description = "Document ID (32 hex characters)", Required = true };
+        var fromChunk = new Option<int?>("--from-chunk") { Description = "First chunk to return, 0-based and inclusive (default: 0)" }.WithImmutableDefault();
+        var toChunk = new Option<int?>("--to-chunk") { Description = "Last chunk to return, 0-based and inclusive (default: the last chunk)" }.WithImmutableDefault();
         command.Add(id);
+        command.Add(fromChunk);
+        command.Add(toChunk);
         var common = AddCommon(command);
 
         command.SetAction(parseResult => WithIndex(parseResult, common, index =>
-            new RagGetComponent(index).Run(new RagGetOptions(parseResult.GetValue(id)!, parseResult.GetValue(common.Format)))));
+            new RagGetComponent(index).Run(new RagGetOptions(parseResult.GetValue(id)!, parseResult.GetValue(common.Format),
+                parseResult.GetValue(fromChunk), parseResult.GetValue(toChunk)))));
         return command;
     }
 
     private static Command CreateSearch()
     {
-        var command = new Command("search", "Search chunks with a Lucene query (fields, phrases, AND/OR/NOT, wildcards, fuzzy, ranges, boosts)");
-        var query = new Option<string>("--query") { Description = "Lucene query; the default field is content", Required = true };
+        var command = new Command("search", "Search chunks for plain-text terms, ranked by BM25 (any term can match; stemming and stop words apply)");
+        var query = new Option<string>("--query") { Description = "Plain text to search for; every term is analysed and none is query syntax", Required = true };
         var page = new Option<int>("--page") { Description = "Page number, starting at 1", DefaultValueFactory = _ => 1 };
         var pageSize = new Option<int>("--page-size") { Description = "Results per page (1 to 100)", DefaultValueFactory = _ => 10 };
         command.Add(query);

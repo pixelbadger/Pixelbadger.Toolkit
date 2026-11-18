@@ -7,7 +7,7 @@ public sealed record RagDocumentHeader(
 
 public sealed record RagDocument(RagDocumentHeader Header, IReadOnlyList<TextChunk> Chunks);
 
-public sealed record RagSearchHit(string Id, string Title, int ChunkIndex, float Score, int Start, int End, string Content);
+public sealed record RagSearchHit(string Id, string Title, int ChunkIndex, int ChunkCount, float Score, int Start, int End, int CharCount, string Content);
 
 public sealed record RagPage<T>(int Page, int PageSize, int Total, IReadOnlyList<T> Items)
 {
@@ -30,4 +30,10 @@ public sealed class RagIndexPathException : Exception
 {
     public RagIndexPathException(string message) : base(message) { }
     public RagIndexPathException(string message, Exception inner) : base(message, inner) { }
+}
+
+/// <summary>The index was written by an older pbtk version and carries no current schema marker.</summary>
+public sealed class RagIndexSchemaException : Exception
+{
+    public RagIndexSchemaException(string message) : base(message) { }
 }
